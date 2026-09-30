@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relevé d'écolage · IFSPA</title>
+<link rel="icon" href="assets/img/logo-ifspa.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  body { background: #dde2ea; }
+  .outils {
+    position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem;
+    padding: .7rem clamp(1rem, 3vw, 2rem); background: #fff; border-bottom: 1px solid var(--bordure);
+  }
+  .outils h1 { font: 600 1rem/1.3 var(--police-texte); color: var(--texte); }
+  .outils h1 span { display: block; font-size: .78rem; font-weight: 500; color: var(--texte-2); }
+  .outils .actions { margin-left: auto; }
+  .apercu { overflow-x: auto; padding: 1.25rem 1rem 3rem; }
+  .feuille {
+    width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff; padding: 13mm 14mm 10mm;
+    display: flex; flex-direction: column; gap: 5mm; font-size: 8.8pt; line-height: 1.4; color: #1b2533;
+    box-shadow: 0 1px 3px rgb(18 36 60 / .12), 0 18px 40px -18px rgb(18 36 60 / .35);
+  }
+  .d-tete { display: grid; grid-template-columns: 20mm 1fr auto; gap: 5mm; align-items: center; padding-bottom: 3mm; border-bottom: 1.4pt solid var(--primaire); }
+  .d-tete img { width: 20mm; }
+  .d-inst b { display: block; font: 700 11pt/1.2 var(--police-titre); color: var(--primaire); }
+  .d-inst span { display: block; font-size: 8.4pt; color: #3a4556; }
+  .d-inst small { display: block; margin-top: .8mm; font-size: 6.8pt; color: #566173; }
+  .d-titre { text-align: right; }
+  .d-titre h2 { font: 700 14pt/1.1 var(--police-titre); color: var(--primaire); letter-spacing: .02em; }
+  .d-titre p { margin: 1mm 0 0; font-size: 8pt; color: #3a4556; }
+
+  .identite { display: grid; grid-template-columns: 24mm 1fr; gap: 5mm; align-items: start; padding: 3.5mm; border: .6pt solid #d6dfe9; border-radius: 2mm; background: var(--rose-pale); }
+  .identite img { width: 24mm; height: 28mm; object-fit: cover; border-radius: 1.5mm; }
+  .identite h3 { font: 700 12pt/1.2 var(--police-titre); color: var(--primaire); }
+  .identite dl { margin: 2mm 0 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.8mm 5mm; }
+  .identite dt, .recap dt { font-size: 6.6pt; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--rose-fonce); }
+  .identite dd { margin: .2mm 0 0; font-weight: 600; }
+
+  .annee h3 { display: flex; justify-content: space-between; align-items: baseline; gap: 4mm; font: 700 10pt/1.3 var(--police-titre); color: var(--primaire); margin-bottom: 1.5mm; }
+  .annee h3 span { font: 500 7.8pt var(--police-texte); color: #566173; }
+  table.d-tab { width: 100%; border-collapse: collapse; font-size: 8.3pt; }
+  .d-tab th { text-align: left; font-size: 6.8pt; font-weight: 700; color: var(--primaire); text-transform: uppercase; letter-spacing: .06em; padding: 1mm 2mm; border-bottom: .9pt solid var(--primaire); }
+  .d-tab td { padding: .95mm 2mm; border-bottom: .5pt solid #dfe5ec; }
+  .d-tab .m { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .d-tab th.m { text-align: right; }
+  .d-tab tfoot td { font-weight: 700; border-top: .9pt solid var(--primaire); border-bottom: 0; padding-top: 1.3mm; }
+  .d-tab tr.annulee td { color: #7a8494; }
+  .d-tab tr.annulee .m { text-decoration: line-through; }
+  .st { display: inline-flex; align-items: center; gap: 1.2mm; font-weight: 600; font-size: 7.8pt; white-space: nowrap; }
+  .st::before { content: ""; width: 1.8mm; height: 1.8mm; border-radius: 50%; background: currentColor; }
+  .st-paye { color: var(--paye); } .st-partiel { color: var(--partiel); } .st-retard { color: var(--retard); } .st-avenir { color: #566173; }
+  .st-avenir::before { background: transparent; border: .8pt solid currentColor; }
+  .st-annule { color: #566173; }
+
+  .recap { margin: 0; display: grid; grid-template-columns: repeat(4, 1fr); border: .9pt solid var(--primaire); border-radius: 2mm; }
+  .recap div { padding: 2.2mm 3mm; border-left: .6pt solid #d6dfe9; }
+  .recap div:first-child { border-left: 0; }
+  .recap dt { color: #566173; }
+  .recap dd { margin: .6mm 0 0; font-size: 11pt; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .recap dd small { display: block; font-size: 7.4pt; font-weight: 500; color: #566173; }
+  .note { margin: 1.2mm 0 0; font-size: 7.4pt; color: #566173; }
+  .d-pied { margin-top: auto; padding-top: 2.5mm; border-top: .6pt solid #d6dfe9; display: flex; justify-content: space-between; gap: 4mm; font-size: 7.2pt; color: #566173; }
+
+  @page { size: A4 portrait; margin: 0; }
+  @media print {
+    body { background: #fff; }
+    .outils { display: none !important; }
+    .apercu { padding: 0; overflow: visible; }
+    .feuille { box-shadow: none; margin: 0; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body data-page="releve">
+<div class="outils">
+  <a class="btn btn-fantome" href="etudiant.html?id=8" id="retour">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Retour
+  </a>
+  <h1 id="outils-titre">Relevé d'écolage<span>Aperçu avant impression · A4</span></h1>
+  <div class="actions">
+    <button class="btn btn-secondaire" type="button" id="pdf">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>Télécharger PDF
+    </button>
+    <button class="btn btn-primaire" type="button" onclick="window.print()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Imprimer
+    </button>
+  </div>
+</div>
+<div class="apercu"><article class="feuille" id="feuille"></article></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+  const { PAIEMENTS, TARIF, MOIS, FILIERES, echeancier, situation, totalPaye, ar, dateFr, photo, nomComplet, niveau, modeLibelle } = IFSPA;
+  const $ = (s) => document.querySelector(s);
+  const e = IFSPA.etudiant(new URLSearchParams(location.search).get("id")) || IFSPA.etudiant(8);
+  const F = e.sexe === "F";
+  const DU_ANNUEL = TARIF.droits + TARIF.mensuel * TARIF.nombreMois;
+  const STATUTS = { paye: "Payé", partiel: "Partiel", retard: "En retard", avenir: "À venir" };
+  const st = (k, txt) => `<span class="st st-${k}">${txt || STATUTS[k]}</span>`;
+
+  /* ── Parcours : années scolaires de l'entrée à l'année en cours (ou de sortie) ── */
+  const derniere = e.statut === "ACTIF" ? 2026 : Number((e.sortie || "").slice(-4)) - 1 || 2025;
+  const annees = [];
+  let n = e.niveau;
+  for (let y = derniere; y >= e.entree; y--) {
+    annees.unshift({ y, n: Math.max(1, n), redouble: y === 2026 && e.redoublant });
+    if (!(y === 2026 && e.redoublant)) n--;
+  }
+
+  let totalDu = 0, totalPayeTout = 0;
+  const sections = annees.map(({ y, n, redouble }) => {
+    const lib = `${y}-${y + 1}`;
+    const titre = `<h3><b style="font-weight:inherit">Année ${lib} · ${niveau(n)}${redouble ? ` <em style="font:600 7.8pt var(--police-texte);color:var(--rose-fonce);font-style:normal">${F ? "redoublante" : "redoublant"}</em>` : ""}</b><span>${y === 2026 && e.statut === "ACTIF" ? "Année en cours · situation au 12/03/2027" : "Année clôturée"}</span></h3>`;
+    if (y === 2026 && e.statut === "ACTIF") {
+      const lignes = echeancier(e);
+      const du = lignes.reduce((s, l) => s + l.du, 0), paye = lignes.reduce((s, l) => s + l.paye, 0);
+      totalDu += du - (e.arrieres || 0); totalPayeTout += paye;
+      return `<section class="annee">${titre}
+        <table class="d-tab">
+          <thead><tr><th>Échéance</th><th class="m">Dû</th><th class="m">Payé</th><th class="m">Reste</th><th>Statut</th></tr></thead>
+          <tbody>${lignes.map((l) => `<tr><td>${l.libelle}</td><td class="m">${ar(l.du)}</td><td class="m">${l.paye ? ar(l.paye) : "—"}</td><td class="m">${l.du - l.paye ? ar(l.du - l.paye) : "—"}</td><td>${st(l.statut)}</td></tr>`).join("")}</tbody>
+          <tfoot><tr><td>Sous-total ${lib}</td><td class="m">${ar(du)}</td><td class="m">${ar(paye)}</td><td class="m">${ar(du - paye)}</td><td></td></tr></tfoot>
+        </table></section>`;
+    }
+    const arr = y === 2025 && e.arrieres ? e.arrieres : 0;
+    totalDu += DU_ANNUEL; totalPayeTout += DU_ANNUEL - arr;
+    return `<section class="annee">${titre}
+      <table class="d-tab">
+        <thead><tr><th>Échéance</th><th class="m">Dû</th><th class="m">Payé</th><th class="m">Reste</th><th>Statut</th></tr></thead>
+        <tbody><tr><td>Droits d'inscription + ${TARIF.nombreMois} mensualités (oct. ${y} → juil. ${y + 1})</td><td class="m">${ar(DU_ANNUEL)}</td><td class="m">${ar(DU_ANNUEL - arr)}</td><td class="m">${arr ? ar(arr) : "—"}</td><td>${arr ? st("partiel", "Reporté sur 2026-2027") : st("paye", "Soldée")}</td></tr></tbody>
+      </table></section>`;
+  });
+
+  const s = situation(e);
+  const paiements = PAIEMENTS.filter((p) => p.etudiant === e);
+  const valides = paiements.filter((p) => !p.annule);
+  const statut = e.statut === "ACTIF" ? (F ? "Active" : "Actif") : e.statut === "DIPLOME" ? `Diplômé${F ? "e" : ""} le ${e.sortie}` : e.statut;
+
+  document.title = `Relevé ${e.matricule} · IFSPA`;
+  $("#outils-titre").innerHTML = `Relevé d'écolage · ${nomComplet(e)}<span>${e.matricule} · aperçu avant impression (A4)</span>`;
+  $("#retour").href = `etudiant.html?id=${e.id}`;
+  $("#pdf").addEventListener("click", () => PROTO.toast(`Releve-${e.matricule}.pdf en cours de téléchargement (prototype).`));
+
+  $("#feuille").innerHTML = `
+    <header class="d-tete">
+      <img src="assets/img/logo-ifspa.png" alt="Logo IFSPA">
+      <div class="d-inst">
+        <b>Institut de Formation Supérieur des Paramédicaux Atsinanana</b>
+        <span>IFSPA · Toamasina, Madagascar</span>
+        <small>Arrêtés n° 04460/2011-MESupRes et n° 15482/2011-MESupRES · Renouvellement n° 056/2024</small>
+      </div>
+      <div class="d-titre"><h2>RELEVÉ D'ÉCOLAGE</h2><p>Édité le 12/03/2027 à 10:24</p></div>
+    </header>
+
+    <section class="identite">
+      <img src="${photo(e)}" alt="">
+      <div>
+        <h3>${nomComplet(e)}</h3>
+        <dl>
+          <div><dt>Matricule</dt><dd>${e.matricule}</dd></div>
+          <div><dt>Filière</dt><dd>${FILIERES[e.filiere].nom}</dd></div>
+          <div><dt>Statut</dt><dd>${statut}</dd></div>
+          <div><dt>Niveau ${e.statut === "ACTIF" ? "actuel" : "de sortie"}</dt><dd>${niveau(e.niveau)}${e.redoublant ? (F ? " (redoublante)" : " (redoublant)") : ""}</dd></div>
+          <div><dt>Né${F ? "e" : ""} le</dt><dd>${e.naissance} à ${e.lieu}</dd></div>
+          <div><dt>Tuteur</dt><dd>${e.tuteur} · ${e.telTuteur}</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    ${sections.join("")}
+    ${annees.some((a) => a.y < 2026) ? `<p class="note" style="margin-top:-2.5mm">Années antérieures à 2026-2027 reprises de l'ancien suivi Excel : seul le solde annuel est conservé.</p>` : ""}
+
+    <section>
+      <div class="annee"><h3>Récapitulatif général<span>Parcours ${annees[0].y}-${derniere + 1}</span></h3></div>
+      <dl class="recap">
+        <div><dt>Total dû</dt><dd>${ar(totalDu)}</dd></div>
+        <div><dt>Total payé</dt><dd>${ar(totalPayeTout)}</dd></div>
+        <div><dt>Reste à payer</dt><dd>${ar(totalDu - totalPayeTout)}<small>dont échéances à venir : ${ar(Math.max(0, totalDu - totalPayeTout - s.retard))}</small></dd></div>
+        <div><dt>En retard au 12/03/2027</dt><dd class="${s.retard ? "retard" : ""}">${s.retard ? ar(s.retard) : "Néant"}<small>${s.moisRetard} mois de retard</small></dd></div>
+      </dl>
+    </section>
+
+    <section class="annee">
+      <h3>Paiements enregistrés<span>${valides.length} reçu${valides.length > 1 ? "s" : ""} valide${valides.length > 1 ? "s" : ""}${paiements.length > valides.length ? ` · ${paiements.length - valides.length} annulé` : ""}</span></h3>
+      ${paiements.length ? `<table class="d-tab">
+        <thead><tr><th>N° de reçu</th><th>Date</th><th>Mode</th><th>Référence</th><th class="m">Montant</th><th>Statut</th></tr></thead>
+        <tbody>${paiements.map((p) => `<tr class="${p.annule ? "annulee" : ""}"><td style="font-weight:600">${p.recu}</td><td>${dateFr(p.date)}</td><td>${modeLibelle(p.mode)}</td><td>${p.reference || "—"}</td><td class="m">${ar(p.montant)}</td><td>${p.annule ? st("annule", "Annulé · " + p.motifAnnulation.toLowerCase()) : st("paye", "Valide")}</td></tr>`).join("")}</tbody>
+        <tfoot><tr><td colspan="4">Total des paiements valides</td><td class="m">${ar(valides.reduce((t, p) => t + p.montant, 0))}</td><td></td></tr></tfoot>
+      </table>` : `<p class="note">Aucun paiement enregistré dans l'application pour cet étudiant.</p>`}
+    </section>
+
+    <footer class="d-pied">
+      <span>Édité le 12/03/2027 à 10:24 par ${PROTO.UTIL.nom}</span>
+      <span>Page 1/1</span>
+      <span>Document généré par l'application IFSPA</span>
+    </footer>`;
+</script>
+</body>
+</html>

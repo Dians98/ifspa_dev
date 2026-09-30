@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prototype IFSPA — Sommaire</title>
+<link rel="icon" href="assets/img/logo-ifspa.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  body { background: #fff; }
+  .haut { position: relative; isolation: isolate; overflow: hidden; color: #fff; }
+  .haut img.fond { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 35%; z-index: -2; }
+  .haut::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgb(18 36 60 / .94) 0%, rgb(18 36 60 / .8) 50%, rgb(18 36 60 / .45) 100%); }
+  .haut-int { max-width: 1180px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+  .marque { display: flex; align-items: center; gap: .8rem; }
+  .marque img { width: 56px; background: #fff; border-radius: 50%; padding: 3px; }
+  .marque b { font: 700 1.2rem var(--police-titre); }
+  .haut h1 { margin-top: 3.5rem; font: 700 clamp(2.2rem, 4.5vw, 3.4rem)/1.08 var(--police-titre); max-width: 20ch; letter-spacing: -.015em; }
+  .haut h1::after { content: ""; display: block; width: 64px; height: 5px; border-radius: 999px; background: var(--rose); margin-top: 1.25rem; }
+  .haut p { max-width: 58ch; margin: 1.25rem 0 0; font-size: 1.05rem; color: rgb(255 255 255 / .85); }
+  .haut .actions { margin-top: 2rem; }
+  .haut .btn-secondaire { background: transparent; color: #fff; border-color: rgb(255 255 255 / .6); box-shadow: none; }
+  .haut .btn-secondaire:hover { background: rgb(255 255 255 / .1); color: #fff; }
+
+  .corps { max-width: 1180px; margin: 0 auto; padding: 3rem 1.25rem 4rem; }
+  .corps h2 { font: 700 1.5rem var(--police-titre); color: var(--primaire); margin: 2.5rem 0 .35rem; }
+  .corps h2:first-child { margin-top: 0; }
+  .corps > p.intro { color: var(--texte-2); margin: 0 0 1.25rem; }
+  .ecrans { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--bordure); }
+  .ecrans li { display: grid; grid-template-columns: 2.25rem minmax(0, 14rem) minmax(0, 1fr) auto; gap: 1rem; align-items: center; padding: .95rem 0; border-bottom: 1px solid var(--bordure); }
+  .ecrans .num { font: 600 .85rem var(--police-texte); color: var(--rose-fonce); font-variant-numeric: tabular-nums; }
+  .ecrans a.nom { font-weight: 700; color: var(--primaire); text-decoration: none; }
+  .ecrans a.nom:hover { text-decoration: underline; }
+  .ecrans p { margin: 0; color: var(--texte-2); font-size: .9rem; }
+  .ecrans .liens { display: flex; gap: .4rem; }
+  .role { display: inline-block; font-size: .7rem; font-weight: 700; padding: .1rem .45rem; border-radius: 999px; background: var(--rose-pale); color: var(--rose-fonce); margin-left: .35rem; vertical-align: middle; }
+  .mention { margin-top: 3rem; padding: 1.25rem; border-radius: 12px; background: var(--rose-pale); color: var(--texte); font-size: .9rem; }
+  .mention b { color: var(--rose-fonce); }
+  footer { border-top: 1px solid var(--bordure); padding: 1.5rem 1.25rem; text-align: center; font-size: .82rem; color: var(--texte-2); }
+  @media (max-width: 760px) {
+    .ecrans li { grid-template-columns: 2rem minmax(0, 1fr); }
+    .ecrans li p, .ecrans .liens { grid-column: 2; }
+  }
+</style>
+</head>
+<body>
+  <header class="haut">
+    <img class="fond" src="assets/img/hero-etudiants-1920.webp" alt="">
+    <div class="haut-int">
+      <div class="marque"><img src="assets/img/logo-ifspa.png" alt="Logo de l'IFSPA"><b>IFSPA</b></div>
+      <h1>Application de gestion de l'écolage — prototype</h1>
+      <p>Maquettes navigables de l'application de l'Institut de Formation Supérieur des Paramédicaux Atsinanana : suivi des étudiants de l'inscription à la sortie, écolage mois par mois, reçus, admissions et tableau de bord. Toutes les données sont fictives.</p>
+      <div class="actions">
+        <a class="btn btn-accent btn-grand" href="connexion.html">Commencer la visite</a>
+        <a class="btn btn-secondaire btn-grand" href="dashboard.html?role=admin">Aller au tableau de bord</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="corps">
+    <h2>Parcours conseillé</h2>
+    <p class="intro">Chaque écran s'ouvre dans le navigateur. Les captures PNG de tous les écrans sont dans le dossier <b>captures/</b>.</p>
+    <ol class="ecrans" id="liste"></ol>
+
+    <div class="mention">
+      <b>Deux comptes de démonstration.</b> Sur la page de connexion, choisissez « Administrateur » (tous les droits) ou « Secrétariat » (inscriptions et encaissements, sans suppression ni annulation, sans accès aux paramètres). Les boutons réservés à l'administrateur disparaissent pour le secrétariat.
+    </div>
+  </main>
+
+  <footer>© 2027 IFSPA — Conçu et réalisé par <a href="https://portfolio-blue-iota-21.vercel.app/" target="_blank" rel="noopener">Diano ANDRIANTSALAMA</a></footer>
+
+<script>
+  const ECRANS = [
+    ["Page d'accueil publique", "Présentation de l'institut, filières, agréments et contact (site Next.js : voir la capture).", "captures/00-landing-desktop.png"],
+    ["Connexion", "Espace du personnel avec les deux comptes de démonstration.", "connexion.html"],
+    ["Tableau de bord", "Effectifs, encaissements, taux de recouvrement, impayés et derniers paiements.", "dashboard.html"],
+    ["Étudiants", "Liste avec recherche et filtres, photo, matricule et situation d'écolage.", "etudiants.html"],
+    ["Fiche étudiant", "Écolage mois par mois, identité, parcours année par année, paiements.", "etudiant.html?id=5"],
+    ["Nouvel étudiant", "Inscription avec attribution automatique du matricule et échéancier.", "etudiant-nouveau.html"],
+    ["Encaisser", "Écran du guichet : répartition automatique du paiement sur les échéances.", "encaissement.html?id=4"],
+    ["Reçu de paiement", "Ticket pour imprimante de reçus 80 mm : montant en lettres, QR code de vérification.", "recu.html"],
+    ["Vérification d'un reçu", "Page publique ouverte en scannant le QR code du reçu.", "verification.html"],
+    ["Paiements", "Historique des reçus ; annulation réservée à l'administrateur.", "paiements.html"],
+    ["Impayés", "Étudiants en retard, avec relevé et encaissement en un clic.", "impayes.html"],
+    ["Relevé d'écolage", "Document A4 pour les parents : situation complète de l'étudiant.", "releve.html?id=8"],
+    ["Admissions", "Passage d'année en lot en 3 étapes, avec vérification et historique annulable.", "admissions.html"],
+    ["Paramètres", "Filières, années scolaires, tarifs et utilisateurs.", "parametres.html", true],
+  ];
+  document.getElementById("liste").innerHTML = ECRANS.map(([nom, desc, href, admin], i) => `
+    <li>
+      <span class="num">${String(i).padStart(2, "0")}</span>
+      <a class="nom" href="${href}">${nom}</a>${admin ? '' : ''}
+      <p>${desc}${admin ? '<span class="role">Admin</span>' : ""}</p>
+      <span class="liens"><a class="btn btn-secondaire btn-petit" href="${href}">Ouvrir</a></span>
+    </li>`).join("");
+</script>
+</body>
+</html>

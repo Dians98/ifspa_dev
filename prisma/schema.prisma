@@ -1,0 +1,385 @@
+// Schéma de la base IFSPA.
+// Après chaque modification : npx prisma migrate dev --name <description>
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────
+// Authentification (tables gérées par Better Auth + plugin admin)
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  // Plugin admin : "admin" | "user"
+  role          String?   @default("user")
+  banned        Boolean?  @default(false)
+  banReason     String?
+  banExpires    DateTime?
+
+  sessions Session[]
+  accounts Account[]
+
+  etudiantsCrees     Etudiant[]           @relation("EtudiantCreePar")
+  paiementsSaisis    Paiement[]           @relation("PaiementSaisiPar")
+  paiementsAnnules   Paiement[]           @relation("PaiementAnnulePar")
+  admissionsCreees   OperationAdmission[] @relation("AdmissionCreePar")
+  admissionsAnnulees OperationAdmission[] @relation("AdmissionAnnuleePar")
+
+  @@map("user")
+}
+
+model Session {
+  id             String   @id
+  expiresAt      DateTime
+  token          String   @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  ipAddress      String?
+  userAgent      String?
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  impersonatedBy String?
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Établissement (ligne unique : infos affichées sur la landing et les PDF)
+// ─────────────────────────────────────────────────────────────
+
+model Etablissement {
+  id        Int      @id @default(1)
+  nom       String   @default("Institut de Formation Supérieur des Paramédicaux Atsinanana")
+  sigle     String   @default("IFSPA")
+  adresse   String?
+  ville     String   @default("Toamasina")
+  telephone String?
+  email     String?
+  nif       String?
+  stat      String?
+  updatedAt DateTime @updatedAt
+
+  @@map("etablissement")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Référentiels
+// ─────────────────────────────────────────────────────────────
+
+model Filiere {
+  id          String   @id @default(cuid())
+  code        String   @unique // ex. "IF", "SF" — utilisé dans le matricule
+  nom         String
+  dureeAnnees Int      @default(3)
+  actif       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  etudiants  Etudiant[]
+  tarifs     Tarif[]
+  admissions OperationAdmission[]
+
+  @@map("filiere")
+}
+
+model AnneeScolaire {
+  id               String   @id @default(cuid())
+  libelle          String   @unique // "2026-2027"
+  anneeDebut       Int      @unique // 2026
+  dateDebut        DateTime @db.Date
+  dateFin          DateTime @db.Date
+  moisDebutEcolage Int      @default(10) // 10 = octobre
+  estCourante      Boolean  @default(false)
+  cloturee         Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tarifs           Tarif[]
+  inscriptions     Inscription[]
+  etudiantsEntres  Etudiant[]
+  admissionsSource OperationAdmission[] @relation("AdmissionAnneeSource")
+  admissionsCible  OperationAdmission[] @relation("AdmissionAnneeCible")
+
+  @@map("annee_scolaire")
+}
+
+model Tarif {
+  id                String        @id @default(cuid())
+  filiereId         String
+  filiere           Filiere       @relation(fields: [filiereId], references: [id])
+  anneeScolaireId   String
+  anneeScolaire     AnneeScolaire @relation(fields: [anneeScolaireId], references: [id])
+  niveau            Int
+  droitsInscription Int // en ariary
+  montantMensuel    Int // en ariary
+  nombreMois        Int           @default(10)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@unique([filiereId, anneeScolaireId, niveau])
+  @@map("tarif")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Étudiants et parcours
+// ─────────────────────────────────────────────────────────────
+
+enum Sexe {
+  M
+  F
+}
+
+enum StatutEtudiant {
+  ACTIF
+  DIPLOME
+  ABANDON
+  EXCLU
+}
+
+model Etudiant {
+  id              String         @id @default(cuid())
+  matricule       String         @unique // IF-2026-0001 — ne change jamais
+  nom             String
+  prenoms         String
+  sexe            Sexe
+  dateNaissance   DateTime       @db.Date
+  lieuNaissance   String
+  cin             String?
+  telephone       String?
+  email           String?
+  adresse         String?
+  tuteurNom       String?
+  tuteurTelephone String?
+  photo           String?
+  filiereId       String
+  filiere         Filiere        @relation(fields: [filiereId], references: [id])
+  anneeEntreeId   String
+  anneeEntree     AnneeScolaire  @relation(fields: [anneeEntreeId], references: [id])
+  statut          StatutEtudiant @default(ACTIF)
+  dateSortie      DateTime?      @db.Date
+  motifSortie     String?
+  creeParId       String?
+  creePar         User?          @relation("EtudiantCreePar", fields: [creeParId], references: [id])
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  inscriptions    Inscription[]
+  paiements       Paiement[]
+  lignesAdmission LigneAdmission[]
+
+  @@index([nom, prenoms])
+  @@index([filiereId, statut])
+  @@map("etudiant")
+}
+
+enum StatutInscription {
+  EN_COURS
+  ADMIS
+  REDOUBLE
+  DIPLOME
+  ABANDON
+  EXCLU
+}
+
+model Inscription {
+  id                   String              @id @default(cuid())
+  etudiantId           String
+  etudiant             Etudiant            @relation(fields: [etudiantId], references: [id])
+  anneeScolaireId      String
+  anneeScolaire        AnneeScolaire       @relation(fields: [anneeScolaireId], references: [id])
+  niveau               Int
+  redoublement         Boolean             @default(false)
+  statut               StatutInscription   @default(EN_COURS)
+  // Renseigné quand l'inscription a été créée par une admission en lot
+  operationAdmissionId String?
+  operationAdmission   OperationAdmission? @relation(fields: [operationAdmissionId], references: [id])
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  echeances Echeance[]
+
+  @@unique([etudiantId, anneeScolaireId])
+  @@index([anneeScolaireId, niveau])
+  @@map("inscription")
+}
+
+enum TypeEcheance {
+  DROITS
+  MENSUALITE
+}
+
+model Echeance {
+  id            String       @id @default(cuid())
+  inscriptionId String
+  inscription   Inscription  @relation(fields: [inscriptionId], references: [id], onDelete: Cascade)
+  type          TypeEcheance
+  mois          DateTime     @db.Date // 1er du mois concerné (date d'exigibilité)
+  ordre         Int // 0 = droits, puis 1..N pour les mensualités
+  montantDu     Int // copié depuis le tarif à la génération
+
+  lignesPaiement PaiementLigne[]
+
+  @@unique([inscriptionId, ordre])
+  @@index([mois])
+  @@map("echeance")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Paiements
+// ─────────────────────────────────────────────────────────────
+
+enum ModePaiement {
+  ESPECES
+  MOBILE_MONEY
+}
+
+enum OperateurMobile {
+  MVOLA
+  ORANGE_MONEY
+  AIRTEL_MONEY
+}
+
+model Paiement {
+  id              String           @id @default(cuid())
+  numeroRecu      String           @unique // R-2026-00001
+  etudiantId      String
+  etudiant        Etudiant         @relation(fields: [etudiantId], references: [id])
+  date            DateTime         @default(now())
+  montant         Int // en ariary
+  mode            ModePaiement
+  operateur       OperateurMobile?
+  reference       String?
+  observation     String?
+  saisiParId      String
+  saisiPar        User             @relation("PaiementSaisiPar", fields: [saisiParId], references: [id])
+  // Jamais supprimé physiquement : l'admin l'annule
+  annule          Boolean          @default(false)
+  annuleParId     String?
+  annulePar       User?            @relation("PaiementAnnulePar", fields: [annuleParId], references: [id])
+  dateAnnulation  DateTime?
+  motifAnnulation String?
+  createdAt       DateTime         @default(now())
+
+  lignes PaiementLigne[]
+
+  @@index([etudiantId])
+  @@index([date])
+  @@map("paiement")
+}
+
+model PaiementLigne {
+  id         String   @id @default(cuid())
+  paiementId String
+  paiement   Paiement @relation(fields: [paiementId], references: [id], onDelete: Cascade)
+  echeanceId String
+  echeance   Echeance @relation(fields: [echeanceId], references: [id])
+  montant    Int
+
+  @@index([echeanceId])
+  @@map("paiement_ligne")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Admissions en lot (passage d'année)
+// ─────────────────────────────────────────────────────────────
+
+enum DecisionAdmission {
+  ADMIS
+  REDOUBLANT
+  DIPLOME
+}
+
+model OperationAdmission {
+  id             String        @id @default(cuid())
+  anneeSourceId  String
+  anneeSource    AnneeScolaire @relation("AdmissionAnneeSource", fields: [anneeSourceId], references: [id])
+  anneeCibleId   String
+  anneeCible     AnneeScolaire @relation("AdmissionAnneeCible", fields: [anneeCibleId], references: [id])
+  filiereId      String
+  filiere        Filiere       @relation(fields: [filiereId], references: [id])
+  niveauSource   Int
+  creeParId      String
+  creePar        User          @relation("AdmissionCreePar", fields: [creeParId], references: [id])
+  createdAt      DateTime      @default(now())
+  annulee        Boolean       @default(false)
+  annuleeParId   String?
+  annuleePar     User?         @relation("AdmissionAnnuleePar", fields: [annuleeParId], references: [id])
+  dateAnnulation DateTime?
+
+  lignes       LigneAdmission[]
+  inscriptions Inscription[]
+
+  @@map("operation_admission")
+}
+
+model LigneAdmission {
+  id                      String             @id @default(cuid())
+  operationId             String
+  operation               OperationAdmission @relation(fields: [operationId], references: [id], onDelete: Cascade)
+  etudiantId              String
+  etudiant                Etudiant           @relation(fields: [etudiantId], references: [id])
+  decision                DecisionAdmission
+  inscriptionSourceId     String
+  ancienStatutInscription StatutInscription
+  ancienStatutEtudiant    StatutEtudiant
+  inscriptionCibleId      String? // null si DIPLOME
+
+  @@map("ligne_admission")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Technique
+// ─────────────────────────────────────────────────────────────
+
+// Compteurs atomiques : "MATRICULE:IF:2026", "RECU:2026"
+model Compteur {
+  cle    String @id
+  valeur Int    @default(0)
+
+  @@map("compteur")
+}

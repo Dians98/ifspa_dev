@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Étudiants · IFSPA</title>
+<link rel="icon" href="assets/img/logo-ifspa.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  .filtre-case { display: inline-flex; align-items: center; gap: .5rem; height: 38px; padding: 0 .8rem; border: 1px solid var(--champ); border-radius: var(--rayon); background: #fff; font-size: .875rem; font-weight: 500; cursor: pointer; white-space: nowrap; }
+  .filtre-case:has(input:checked) { border-color: var(--retard); background: var(--retard-pale); color: var(--retard); font-weight: 600; }
+  .filtre-case input { accent-color: var(--retard); }
+  .resume-filtres { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .55rem 1rem; font-size: .8rem; color: var(--texte-2); border-bottom: 1px solid var(--bordure); background: #fcfdfe; }
+  .resume-filtres[hidden] { display: none; }
+  .redoublant { display: block; font-size: .74rem; color: var(--rose-fonce); font-weight: 600; }
+  .personne .sous { display: none; }
+  .pagination nav { display: flex; gap: .25rem; }
+  .pagination .page-num { min-width: 30px; }
+  .pagination .page-num[aria-current="page"] { background: var(--primaire); color: #fff; border-color: var(--primaire); }
+  @media (max-width: 860px) {
+    .barre-outils .saisie { flex: 1 1 45%; min-width: 0; }
+    .barre-outils .recherche { flex-basis: 100%; }
+    .personne .sous { display: block; }
+    .personne b { white-space: normal; overflow-wrap: anywhere; }
+    .personne img { width: 34px; height: 34px; }
+    .col-mobile-masquee { display: none; }
+    .tableau td, .tableau th { padding-left: .75rem; padding-right: .75rem; }
+    .pagination { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body data-page="etudiants" data-fil="Scolarité/Étudiants">
+<div class="coquille">
+  <aside class="barre" data-barre></aside>
+  <div class="contenu">
+    <header class="entete" data-entete></header>
+    <main class="page">
+      <div class="page-titre">
+        <div>
+          <h1>Étudiants</h1>
+          <p>191 étudiants inscrits depuis 2023 · 184 actifs en 2026-2027</p>
+        </div>
+        <div class="actions">
+          <a class="btn btn-primaire" href="etudiant-nouveau.html" id="btn-nouveau"></a>
+        </div>
+      </div>
+
+      <section class="panneau">
+        <form class="barre-outils" id="filtres" role="search" onsubmit="return false">
+          <div class="recherche" id="zone-recherche">
+            <input class="saisie" type="search" id="q" placeholder="Nom, prénom ou matricule (ex. IF-2025-0003)" aria-label="Rechercher par nom ou matricule" autocomplete="off">
+          </div>
+          <select class="saisie" id="f-filiere" aria-label="Filière">
+            <option value="">Toutes les filières</option>
+            <option value="IF">Infirmier(e)s</option>
+            <option value="SF">Sage-femmes</option>
+          </select>
+          <select class="saisie" id="f-niveau" aria-label="Niveau">
+            <option value="">Tous les niveaux</option>
+            <option value="1">1re année</option>
+            <option value="2">2e année</option>
+            <option value="3">3e année</option>
+          </select>
+          <select class="saisie" id="f-statut" aria-label="Statut">
+            <option value="">Tous les statuts</option>
+            <option value="ACTIF">Actif</option>
+            <option value="DIPLOME">Diplômé</option>
+            <option value="ABANDON">Abandon</option>
+            <option value="EXCLU">Exclu</option>
+          </select>
+          <label class="filtre-case"><input type="checkbox" id="f-retard"> En retard uniquement</label>
+        </form>
+        <div class="resume-filtres" id="resume" hidden>
+          <span id="resume-texte"></span>
+          <button class="btn btn-fantome btn-petit" type="button" id="reinitialiser">Effacer les filtres</button>
+        </div>
+        <div class="tableau-conteneur">
+          <table class="tableau">
+            <thead>
+              <tr>
+                <th>Étudiant</th>
+                <th class="col-mobile-masquee">Matricule</th>
+                <th class="col-mobile-masquee">Filière</th>
+                <th class="col-mobile-masquee">Niveau</th>
+                <th class="col-mobile-masquee">Statut</th>
+                <th class="a-droite">Situation<span class="masquer-mobile"> d'écolage</span></th>
+              </tr>
+            </thead>
+            <tbody id="liste"></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span id="compteur"></span>
+          <nav aria-label="Pages">
+            <button class="btn btn-secondaire btn-petit" type="button" disabled>Précédent</button>
+            <button class="btn btn-secondaire btn-petit page-num" type="button" aria-current="page">1</button>
+            <button class="btn btn-secondaire btn-petit page-num masquer-mobile" type="button" data-toast="Prototype : seule la première page est simulée.">2</button>
+            <button class="btn btn-secondaire btn-petit page-num masquer-mobile" type="button" data-toast="Prototype : seule la première page est simulée.">3</button>
+            <button class="btn btn-secondaire btn-petit" type="button" data-toast="Prototype : seule la première page est simulée.">Suivant</button>
+          </nav>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+  const { ar, ETUDIANTS, FILIERES, situation, photo, nomComplet, niveau } = IFSPA;
+  const { svg } = PROTO;
+
+  document.getElementById("btn-nouveau").innerHTML = `${svg("plus")}Nouvel étudiant`;
+  document.getElementById("zone-recherche").insertAdjacentHTML("afterbegin", svg("recherche"));
+
+  const STATUTS = { ACTIF: "Actif", DIPLOME: "Diplômé", ABANDON: "Abandon", EXCLU: "Exclu" };
+  const libelleStatut = (e) => {
+    const l = STATUTS[e.statut] || e.statut;
+    return e.sexe === "F" && (e.statut === "ACTIF" || e.statut === "DIPLOME") ? (e.statut === "ACTIF" ? "Active" : "Diplômée") : l;
+  };
+  const badgeStatut = (e) => e.statut === "ACTIF"
+    ? `<span class="badge badge-neutre badge-sans-point">${libelleStatut(e)}</span>`
+    : `<span class="badge badge-avenir badge-sans-point">${libelleStatut(e)}${e.sortie ? " · " + e.sortie.slice(-4) : ""}</span>`;
+
+  function badgeSituation(e, s) {
+    if (e.statut !== "ACTIF") return `<span class="petit muet">Sorti${e.sexe === "F" ? "e" : ""} · aucune échéance</span>`;
+    if (s.statut === "ajour") return `<span class="badge badge-paye">À jour</span>`;
+    const detail = `<div class="petit muet" style="margin-top:.2rem">${s.moisRetard} mois</div>`;
+    if (s.statut === "partiel") return `<span class="badge badge-partiel"><span class="masquer-mobile">Partiel · </span>${ar(s.retard)}</span>${detail}`;
+    return `<span class="badge badge-retard"><span class="masquer-mobile">En retard · </span>${ar(s.retard)}</span>${detail}`;
+  }
+
+  const donnees = ETUDIANTS.map((e) => ({ e, s: situation(e) }));
+  const normaliser = (t) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const champs = ["q", "f-filiere", "f-niveau", "f-statut", "f-retard"].map((id) => document.getElementById(id));
+
+  function afficher() {
+    const q = normaliser(document.getElementById("q").value.trim());
+    const fil = document.getElementById("f-filiere").value;
+    const niv = document.getElementById("f-niveau").value;
+    const stat = document.getElementById("f-statut").value;
+    const retard = document.getElementById("f-retard").checked;
+
+    const res = donnees.filter(({ e, s }) =>
+      (!q || normaliser(`${e.nom} ${e.prenoms} ${e.prenoms} ${e.nom} ${e.matricule}`).includes(q)) &&
+      (!fil || e.filiere === fil) &&
+      (!niv || String(e.niveau) === niv) &&
+      (!stat || e.statut === stat) &&
+      (!retard || s.retard > 0));
+
+    const tbody = document.getElementById("liste");
+    tbody.innerHTML = res.length ? res.map(({ e, s }) => `
+      <tr class="ligne-lien" data-lien="etudiant.html?id=${e.id}">
+        <td><div class="personne"><img src="${photo(e)}" alt="" loading="lazy"><div>
+          <b><a href="etudiant.html?id=${e.id}" style="color:inherit;text-decoration:none">${nomComplet(e)}</a></b>
+          <span class="sous"><span class="matricule">${e.matricule}</span> · ${niveau(e.niveau)}${e.redoublant ? " · redoublant" + (e.sexe === "F" ? "e" : "") : ""}</span>
+        </div></div></td>
+        <td class="col-mobile-masquee"><span class="matricule">${e.matricule}</span></td>
+        <td class="col-mobile-masquee"><span class="badge badge-${e.filiere.toLowerCase()}">${FILIERES[e.filiere].nom}</span></td>
+        <td class="col-mobile-masquee">${niveau(e.niveau)}${e.redoublant ? `<span class="redoublant">Redoublant${e.sexe === "F" ? "e" : ""}</span>` : ""}</td>
+        <td class="col-mobile-masquee">${badgeStatut(e)}</td>
+        <td class="a-droite">${badgeSituation(e, s)}</td>
+      </tr>`).join("")
+      : `<tr><td colspan="6"><div class="vide"><b style="display:block;color:var(--texte);margin-bottom:.25rem">Aucun étudiant ne correspond</b>Vérifiez l'orthographe du nom ou le matricule, ou effacez les filtres.</div></td></tr>`;
+
+    const filtre = q || fil || niv || stat || retard;
+    document.getElementById("resume").hidden = !filtre;
+    document.getElementById("resume-texte").textContent = `${res.length} étudiant${res.length > 1 ? "s" : ""} sur cette page correspond${res.length > 1 ? "ent" : ""} aux critères`;
+    document.getElementById("compteur").textContent = filtre ? `${res.length} résultat${res.length > 1 ? "s" : ""} (page 1)` : "1–12 sur 191";
+  }
+
+  champs.forEach((c) => c.addEventListener(c.type === "search" ? "input" : "change", afficher));
+  document.getElementById("reinitialiser").addEventListener("click", () => {
+    document.getElementById("filtres").reset(); afficher(); document.getElementById("q").focus();
+  });
+  afficher();
+</script>
+</body>
+</html>

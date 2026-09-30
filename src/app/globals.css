@@ -1,26 +1,221 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-texte);
+  --font-heading: var(--font-titre);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  /* Marque IFSPA */
+  --color-rose: var(--rose);
+  --color-rose-fonce: var(--rose-fonce);
+  --color-rose-pale: var(--rose-pale);
+  --color-rose-clair: var(--rose-clair);
+  --color-bleu: var(--bleu);
+  --color-bleu-pale: var(--bleu-pale);
+  /* Statuts d'écolage — volontairement distincts du rose d'accent */
+  --color-paye: var(--paye);
+  --color-paye-pale: var(--paye-pale);
+  --color-partiel: var(--partiel);
+  --color-partiel-pale: var(--partiel-pale);
+  --color-retard: var(--retard);
+  --color-retard-pale: var(--retard-pale);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Thème retenu : bleu nuit + rose poudré, beaucoup de blanc */
+:root {
+  --background: #ffffff;
+  --foreground: #1b2533;
+  --card: #ffffff;
+  --card-foreground: #1b2533;
+  --popover: #ffffff;
+  --popover-foreground: #1b2533;
+  --primary: #1e3a5f;
+  --primary-foreground: #ffffff;
+  --secondary: #eef3f9;
+  --secondary-foreground: #1e3a5f;
+  --muted: #f4f6f9;
+  --muted-foreground: #566173;
+  --accent: #fbf1f3;
+  --accent-foreground: #8e3b52;
+  --destructive: #c62828;
+  --border: #e1e7ef;
+  --input: #cfd8e3;
+  --ring: #4a7fb5;
+
+  --bleu: #4a7fb5;
+  --bleu-pale: #eef3f9;
+  --rose: #d4798c;
+  --rose-fonce: #a84860;
+  --rose-pale: #fbf1f3;
+  --rose-clair: #f2b3c0; /* rose lisible sur fond bleu nuit */
+
+  --paye: #1f7a4d;
+  --paye-pale: #e7f4ec;
+  --partiel: #b45309;
+  --partiel-pale: #fdf1e3;
+  --retard: #c62828;
+  --retard-pale: #fdecec;
+
+  --chart-1: #1e3a5f;
+  --chart-2: #4a7fb5;
+  --chart-3: #d4798c;
+  --chart-4: #8aa9cc;
+  --chart-5: #a84860;
+  --radius: 0.5rem;
+
+  --sidebar: #1e3a5f;
+  --sidebar-foreground: #e6edf6;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #1e3a5f;
+  --sidebar-accent: #2a4b75;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #2f5079;
+  --sidebar-ring: #d4798c;
+}
+
+/* Thèmes candidats — comparables sur /demo-palette (développement uniquement) */
+[data-theme="ciel-corail"] {
+  --primary: #0f6ca8;
+  --secondary: #eaf6fc;
+  --secondary-foreground: #0b4f7c;
+  --accent: #fdf0f0;
+  --accent-foreground: #b3434f;
+  --ring: #5bb5e0;
+  --bleu: #5bb5e0;
+  --bleu-pale: #eaf6fc;
+  --rose: #e97b84;
+  --rose-fonce: #b3434f;
+  --rose-pale: #fdf0f0;
+  --sidebar: #0f6ca8;
+  --sidebar-foreground: #eef8fd;
+  --sidebar-primary-foreground: #0f6ca8;
+  --sidebar-accent: #1a7fbf;
+  --sidebar-border: #2a8ac6;
+}
+[data-theme="sarcelle-vieux-rose"] {
+  --background: #fcfbf9;
+  --primary: #0f5e6e;
+  --secondary: #eaf4f3;
+  --secondary-foreground: #0f5e6e;
+  --accent: #f8eff0;
+  --accent-foreground: #8a4c57;
+  --ring: #2a9d8f;
+  --bleu: #2a9d8f;
+  --bleu-pale: #eaf4f3;
+  --rose: #b9737f;
+  --rose-fonce: #8a4c57;
+  --rose-pale: #f8eff0;
+  --sidebar: #0f5e6e;
+  --sidebar-foreground: #e8f3f2;
+  --sidebar-primary-foreground: #0f5e6e;
+  --sidebar-accent: #1a6f80;
+  --sidebar-border: #257889;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  button:not(:disabled), [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  html {
+    @apply font-sans;
+    scrollbar-color: var(--input) var(--background);
+  }
+  h1, h2, h3 {
+    @apply font-heading;
+    text-wrap: balance;
+  }
+  ::selection {
+    background: var(--rose-pale);
+    color: var(--rose-fonce);
+  }
+  a {
+    text-underline-offset: 0.22em;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Bandeau prototype (2rem) + en-tête (4.5rem) + sa bordure : la photo d'ouverture
+   occupe exactement le reste de l'écran. */
+:root {
+  --hauteur-chrome: calc(6.5rem + 1px);
+}
+
+/* ── Ouverture recouverte au défilement ──
+   La photo est fixe (section sticky) ; pendant que la page la recouvre, elle
+   s'assombrit et le texte s'efface. Animations liées au défilement, sans JavaScript :
+   ignorées par les navigateurs qui ne les gèrent pas (la photo reste fixe et se fait
+   recouvrir quand même) et désactivées si l'utilisateur réduit les animations. */
+@keyframes ouverture-voile {
+  to {
+    opacity: 0.65;
+  }
+}
+@keyframes ouverture-texte {
+  to {
+    opacity: 0;
+    transform: translate3d(0, -12%, 0) scale(0.97);
+  }
+}
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .ouverture-voile {
+      animation: ouverture-voile linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 100svh;
+    }
+    .ouverture-texte {
+      animation: ouverture-texte linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 70svh;
+    }
+  }
 }

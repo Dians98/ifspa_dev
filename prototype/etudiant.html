@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fiche étudiant · IFSPA</title>
+<link rel="icon" href="assets/img/logo-ifspa.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  /* En-tête de fiche */
+  .fiche-tete { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 1.5rem; align-items: center; padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; }
+  .fiche-photo { width: 120px; height: 150px; object-fit: cover; border-radius: 12px; background: var(--rose-pale); padding: 4px; border: 1px solid var(--rose-clair); }
+  .fiche-tete h1 { font: 700 clamp(1.45rem, 2.2vw, 1.85rem)/1.15 var(--police-titre); color: var(--primaire); letter-spacing: -.01em; }
+  .fiche-matricule { display: inline-flex; align-items: baseline; gap: .5rem; margin-top: .45rem; font-size: .8rem; color: var(--texte-2); }
+  .fiche-matricule .matricule { font-size: 1.3rem; font-weight: 700; letter-spacing: .03em; }
+  .fiche-badges { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .75rem; }
+  .fiche-actions { display: grid; gap: .5rem; justify-items: stretch; }
+  .fiche-actions .rangee { display: flex; gap: .5rem; }
+  .fiche-actions .rangee .btn { flex: 1; }
+
+  /* Chiffres clés */
+  .chiffres { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; }
+  .chiffres > div { padding: 1rem 1.25rem; }
+  .chiffres > div + div { border-left: 1px solid var(--bordure); }
+  .chiffres dt { font-size: .8rem; font-weight: 600; color: var(--texte-2); }
+  .chiffres dd { margin: .35rem 0 0; font: 700 1.5rem/1.1 var(--police-texte); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .chiffres .detail { margin: .3rem 0 0; font-size: .78rem; color: var(--texte-2); }
+
+  /* Grille mois par mois */
+  .grille-mois { --n: 11; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: .5rem; }
+  .case { position: relative; border-radius: 10px; padding: .65rem .6rem .7rem; border: 1px solid transparent; display: grid; gap: .2rem; min-width: 0; }
+  .case-mois { font-weight: 700; font-size: .9rem; color: var(--texte); }
+  .case-statut { font-size: .72rem; font-weight: 600; }
+  .case-montant { font-size: .78rem; font-variant-numeric: tabular-nums; color: var(--texte-2); line-height: 1.3; }
+  .case-montant b { color: var(--texte); font-weight: 700; }
+  .case .barre-paye { height: 4px; border-radius: 999px; background: rgb(255 255 255 / .7); overflow: hidden; margin-top: .25rem; }
+  .case .barre-paye i { display: block; height: 100%; background: currentColor; border-radius: inherit; }
+  .case-paye { background: var(--paye-pale); border-color: #bfe0cc; }
+  .case-paye .case-statut, .case-paye .barre-paye { color: var(--paye); }
+  .case-partiel { background: var(--partiel-pale); border-color: #f5d3a8; }
+  .case-partiel .case-statut, .case-partiel .barre-paye { color: var(--partiel); }
+  .case-retard { background: var(--retard-pale); border-color: #f1c0c0; }
+  .case-retard .case-statut, .case-retard .barre-paye { color: var(--retard); }
+  .case-avenir { background: #fff; border-color: var(--bordure); border-style: dashed; }
+  .case-avenir .case-statut { color: var(--texte-2); }
+  .case-avenir .barre-paye { background: var(--fond-2); }
+  .case-courant { box-shadow: 0 0 0 2px var(--primaire); }
+  .case-courant::after { content: "Mois en cours"; position: absolute; top: -.6rem; right: .4rem; font-size: .62rem; font-weight: 700; background: var(--primaire); color: #fff; padding: .05rem .35rem; border-radius: 4px; }
+
+  .separation-annee { grid-column: span 1; }
+  .legende { display: flex; flex-wrap: wrap; gap: .4rem 1rem; font-size: .78rem; color: var(--texte-2); margin-top: 1rem; }
+  .legende span { display: inline-flex; align-items: center; gap: .4rem; }
+  .legende i { width: 12px; height: 12px; border-radius: 3px; border: 1px solid; }
+
+  /* Parcours */
+  .parcours { list-style: none; margin: 0; padding: 0; }
+  .parcours li { display: grid; grid-template-columns: 7rem 1.5rem minmax(0, 1fr) auto; gap: .75rem; align-items: start; padding: .8rem 0; }
+  .parcours li + li { border-top: 1px solid var(--bordure); }
+  .parcours .annee { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--primaire); }
+  .parcours .point { width: 12px; height: 12px; border-radius: 50%; margin-top: .35rem; background: var(--bleu); justify-self: center; }
+  .parcours .point-redouble { background: var(--rose); }
+  .parcours .point-sortie { background: var(--paye); }
+  .parcours .point-courant { background: #fff; border: 2px solid var(--primaire); }
+  .parcours b { display: block; }
+
+  .etat-sorti { display: grid; grid-template-columns: auto 1fr; gap: 1rem; align-items: start; padding: 1.5rem; }
+  .etat-sorti svg { width: 28px; height: 28px; color: var(--paye); }
+  .etat-sorti h2 { font: 700 1.15rem/1.3 var(--police-titre); color: var(--primaire); }
+  .etat-sorti p { margin: .35rem 0 0; color: var(--texte-2); max-width: 65ch; }
+
+  @media (max-width: 1100px) {
+    .fiche-tete { grid-template-columns: auto minmax(0, 1fr); }
+    .fiche-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; }
+    .fiche-actions .rangee { display: contents; }
+    .grille-mois { grid-template-columns: repeat(6, minmax(0, 1fr)); row-gap: .9rem; }
+  }
+  @media (max-width: 640px) {
+    .fiche-tete { grid-template-columns: 88px minmax(0, 1fr); gap: 1rem; padding: 1rem; }
+    .fiche-photo { width: 88px; height: 110px; }
+    .fiche-matricule .matricule { font-size: 1.1rem; }
+    .fiche-actions .btn { flex: 1 1 calc(50% - .5rem); }
+    .panneau-tete { flex-wrap: wrap; }
+    .chiffres { grid-template-columns: 1fr; }
+    .chiffres > div + div { border-left: 0; border-top: 1px solid var(--bordure); }
+    .grille-mois { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .parcours li { grid-template-columns: 1.25rem minmax(0, 1fr); }
+    .parcours .annee { grid-column: 2; grid-row: 1; }
+    .parcours .point { grid-column: 1; grid-row: 1 / span 3; }
+    .parcours li > div, .parcours li > .decision { grid-column: 2; }
+  }
+</style>
+</head>
+<body data-page="etudiants" data-fil="Scolarité/Étudiants|etudiants.html/Fiche">
+<div class="coquille">
+  <aside class="barre" data-barre></aside>
+  <div class="contenu">
+    <header class="entete" data-entete></header>
+    <main class="page">
+      <section class="panneau fiche-tete" id="tete"></section>
+
+      <div class="onglets" data-onglets role="tablist" aria-label="Sections de la fiche">
+        <button type="button" role="tab" aria-controls="ecolage">Écolage</button>
+        <button type="button" role="tab" aria-controls="identite">Identité</button>
+        <button type="button" role="tab" aria-controls="parcours">Parcours</button>
+        <button type="button" role="tab" aria-controls="paiements" id="onglet-paiements">Paiements</button>
+      </div>
+
+      <div data-panneau="ecolage" role="tabpanel" id="p-ecolage" class="pile"></div>
+
+      <div data-panneau="identite" role="tabpanel" hidden>
+        <div class="grille grille-2">
+          <section class="panneau">
+            <div class="panneau-tete"><div><h2>État civil et contact</h2></div></div>
+            <div class="panneau-corps"><dl class="liste-def" id="identite"></dl></div>
+          </section>
+          <section class="panneau">
+            <div class="panneau-tete"><div><h2>Parent ou tuteur</h2><p>Personne à contacter pour l'écolage.</p></div></div>
+            <div class="panneau-corps"><dl class="liste-def" id="tuteur"></dl></div>
+          </section>
+        </div>
+      </div>
+
+      <div data-panneau="parcours" role="tabpanel" hidden>
+        <section class="panneau">
+          <div class="panneau-tete"><div><h2>Parcours scolaire</h2><p id="parcours-sous"></p></div></div>
+          <div class="panneau-corps" style="padding-top:.25rem;padding-bottom:.25rem"><ol class="parcours" id="parcours-liste"></ol></div>
+        </section>
+      </div>
+
+      <div data-panneau="paiements" role="tabpanel" hidden>
+        <section class="panneau">
+          <div class="panneau-tete"><div><h2>Paiements</h2><p>Reçus émis pour cet étudiant, du plus récent au plus ancien.</p></div><a class="btn btn-secondaire btn-petit" id="lien-releve-2" href="#">Relevé d'écolage</a></div>
+          <div class="tableau-conteneur">
+            <table class="tableau">
+              <thead><tr><th>Reçu</th><th>Date</th><th class="a-droite">Montant</th><th>Mode</th><th class="masquer-mobile">Caissier</th><th>Statut</th></tr></thead>
+              <tbody id="paiements-liste"></tbody>
+              <tfoot id="paiements-total"></tfoot>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+
+<dialog class="dialogue" id="dlg-sortie" aria-labelledby="dlg-sortie-titre">
+  <form method="dialog" id="form-sortie" novalidate>
+    <div class="dialogue-tete">
+      <h2 id="dlg-sortie-titre">Enregistrer une sortie</h2>
+      <p id="dlg-sortie-sous"></p>
+    </div>
+    <div class="dialogue-corps pile">
+      <fieldset class="champ" style="border:0;padding:0;margin:0">
+        <legend class="etiquette" style="margin-bottom:.35rem">Type de sortie</legend>
+        <div class="choix">
+          <label><input type="radio" name="type" value="Abandon" checked> Abandon</label>
+          <label><input type="radio" name="type" value="Exclusion"> Exclusion</label>
+        </div>
+      </fieldset>
+      <div class="champ">
+        <label for="sortie-date">Date de sortie</label>
+        <input class="saisie" type="date" id="sortie-date" value="2027-03-12" max="2027-03-12">
+      </div>
+      <div class="champ">
+        <label for="sortie-motif">Motif</label>
+        <textarea class="saisie" id="sortie-motif" placeholder="Ex. : départ pour raisons familiales, courrier du 10/03/2027" aria-describedby="sortie-motif-err"></textarea>
+        <span class="erreur" id="sortie-motif-err" hidden>Indiquez le motif de la sortie : il figurera dans le dossier de l'étudiant.</span>
+      </div>
+      <div class="alerte alerte-attention" role="note" id="sortie-alerte"></div>
+    </div>
+    <div class="dialogue-pied">
+      <button class="btn btn-secondaire" type="button" data-fermer>Annuler</button>
+      <button class="btn btn-danger" type="submit" value="ok">Confirmer la sortie</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+  const { ar, FILIERES, PAIEMENTS, ANNEE, echeancier, situation, photo, nomComplet, niveau, dateFr, modeLibelle, etudiant } = IFSPA;
+  const { svg, toast } = PROTO;
+  const params = new URLSearchParams(location.search);
+  const e = etudiant(params.get("id")) || etudiant(5);
+  const F = e.sexe === "F";
+  const accord = (m) => m + (F ? "e" : "");
+  const actif = e.statut === "ACTIF";
+  const s = situation(e);
+  const STATUTS = { ACTIF: accord("Actif"), DIPLOME: accord("Diplômé"), ABANDON: "Abandon", EXCLU: accord("Exclu") };
+
+  document.title = `${nomComplet(e)} · IFSPA`;
+  document.querySelector(".fil span:last-child").textContent = nomComplet(e);
+
+  // ── En-tête de fiche ──
+  document.getElementById("tete").innerHTML = `
+    <img class="fiche-photo" src="${photo(e)}" alt="Photo d'identité de ${nomComplet(e)}">
+    <div style="min-width:0">
+      <h1>${e.nom} <span style="font-weight:600">${e.prenoms}</span></h1>
+      <div class="fiche-matricule">Matricule <span class="matricule">${e.matricule}</span></div>
+      <div class="fiche-badges">
+        <span class="badge badge-${e.filiere.toLowerCase()}">${FILIERES[e.filiere].nom}</span>
+        <span class="badge badge-neutre badge-sans-point">${niveau(e.niveau)}${actif ? " · " + ANNEE.libelle : ""}</span>
+        ${e.redoublant ? `<span class="badge badge-sf badge-sans-point">${accord("Redoublant")}</span>` : ""}
+        <span class="badge ${actif ? "badge-paye" : "badge-avenir"} badge-sans-point">${STATUTS[e.statut]}${e.sortie ? " le " + e.sortie : ""}</span>
+      </div>
+    </div>
+    <div class="fiche-actions">
+      ${actif ? `<a class="btn btn-accent" href="encaissement.html?id=${e.id}">${svg("encaisser")}Encaisser</a>` : ""}
+      <a class="btn btn-secondaire" href="releve.html?id=${e.id}">${svg("paiements")}Relevé d'écolage</a>
+      <div class="rangee">
+        <button class="btn btn-secondaire" type="button" data-toast="Prototype : l'écran de modification reprend le formulaire d'inscription.">Modifier</button>
+        ${actif ? `<button class="btn btn-danger-contour" type="button" data-admin data-ouvrir="dlg-sortie">${svg("sortie")}Enregistrer une sortie</button>` : ""}
+      </div>
+    </div>`;
+  document.getElementById("lien-releve-2").href = `releve.html?id=${e.id}`;
+
+  // ── Écolage ──
+  const zone = document.getElementById("p-ecolage");
+  if (!actif) {
+    zone.innerHTML = `
+      <section class="panneau etat-sorti">
+        ${svg("ok")}
+        <div>
+          <h2>Aucun échéancier en ${ANNEE.libelle}</h2>
+          <p>${nomComplet(e)} a quitté l'institut : ${STATUTS[e.statut].toLowerCase()} le ${e.sortie}. Aucune échéance n'a été générée pour l'année en cours, rien n'est à encaisser.</p>
+          <p>L'historique de ses années d'études reste consultable dans l'onglet Parcours et dans le relevé d'écolage.</p>
+          <div class="actions" style="margin-top:1rem">
+            <a class="btn btn-secondaire" href="releve.html?id=${e.id}">Ouvrir le relevé d'écolage</a>
+            <button class="btn btn-fantome" type="button" onclick="document.querySelector('[aria-controls=parcours]').click()">Voir le parcours</button>
+          </div>
+        </div>
+      </section>`;
+  } else {
+    const lignes = echeancier(e);
+    const statutTexte = { paye: "Payé", partiel: "Partiel", retard: "En retard", avenir: "À venir" };
+    const courant = "mars"; // date simulée : 12 mars 2027
+    const nbMoisPayes = lignes.filter((l) => l.court !== "Droits" && l.statut === "paye").length;
+    const couleurRetard = s.retard > 0 ? "var(--retard)" : "var(--paye)";
+
+    zone.innerHTML = `
+      <section class="panneau">
+        <dl class="chiffres">
+          <div><dt>Dû à ce jour</dt><dd>${ar(s.duEchu)}</dd><p class="detail">Droits et mensualités d'octobre à mars</p></div>
+          <div><dt>Payé</dt><dd class="succes">${ar(s.paye)}</dd><p class="detail">${nbMoisPayes} mensualité${nbMoisPayes > 1 ? "s" : ""} soldée${nbMoisPayes > 1 ? "s" : ""} sur 10 · reste ${ar(s.resteAnnee)} sur l'année</p></div>
+          <div><dt>Reste en retard</dt><dd style="color:${couleurRetard}">${s.retard > 0 ? ar(s.retard) : "Aucun"}</dd><p class="detail">${s.retard > 0 ? `${s.moisRetard} mois impayé${s.moisRetard > 1 ? "s" : ""} ou incomplet${s.moisRetard > 1 ? "s" : ""}` : "L'étudiant" + (F ? "e" : "") + " est à jour de ses paiements"}</p></div>
+        </dl>
+      </section>
+      <section class="panneau">
+        <div class="panneau-tete">
+          <div><h2>Écolage ${ANNEE.libelle}, mois par mois</h2><p>Les paiements soldent d'abord les échéances les plus anciennes.</p></div>
+          ${s.retard > 0 ? `<a class="btn btn-accent btn-petit" href="encaissement.html?id=${e.id}">Encaisser ${ar(s.retard)}</a>` : ""}
+        </div>
+        <div class="panneau-corps">
+          <div class="grille-mois" style="--n:${lignes.length}">
+            ${lignes.map((l) => {
+              const titre = l.court === "Droits" ? "Droits" : l.court.charAt(0).toUpperCase() + l.court.slice(1);
+              const pct = Math.round((l.paye / l.du) * 100);
+              return `<div class="case case-${l.statut}${l.court === courant ? " case-courant" : ""}" title="${l.libelle} : ${ar(l.paye)} payés sur ${ar(l.du)}">
+                <span class="case-mois">${titre}</span>
+                <span class="case-statut">${statutTexte[l.statut]}</span>
+                <span class="case-montant"><b>${ar(l.paye)}</b><br>sur&nbsp;${l.du.toLocaleString("fr-FR").replace(/\s/g, " ")}</span>
+                <span class="barre-paye" aria-hidden="true"><i style="width:${pct}%"></i></span>
+              </div>`;
+            }).join("")}
+          </div>
+          <div class="legende" aria-label="Légende">
+            <span><i style="background:var(--paye-pale);border-color:var(--paye)"></i>Payé</span>
+            <span><i style="background:var(--partiel-pale);border-color:var(--partiel)"></i>Partiel</span>
+            <span><i style="background:var(--retard-pale);border-color:var(--retard)"></i>En retard (échu, non payé)</span>
+            <span><i style="background:#fff;border-color:var(--texte-3);border-style:dashed"></i>À venir</span>
+            <span class="muet">Situation au 12 mars 2027</span>
+          </div>
+        </div>
+      </section>`;
+  }
+
+  // ── Identité ──
+  const dl = (paires) => paires.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+  document.getElementById("identite").innerHTML = dl([
+    ["Nom", e.nom], ["Prénoms", e.prenoms], ["Sexe", F ? "Féminin" : "Masculin"],
+    ["Date de naissance", e.naissance], ["Lieu de naissance", e.lieu],
+    ["CIN", '<span class="muet" style="font-weight:400">Non renseignée</span>'],
+    ["Téléphone", `<a href="tel:${e.tel.replace(/\s/g, "")}">${e.tel}</a>`], ["Adresse", e.adresse],
+    ["Année d'entrée", `${e.entree}-${e.entree + 1}`],
+  ]);
+  document.getElementById("tuteur").innerHTML = dl([
+    ["Nom", e.tuteur], ["Téléphone", `<a href="tel:${e.telTuteur.replace(/\s/g, "")}">${e.telTuteur}</a>`],
+  ]);
+
+  // ── Parcours ──
+  const etapes = [];
+  const derniere = actif ? 2026 : Number(e.sortie.slice(-4)) - 1; // diplômé en juillet 2026 → dernière année 2025-2026
+  for (let a = e.entree; a <= derniere; a++) {
+    let niv, decision, classe = "";
+    if (e.redoublant) {
+      niv = e.niveau; // redoublant en 1re année : même niveau les deux années
+      decision = a < derniere ? `<span class="badge badge-sf badge-sans-point">${accord("Redoublant")}</span>` : `<span class="badge badge-neutre badge-sans-point">En cours · redoublement</span>`;
+      classe = a < derniere ? "point-redouble" : "point-courant";
+    } else {
+      niv = e.niveau - (derniere - a);
+      if (a < derniere) decision = `<span class="badge badge-paye badge-sans-point">${accord("Admis")} en ${niveau(niv + 1)}</span>`;
+      else if (actif) { decision = `<span class="badge badge-neutre badge-sans-point">En cours</span>`; classe = "point-courant"; }
+      else decision = `<span class="badge badge-paye badge-sans-point">${accord("Diplômé")}</span>`;
+    }
+    etapes.push(`<li><span class="annee">${a}-${a + 1}</span><span class="point ${classe}"></span><div><b>${niveau(niv)}</b><span class="petit muet">${FILIERES[e.filiere].nom}${e.redoublant && a === derniere ? " · niveau repris" : ""}</span></div><span class="decision">${decision}</span></li>`);
+  }
+  if (!actif) etapes.push(`<li><span class="annee">${e.sortie.slice(-4)}</span><span class="point point-sortie"></span><div><b>Sortie : ${STATUTS[e.statut].toLowerCase()} le ${e.sortie}</b><span class="petit muet">Fin de formation, matricule ${e.matricule} conservé</span></div><span></span></li>`);
+  document.getElementById("parcours-liste").innerHTML = etapes.reverse().join("");
+  document.getElementById("parcours-sous").textContent = `Entrée en ${e.entree}-${e.entree + 1} · le matricule ${e.matricule} reste le même sur toute la scolarité.`;
+
+  // ── Paiements ──
+  const mesPaiements = PAIEMENTS.filter((p) => p.etudiant === e).reverse();
+  document.getElementById("onglet-paiements").textContent = `Paiements (${mesPaiements.length})`;
+  document.getElementById("paiements-liste").innerHTML = mesPaiements.length ? mesPaiements.map((p) => `
+    <tr class="${p.annule ? "ligne-annulee" : ""}">
+      <td><a class="matricule" href="recu.html?recu=${p.recu}">${p.recu}</a></td>
+      <td class="montant">${dateFr(p.date)}</td>
+      <td class="a-droite"><b class="montant">${ar(p.montant)}</b></td>
+      <td>${modeLibelle(p.mode)}${p.reference ? `<div class="petit muet montant">${p.reference}</div>` : ""}</td>
+      <td class="masquer-mobile">${p.caissier}</td>
+      <td>${p.annule
+        ? `<span class="badge badge-annule badge-sans-point">Annulé</span><div class="petit muet" style="margin-top:.2rem">${p.motifAnnulation}${p.annulePar ? ` · par ${p.annulePar}, ${p.dateAnnulation}` : ""}</div>`
+        : `<span class="badge badge-paye badge-sans-point">Validé</span>`}</td>
+    </tr>`).join("")
+    : `<tr><td colspan="6"><div class="vide"><b style="display:block;color:var(--texte);margin-bottom:.25rem">Aucun paiement en ${ANNEE.libelle}</b>${actif ? "Les reçus apparaîtront ici après le premier encaissement." : "L'étudiant" + (F ? "e" : "") + " est sorti" + (F ? "e" : "") + " avant cette année scolaire."}</div></td></tr>`;
+  const valides = mesPaiements.filter((p) => !p.annule);
+  if (valides.length) document.getElementById("paiements-total").innerHTML = `<tr><td colspan="2">Total encaissé (hors annulés)</td><td class="a-droite montant">${ar(valides.reduce((t, p) => t + p.montant, 0))}</td><td colspan="3"></td></tr>`;
+
+  // ── Dialogue de sortie ──
+  const dlg = document.getElementById("dlg-sortie");
+  document.getElementById("dlg-sortie-sous").innerHTML = `${nomComplet(e)} · <span class="matricule">${e.matricule}</span>`;
+  const majAlerte = () => {
+    const type = dlg.querySelector("input[name=type]:checked").value;
+    document.getElementById("sortie-alerte").innerHTML = `${svg("impayes")}<div><b>${type} : cette action est définitive</b>L'étudiant${F ? "e" : ""} ne comptera plus dans les effectifs actifs et ne pourra plus être encaissé${F ? "e" : ""}. Son matricule, ses paiements et son relevé restent consultables. ${s.retard > 0 ? `Un retard de ${ar(s.retard)} reste dû à ce jour. ` : ""}</div>`;
+  };
+  dlg.querySelectorAll("input[name=type]").forEach((r) => r.addEventListener("change", majAlerte));
+  majAlerte();
+  const motif = document.getElementById("sortie-motif");
+  motif.addEventListener("input", () => { if (motif.value.trim()) { motif.removeAttribute("aria-invalid"); document.getElementById("sortie-motif-err").hidden = true; } });
+  document.getElementById("form-sortie").addEventListener("submit", (ev) => {
+    if (!motif.value.trim()) {
+      ev.preventDefault();
+      motif.setAttribute("aria-invalid", "true");
+      document.getElementById("sortie-motif-err").hidden = false;
+      motif.focus();
+      return;
+    }
+    const type = dlg.querySelector("input[name=type]:checked").value;
+    setTimeout(() => toast(`${type} enregistré${type === "Exclusion" ? "e" : ""} pour ${nomComplet(e)} (prototype : aucune donnée modifiée).`), 50);
+  });
+</script>
+</body>
+</html>

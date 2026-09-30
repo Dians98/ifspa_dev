@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nouvel étudiant · IFSPA</title>
+<link rel="icon" href="assets/img/logo-ifspa.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  .inscription { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 1.25rem; align-items: start; }
+  .recap { position: sticky; top: 84px; }
+  .obligatoire { color: var(--retard); font-weight: 700; }
+  .champ fieldset { border: 0; padding: 0; margin: 0; }
+  .champ legend { padding: 0; margin-bottom: .35rem; }
+  .choix[aria-invalid="true"] label { border-color: var(--retard); }
+
+  .alerte[hidden] { display: none; }
+  .identite-grille > .champ { align-content: start; }
+  .identite-grille { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 1.25rem; }
+  .depot { display: grid; place-items: center; align-content: center; gap: .5rem; text-align: center; width: 100%; aspect-ratio: 4 / 5; padding: 1rem; border: 1.5px dashed var(--champ); border-radius: 10px; background: var(--fond-2); color: var(--texte-2); font-size: .8rem; cursor: pointer; transition: border-color .15s, background-color .15s; overflow: hidden; position: relative; }
+  .depot:hover, .depot.survol { border-color: var(--bleu); background: var(--primaire-pale); color: var(--primaire); }
+  .depot:focus-within { outline: 2px solid var(--bleu); outline-offset: 2px; }
+  .depot svg { width: 30px; height: 30px; color: var(--bleu); }
+  .depot b { color: var(--texte); font-size: .85rem; }
+  .depot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .depot input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+
+  .recap-matricule { background: var(--rose-pale); }
+  .recap-matricule h3 { color: var(--rose-fonce); }
+  .recap-matricule .petit { color: #7d4a57; }
+  .matricule-apercu { margin: .35rem 0 .25rem; font: 700 1.75rem/1.1 var(--police-texte); letter-spacing: .03em; color: var(--rose-fonce); font-variant-numeric: tabular-nums; }
+  .matricule-apercu.vide-mat { color: #7d4a57; font-size: 1.1rem; font-weight: 600; letter-spacing: 0; }
+  .recap-bloc { padding: 1.1rem 1.25rem; }
+  .recap-bloc + .recap-bloc { border-top: 1px solid var(--bordure); }
+  .recap-bloc h3 { font-size: .8rem; font-weight: 600; color: var(--texte-2); }
+  .echeances { list-style: none; margin: .6rem 0 0; padding: 0; font-size: .875rem; }
+  .echeances li { display: flex; justify-content: space-between; gap: 1rem; padding: .3rem 0; font-variant-numeric: tabular-nums; }
+  .echeances li.total { border-top: 1px solid var(--bordure); margin-top: .35rem; padding-top: .55rem; font-weight: 700; }
+  .mois-puces { display: flex; flex-wrap: wrap; gap: .25rem; margin-top: .5rem; }
+  .mois-puces span { font-size: .7rem; font-weight: 600; padding: .1rem .4rem; border-radius: 4px; background: var(--fond-2); color: var(--texte-2); }
+  .pied-formulaire { display: flex; justify-content: space-between; align-items: center; gap: .75rem; flex-wrap: wrap; }
+
+  @media (max-width: 1100px) {
+    .inscription { grid-template-columns: 1fr; }
+    .recap { position: static; }
+  }
+  @media (max-width: 640px) {
+    .identite-grille { grid-template-columns: 1fr; }
+    .depot { max-width: 180px; }
+    .pied-formulaire .btn { flex: 1; }
+  }
+</style>
+</head>
+<body data-page="etudiants" data-fil="Scolarité/Étudiants|etudiants.html/Nouvel étudiant">
+<div class="coquille">
+  <aside class="barre" data-barre></aside>
+  <div class="contenu">
+    <header class="entete" data-entete></header>
+    <main class="page">
+      <div class="page-titre">
+        <div>
+          <h1>Nouvel étudiant</h1>
+          <p>Inscription en 2026-2027. Le matricule et l'échéancier de l'année sont créés à l'enregistrement.</p>
+        </div>
+      </div>
+
+      <div class="alerte alerte-erreur" id="resume-erreurs" role="alert" hidden style="margin-bottom:1.25rem"></div>
+
+      <form class="inscription" id="form" novalidate>
+        <div class="pile">
+          <section class="panneau">
+            <div class="panneau-tete"><div><h2>Identité</h2><p>Les champs marqués <span class="obligatoire">*</span> sont obligatoires.</p></div></div>
+            <div class="panneau-corps identite-grille">
+              <div class="champ">
+                <span class="etiquette">Photo d'identité</span>
+                <label class="depot" id="depot">
+                  <input type="file" id="photo" accept="image/jpeg,image/png,image/webp" aria-describedby="photo-aide">
+                  <span id="depot-vide" style="display:grid;gap:.4rem;justify-items:center"></span>
+                </label>
+                <span class="aide" id="photo-aide">JPG ou PNG, format portrait. Facultatif.</span>
+              </div>
+              <div class="formulaire-grille">
+                <div class="champ">
+                  <label for="nom">Nom <span class="obligatoire">*</span></label>
+                  <input class="saisie" id="nom" autocomplete="family-name" data-requis="Indiquez le nom de famille." style="text-transform:uppercase">
+                </div>
+                <div class="champ">
+                  <label for="prenoms">Prénoms <span class="obligatoire">*</span></label>
+                  <input class="saisie" id="prenoms" autocomplete="given-name" data-requis="Indiquez au moins un prénom.">
+                </div>
+                <div class="champ large">
+                  <fieldset id="sexe" data-requis="Choisissez le sexe.">
+                    <legend class="etiquette">Sexe <span class="obligatoire">*</span></legend>
+                    <div class="choix">
+                      <label><input type="radio" name="sexe" value="F"> Féminin</label>
+                      <label><input type="radio" name="sexe" value="M"> Masculin</label>
+                    </div>
+                  </fieldset>
+                </div>
+                <div class="champ">
+                  <label for="naissance">Date de naissance <span class="obligatoire">*</span></label>
+                  <input class="saisie" type="date" id="naissance" min="1980-01-01" max="2012-12-31" data-requis="Indiquez la date de naissance.">
+                </div>
+                <div class="champ">
+                  <label for="lieu">Lieu de naissance <span class="obligatoire">*</span></label>
+                  <input class="saisie" id="lieu" placeholder="Ex. : Toamasina" data-requis="Indiquez le lieu de naissance.">
+                </div>
+                <div class="champ">
+                  <label for="cin">CIN <span class="muet" style="font-weight:400">(facultatif)</span></label>
+                  <input class="saisie" id="cin" inputmode="numeric" placeholder="12 chiffres" maxlength="15">
+                </div>
+                <div class="champ">
+                  <label for="tel">Téléphone <span class="obligatoire">*</span></label>
+                  <input class="saisie" type="tel" id="tel" placeholder="034 12 345 67" autocomplete="tel" data-requis="Indiquez un numéro de téléphone." data-tel>
+                </div>
+                <div class="champ large">
+                  <label for="adresse">Adresse <span class="obligatoire">*</span></label>
+                  <input class="saisie" id="adresse" placeholder="Lot, quartier, ville" autocomplete="street-address" data-requis="Indiquez l'adresse actuelle.">
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panneau">
+            <div class="panneau-tete"><div><h2>Parent ou tuteur</h2><p>Contact pour les questions d'écolage.</p></div></div>
+            <div class="panneau-corps formulaire-grille">
+              <div class="champ">
+                <label for="tuteur">Nom et prénoms <span class="obligatoire">*</span></label>
+                <input class="saisie" id="tuteur" data-requis="Indiquez le nom du parent ou tuteur.">
+              </div>
+              <div class="champ">
+                <label for="tel-tuteur">Téléphone <span class="obligatoire">*</span></label>
+                <input class="saisie" type="tel" id="tel-tuteur" placeholder="032 45 678 90" data-requis="Indiquez le téléphone du parent ou tuteur." data-tel>
+              </div>
+            </div>
+          </section>
+
+          <section class="panneau">
+            <div class="panneau-tete"><div><h2>Inscription</h2><p>La filière détermine le matricule : elle ne pourra plus être changée ensuite.</p></div></div>
+            <div class="panneau-corps formulaire-grille">
+              <div class="champ large">
+                <fieldset id="filiere" data-requis="Choisissez la filière.">
+                  <legend class="etiquette">Filière <span class="obligatoire">*</span></legend>
+                  <div class="choix">
+                    <label><input type="radio" name="filiere" value="IF"> Infirmier(e)s <span class="muet" style="font-weight:500">· IF</span></label>
+                    <label><input type="radio" name="filiere" value="SF"> Sage-femmes <span class="muet" style="font-weight:500">· SF</span></label>
+                  </div>
+                </fieldset>
+              </div>
+              <div class="champ">
+                <label for="annee">Année scolaire</label>
+                <input class="saisie" id="annee" value="2026-2027" readonly>
+                <span class="aide">Année en cours</span>
+              </div>
+              <div class="champ">
+                <label for="niveau">Niveau <span class="obligatoire">*</span></label>
+                <select class="saisie" id="niveau" data-requis="Choisissez le niveau.">
+                  <option value="">Choisir…</option>
+                  <option value="1" selected>1re année</option>
+                  <option value="2">2e année</option>
+                  <option value="3">3e année</option>
+                </select>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <aside class="panneau recap" aria-labelledby="recap-titre">
+          <div class="panneau-tete"><div><h2 id="recap-titre">Récapitulatif</h2></div></div>
+          <div class="recap-bloc recap-matricule">
+            <h3>Matricule qui sera attribué</h3>
+            <p class="matricule-apercu vide-mat" id="apercu-matricule" aria-live="polite">Choisissez une filière</p>
+            <p class="petit muet" style="margin:0" id="apercu-note">Format : filière, année d'entrée, numéro d'ordre.</p>
+          </div>
+          <div class="recap-bloc">
+            <h3>Échéancier généré · 2026-2027</h3>
+            <ul class="echeances" id="echeances"></ul>
+            <div class="mois-puces" id="mois-puces" aria-label="Mensualités"></div>
+            <p class="petit muet" style="margin:.75rem 0 0">Montants copiés du tarif 2026-2027 en vigueur. Une modification ultérieure du tarif ne changera pas cet échéancier.</p>
+          </div>
+          <div class="recap-bloc pied-formulaire">
+            <a class="btn btn-fantome" href="etudiants.html">Annuler</a>
+            <button class="btn btn-primaire" type="submit">Enregistrer l'étudiant</button>
+          </div>
+        </aside>
+      </form>
+    </main>
+  </div>
+</div>
+
+<dialog class="dialogue" id="dlg-confirmer" aria-labelledby="dlg-titre">
+  <div class="dialogue-tete">
+    <h2 id="dlg-titre">Confirmer l'inscription</h2>
+    <p>Vérifiez ces informations : le matricule ne pourra plus être modifié.</p>
+  </div>
+  <div class="dialogue-corps"><dl class="liste-def" id="dlg-recap"></dl></div>
+  <div class="dialogue-pied">
+    <button class="btn btn-secondaire" type="button" data-fermer>Corriger</button>
+    <button class="btn btn-primaire" type="button" id="btn-confirmer">Confirmer et enregistrer</button>
+  </div>
+</dialog>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+  const { ar, TARIF, MOIS, FILIERES } = IFSPA;
+  const { svg, toast } = PROTO;
+  const PROCHAIN = { IF: "IF-2026-0043", SF: "SF-2026-0028" }; // séquences fictives
+  const form = document.getElementById("form");
+
+  // Zone de dépôt de la photo
+  const depot = document.getElementById("depot");
+  const inputPhoto = document.getElementById("photo");
+  document.getElementById("depot-vide").innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg><b>Déposer la photo</b><span>ou cliquer pour choisir un fichier</span>`;
+  function apercuPhoto(fichier) {
+    if (!fichier || !fichier.type.startsWith("image/")) return;
+    const lecteur = new FileReader();
+    lecteur.onload = () => {
+      depot.querySelector("img")?.remove();
+      depot.insertAdjacentHTML("beforeend", `<img src="${lecteur.result}" alt="Aperçu de la photo d'identité">`);
+    };
+    lecteur.readAsDataURL(fichier);
+  }
+  inputPhoto.addEventListener("change", () => apercuPhoto(inputPhoto.files[0]));
+  ["dragenter", "dragover"].forEach((t) => depot.addEventListener(t, (ev) => { ev.preventDefault(); depot.classList.add("survol"); }));
+  ["dragleave", "drop"].forEach((t) => depot.addEventListener(t, (ev) => { ev.preventDefault(); depot.classList.remove("survol"); }));
+  depot.addEventListener("drop", (ev) => apercuPhoto(ev.dataTransfer.files[0]));
+
+  // Récapitulatif
+  const total = TARIF.droits + TARIF.mensuel * TARIF.nombreMois;
+  document.getElementById("echeances").innerHTML = `
+    <li><span>Droits d'inscription</span><span>${ar(TARIF.droits)}</span></li>
+    <li><span>${TARIF.nombreMois} mensualités × ${ar(TARIF.mensuel)}</span><span>${ar(TARIF.mensuel * TARIF.nombreMois)}</span></li>
+    <li class="total"><span>Total de l'année</span><span>${ar(total)}</span></li>`;
+  document.getElementById("mois-puces").innerHTML = MOIS.map((m) => `<span>${m}</span>`).join("");
+
+  const filiere = () => form.querySelector("input[name=filiere]:checked")?.value;
+  function majMatricule() {
+    const f = filiere();
+    const el = document.getElementById("apercu-matricule");
+    el.classList.toggle("vide-mat", !f);
+    el.textContent = f ? PROCHAIN[f] : "Choisissez une filière";
+    document.getElementById("apercu-note").textContent = f
+      ? `${FILIERES[f].nom}, entrée 2026. Aperçu : le numéro est attribué définitivement à l'enregistrement.`
+      : "Format : filière, année d'entrée, numéro d'ordre.";
+  }
+  form.querySelectorAll("input[name=filiere]").forEach((r) => r.addEventListener("change", majMatricule));
+
+  // Validation
+  const requis = [...form.querySelectorAll("[data-requis]")];
+  const telOk = (v) => /^0(32|33|34|37|38)\d{7}$/.test(v.replace(/\s/g, ""));
+  function erreurDe(el) {
+    if (el.tagName === "FIELDSET") return el.querySelector("input:checked") ? "" : el.dataset.requis;
+    const v = el.value.trim();
+    if (!v) return el.dataset.requis;
+    if (el.hasAttribute("data-tel") && !telOk(v)) return "Numéro invalide : 10 chiffres commençant par 032, 033, 034, 037 ou 038.";
+    return "";
+  }
+  function marquer(el, msg) {
+    const cible = el.tagName === "FIELDSET" ? el.querySelector(".choix") : el;
+    const champ = el.closest(".champ");
+    let err = champ.querySelector(".erreur");
+    if (msg) {
+      cible.setAttribute("aria-invalid", "true");
+      if (!err) { err = document.createElement("span"); err.className = "erreur"; err.id = (el.id || "c") + "-err"; champ.appendChild(err); }
+      err.textContent = msg;
+      if (el.tagName !== "FIELDSET") el.setAttribute("aria-describedby", err.id);
+    } else {
+      cible.removeAttribute("aria-invalid");
+      err?.remove();
+      if (el.tagName !== "FIELDSET") el.removeAttribute("aria-describedby");
+    }
+  }
+  requis.forEach((el) => {
+    const evt = el.tagName === "FIELDSET" || el.tagName === "SELECT" ? "change" : "blur";
+    el.addEventListener(evt, () => { if (evt === "change" || el.getAttribute("aria-invalid") === "true" || el.value) marquer(el, erreurDe(el)); });
+    if (el.tagName === "INPUT") el.addEventListener("input", () => { if (el.getAttribute("aria-invalid") === "true" && !erreurDe(el)) marquer(el, ""); });
+  });
+
+  form.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const fautes = requis.map((el) => { const m = erreurDe(el); marquer(el, m); return m ? el : null; }).filter(Boolean);
+    const resume = document.getElementById("resume-erreurs");
+    if (fautes.length) {
+      resume.hidden = false;
+      resume.innerHTML = `${svg("impayes")}<div><b>${fautes.length} champ${fautes.length > 1 ? "s" : ""} à corriger avant l'enregistrement</b>Les champs concernés sont signalés en rouge ci-dessous.</div>`;
+      const premier = fautes[0].tagName === "FIELDSET" ? fautes[0].querySelector("input") : fautes[0];
+      premier.focus();
+      premier.scrollIntoView({ block: "center", behavior: "smooth" });
+      return;
+    }
+    resume.hidden = true;
+    const val = (id) => document.getElementById(id).value.trim();
+    const f = filiere();
+    const niv = document.getElementById("niveau");
+    document.getElementById("dlg-recap").innerHTML = `
+      <dt>Étudiant</dt><dd>${val("nom").toUpperCase()} ${val("prenoms")}</dd>
+      <dt>Filière</dt><dd>${FILIERES[f].nom} · ${niv.options[niv.selectedIndex].text}</dd>
+      <dt>Matricule</dt><dd><span class="matricule" style="font-size:1rem">${PROCHAIN[f]}</span></dd>
+      <dt>Échéancier 2026-2027</dt><dd>${ar(TARIF.droits)} + ${TARIF.nombreMois} × ${ar(TARIF.mensuel)} = <b>${ar(total)}</b></dd>`;
+    document.getElementById("dlg-confirmer").showModal();
+  });
+
+  document.getElementById("btn-confirmer").addEventListener("click", (ev) => {
+    ev.currentTarget.disabled = true;
+    ev.currentTarget.textContent = "Enregistrement…";
+    document.getElementById("dlg-confirmer").close();
+    toast(`Étudiant enregistré sous le matricule ${PROCHAIN[filiere()]}. Échéancier 2026-2027 créé.`);
+    setTimeout(() => { location.href = "etudiant.html?id=1"; }, 1600);
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reçu de paiement · IFSPA</title>
+<link rel="icon" href="assets/img/logo-ifspa.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  /* Largeur du rouleau : 80 mm (zone imprimable ≈ 72 mm) ou 58 mm (≈ 48 mm).
+     --papier = largeur physique, --marge = marge latérale, --k = échelle typographique. */
+  :root { --papier: 80mm; --marge: 4mm; --k: 1; }
+  :root[data-largeur="58"] { --papier: 58mm; --marge: 3mm; --k: .84; }
+
+  body { background: #d9dde3; min-height: 100vh; }
+
+  /* ── Barre d'outils (écran uniquement) ── */
+  .outils {
+    position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem;
+    padding: .7rem clamp(1rem, 3vw, 2rem); background: #fff; border-bottom: 1px solid var(--bordure);
+  }
+  .outils h1 { font: 600 1rem/1.3 var(--police-texte); color: var(--texte); }
+  .outils h1 span { display: block; font-size: .78rem; font-weight: 500; color: var(--texte-2); }
+  .outils .actions { margin-left: auto; display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+  .bascule { display: inline-flex; padding: 3px; border-radius: 8px; background: var(--fond-2); border: 1px solid var(--bordure); }
+  .bascule legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .bascule label { position: relative; }
+  .bascule input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .bascule span { display: block; padding: .3rem .7rem; border-radius: 6px; font-size: .8rem; font-weight: 600; color: var(--texte-2); font-variant-numeric: tabular-nums; }
+  .bascule input:checked + span { background: #fff; color: var(--primaire); box-shadow: var(--ombre-1); }
+  .bascule input:focus-visible + span { outline: 2px solid var(--bleu); outline-offset: 1px; }
+
+  .messages { width: min(34rem, 100%); margin: 1.25rem auto 0; padding: 0 1rem; box-sizing: border-box; display: grid; gap: .75rem; }
+  .messages:empty { display: none; }
+  .apercu { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 1.5rem 1rem 3rem; }
+  .introuvable { max-width: 36rem; margin: 3rem auto; }
+
+  .options-impression { display: flex; align-items: center; gap: .5rem; font-size: .85rem; color: var(--texte); cursor: pointer; }
+  .options-impression input { width: 16px; height: 16px; accent-color: var(--primaire); }
+  .options-impression small { color: var(--texte-2); }
+
+  /* ── Ticket ── */
+  .ombre { filter: drop-shadow(0 1px 1px rgb(18 36 60 / .12)) drop-shadow(0 10px 16px rgb(18 36 60 / .18)); }
+  .ticket {
+    --dent: 3mm;
+    width: var(--papier); box-sizing: border-box; background: #fff; color: #000;
+    padding: 5mm var(--marge) calc(5mm + var(--dent));
+    font-family: "Figtree", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    font-size: calc(9pt * var(--k)); line-height: 1.32; font-variant-numeric: tabular-nums;
+    /* bord inférieur déchiré (dents de scie) */
+    -webkit-mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / calc(var(--dent) * 2) 100%;
+            mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / calc(var(--dent) * 2) 100%;
+  }
+  .ticket + .ticket { display: none; }
+  .ticket * { color: #000; }
+  .t-centre { text-align: center; }
+  .t-logo { display: block; width: calc(22mm * var(--k)); height: auto; margin: 0 auto 1.6mm; filter: grayscale(1) contrast(1.3); }
+  .t-sigle { font-size: 1.55em; font-weight: 800; letter-spacing: .08em; line-height: 1.1; }
+  .t-inst { margin-top: .5mm; font-size: .9em; font-weight: 500; line-height: 1.25; text-wrap: balance; }
+  .t-ville { font-size: .9em; font-weight: 500; }
+
+  .sep { border: 0; border-top: .3mm dashed #000; margin: 2.4mm 0; }
+  .sep-plein { border-top-style: solid; border-top-width: .45mm; }
+
+  .t-titre { font-size: 1.2em; font-weight: 800; letter-spacing: .06em; }
+  .t-num { margin-top: .6mm; font-size: 1.12em; font-weight: 700; }
+  .t-double { display: inline-block; margin-bottom: 1.6mm; padding: .3mm 2mm; border: .35mm solid #000; font-weight: 800; letter-spacing: .14em; font-size: .9em; }
+
+  .t-bandeau { margin: 0 calc(var(--marge) * -1) 3mm; padding: 2mm var(--marge); background: #000; text-align: center; }
+  .t-bandeau b { display: block; color: #fff; font-size: 1.45em; font-weight: 800; letter-spacing: .12em; }
+  .t-bandeau span { display: block; margin-top: .6mm; color: #fff; font-size: .9em; font-weight: 600; }
+  .t-annulation { margin-bottom: 1mm; font-weight: 500; }
+  .t-annulation b { font-weight: 700; }
+
+  .t-etu b { display: block; font-size: 1.08em; font-weight: 700; line-height: 1.2; }
+  .t-etu span { display: block; }
+
+  .ligne { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; }
+  .ligne > :last-child { white-space: nowrap; text-align: right; font-weight: 600; }
+  .lignes { display: grid; gap: 1.1mm; }
+  .lignes small { display: block; font-size: .86em; font-weight: 500; }
+  .t-total { margin-top: 2.2mm; padding-top: 2mm; border-top: .45mm solid #000; }
+  .t-total > * { font-size: 1.45em; font-weight: 800 !important; letter-spacing: .02em; }
+  .lettres { margin-top: 1.8mm; font-size: .95em; }
+  .lettres b { font-weight: 700; }
+  .t-barre .m, .t-barre .t-total > :last-child { text-decoration: line-through; text-decoration-thickness: .3mm; }
+
+  .infos { display: grid; gap: .8mm; }
+  .infos .ligne > :first-child { font-weight: 500; }
+  .t-reste { display: grid; gap: .8mm; }
+  .t-reste .ligne > * { font-weight: 700; }
+
+  .t-qr { width: calc(26mm * var(--k)); height: calc(26mm * var(--k)); margin: 0 auto 1.2mm; }
+  .t-qr svg { display: block; width: 100%; height: 100%; }
+  .t-qr-repli { display: grid; place-items: center; height: 100%; border: .3mm dashed #000; font-size: .85em; }
+  .t-verif { font-weight: 600; }
+  .t-verif small { display: block; font-size: .82em; font-weight: 500; word-break: break-all; }
+  .t-merci { font-size: 1.05em; font-weight: 700; }
+  .t-agrement { margin-top: 1mm; font-size: .8em; font-weight: 500; line-height: 1.3; }
+
+  /* Sélection de texte à l'écran */
+  ::selection { background: var(--primaire); color: #fff; }
+
+  /* ── Impression thermique ── */
+  @page { size: 80mm auto; margin: 0; }
+  @media print {
+    html, body { background: #fff !important; min-height: 0; }
+    .outils, .messages, .options-impression { display: none !important; }
+    .apercu { display: block; padding: 0; }
+    .ombre { filter: none; }
+    .ticket { width: 100%; -webkit-mask: none; mask: none; padding-bottom: 6mm; }
+    .avec-double .ticket + .ticket { display: block; break-before: page; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-shadow: none !important; }
+  }
+</style>
+<style id="style-page"></style>
+</head>
+<body data-page="recu">
+<div class="outils">
+  <a class="btn btn-fantome" href="paiements.html" id="retour">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Retour
+  </a>
+  <h1 id="outils-titre">Reçu de paiement<span>Aperçu du ticket de caisse</span></h1>
+  <div class="actions">
+    <fieldset class="bascule" id="bascule">
+      <legend>Largeur du rouleau</legend>
+      <label><input type="radio" name="largeur" value="80" checked><span>80 mm</span></label>
+      <label><input type="radio" name="largeur" value="58"><span>58 mm</span></label>
+    </fieldset>
+    <button class="btn btn-primaire" type="button" id="imprimer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Imprimer le ticket
+    </button>
+  </div>
+</div>
+<div class="messages" id="messages"></div>
+<main class="apercu" id="apercu">
+  <div class="ombre" id="tickets"></div>
+  <label class="options-impression" id="option-double"><input type="checkbox" id="double"><span>Imprimer aussi un double pour l'institut <small>(2 tickets)</small></span></label>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+  const { PAIEMENTS, TARIF, MOIS_LONGS, ar, dateFr, nomComplet, niveau, modeLibelle, FILIERES, ANNEE } = IFSPA;
+  const $ = (s) => document.querySelector(s);
+  const params = new URLSearchParams(location.search);
+  const echapper = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  /* ── Nombre → lettres (français, règles traditionnelles) ── */
+  const U = ["zéro", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf", "dix", "onze", "douze", "treize", "quatorze", "quinze", "seize", "dix-sept", "dix-huit", "dix-neuf"];
+  const D = ["", "", "vingt", "trente", "quarante", "cinquante", "soixante"];
+  function deux(n) {
+    if (n < 20) return U[n];
+    const t = Math.floor(n / 10), u = n % 10;
+    if (t === 7 || t === 9) { const r = n - (t === 7 ? 60 : 80); return (t === 7 ? "soixante" : "quatre-vingt") + (r === 11 && t === 7 ? " et onze" : "-" + U[r]); }
+    if (t === 8) return u ? "quatre-vingt-" + U[u] : "quatre-vingts";
+    return u === 0 ? D[t] : u === 1 ? D[t] + " et un" : D[t] + "-" + U[u];
+  }
+  function trois(n, final) {
+    const c = Math.floor(n / 100), r = n % 100; let s = "";
+    if (c) s = (c === 1 ? "cent" : U[c] + " cent") + (r === 0 && c > 1 && final ? "s" : "");
+    if (r) { let d = deux(r); if (!final && r === 80) d = "quatre-vingt"; s += (s ? " " : "") + d; }
+    return s;
+  }
+  function enLettres(n) {
+    if (!n) return "zéro ariary";
+    const mi = Math.floor(n / 1e6), k = Math.floor(n / 1000) % 1000, r = n % 1000, parts = [];
+    if (mi) parts.push(trois(mi, true) + (mi > 1 ? " millions" : " million"));
+    if (k) parts.push(k === 1 ? "mille" : trois(k, false) + " mille");
+    if (r) parts.push(trois(r, true));
+    return parts.join(" ") + (n % 1e6 === 0 ? " d'ariary" : " ariary");
+  }
+
+  /* ── Largeur du rouleau (80 / 58 mm), mémorisée par poste ── */
+  let largeur = params.get("largeur");
+  try { if (!largeur) largeur = localStorage.getItem("ifspa-ticket-largeur"); } catch (e) { /* stockage indisponible */ }
+  largeur = largeur === "58" ? "58" : "80";
+
+  function appliquerLargeur(l) {
+    largeur = l;
+    document.documentElement.dataset.largeur = l;
+    document.querySelectorAll('input[name="largeur"]').forEach((i) => { i.checked = i.value === l; });
+    try { localStorage.setItem("ifspa-ticket-largeur", l); } catch (e) { /* stockage indisponible */ }
+    taillePage();
+  }
+  /** @page ne lit pas les variables CSS : on réécrit la règle avec la hauteur réelle du ticket. */
+  function taillePage() {
+    const t = document.querySelector(".ticket");
+    const h = t ? Math.ceil(t.getBoundingClientRect().height * 25.4 / 96) + 2 : 200;
+    $("#style-page").textContent = `@page { size: ${largeur}mm ${h}mm; margin: 0; }`;
+  }
+  document.querySelectorAll('input[name="largeur"]').forEach((i) => i.addEventListener("change", () => appliquerLargeur(i.value)));
+  $("#double").addEventListener("change", (ev) => document.body.classList.toggle("avec-double", ev.target.checked));
+  $("#imprimer").addEventListener("click", () => { taillePage(); window.print(); });
+  window.addEventListener("beforeprint", taillePage);
+
+  /* ── Paiement à afficher ── */
+  let p = PAIEMENTS.find((x) => x.recu === params.get("recu"));
+  const nouveau = params.get("nouveau") === "1";
+  if (!p && nouveau) {
+    const e = IFSPA.etudiant(params.get("id")) || IFSPA.etudiant(8);
+    p = { recu: params.get("recu") || "R-2027-00023", etudiant: e, date: "2027-03-12", heure: "10:24",
+      montant: Number(params.get("montant")) || 160000, mode: params.get("mode") || "ESPECES",
+      reference: params.get("ref") || null, caissier: PROTO.UTIL.nom, annule: false, nouveau: true };
+  }
+  if (!p && !params.get("recu")) p = [...PAIEMENTS].reverse().find((x) => !x.annule);
+
+  if (!p) {
+    $("#apercu").innerHTML = `<div class="panneau introuvable"><div class="panneau-corps"><div class="alerte alerte-erreur"><div><b>Reçu introuvable</b>Aucun reçu ne porte le numéro « ${echapper(params.get("recu"))} ». Vérifiez le numéro dans l'historique des paiements.</div></div></div></div>`;
+    $("#imprimer").disabled = true;
+    document.documentElement.dataset.largeur = largeur;
+  } else {
+    afficher(p);
+    appliquerLargeur(largeur);
+    if (document.fonts) document.fonts.ready.then(taillePage);
+  }
+
+  function heure(p) {
+    if (p.heure) return p.heure;
+    if (p.reference) { const h = p.reference.split(".")[1]; return h.slice(0, 2) + ":" + h.slice(2); }
+    const n = Number(p.recu.slice(-5)); return String(8 + (n % 8)).padStart(2, "0") + ":" + String((n * 7) % 60).padStart(2, "0");
+  }
+
+  /** Échéancier de l'année en cours : droits d'inscription + mensualités (octobre → juillet). */
+  function echeances() {
+    return [{ court: "Droits d'inscription", du: TARIF.droits, mois: null },
+      ...MOIS_LONGS.map((m, i) => ({ court: "Mens. " + m, du: TARIF.mensuel, mois: i }))];
+  }
+
+  /** Reconstitue l'imputation : les paiements valides antérieurs remplissent l'échéancier, puis celui-ci. */
+  function repartition(p) {
+    const e = p.etudiant;
+    const idx = PAIEMENTS.indexOf(p);
+    const avant = PAIEMENTS.filter((x, i) => x.etudiant === e && !x.annule && x !== p && (idx < 0 || i < idx)).reduce((s, x) => s + x.montant, 0);
+    const [an, mo] = p.date.split("-").map(Number);
+    const moisPaiement = an * 12 + mo;               // mois civil du paiement
+    const moisDebut = ANNEE.debut * 12 + 10;         // octobre de l'année scolaire
+    const apres = avant + p.montant;
+    let pos = 0, duEchu = 0;
+    const lignes = [];
+    echeances().forEach((l) => {
+      const debut = pos, fin = pos + l.du; pos = fin;
+      if (l.mois === null || moisDebut + l.mois <= moisPaiement) duEchu += l.du;
+      const impute = Math.max(0, Math.min(fin, apres) - Math.max(debut, avant));
+      if (impute > 0) lignes.push({ libelle: l.court, impute, reste: fin - apres, partiel: apres < fin, complement: debut < avant });
+    });
+    const excedent = Math.max(0, apres - pos);
+    if (excedent) lignes.push({ libelle: "Avance", impute: excedent, reste: 0 });
+    return { lignes, retardApres: Math.max(0, duEchu - apres), resteAnnee: Math.max(0, pos - apres) };
+  }
+
+  function ticket(p, r, double) {
+    const e = p.etudiant;
+    const mm = p.mode !== "ESPECES";
+    const url = "verification.html?recu=" + p.recu;
+    return `<article class="ticket${p.annule ? " t-barre" : ""}" aria-label="Reçu ${p.recu}${double ? ", double pour l'institut" : ""}">
+      ${p.annule ? `<div class="t-bandeau" role="note"><b>*** ANNULÉ ***</b><span>Sans valeur de paiement</span></div>` : ""}
+      <header class="t-centre">
+        <img class="t-logo" src="assets/img/logo-ifspa.png" alt="Logo IFSPA">
+        <div class="t-sigle">IFSPA</div>
+        <div class="t-inst">Institut de Formation Supérieur des Paramédicaux Atsinanana</div>
+        <div class="t-ville">Toamasina</div>
+      </header>
+      <hr class="sep">
+      <div class="t-centre">
+        ${double ? `<div class="t-double">DOUBLE</div>` : ""}
+        <div class="t-titre">REÇU DE PAIEMENT</div>
+        <div class="t-num">N° ${p.recu}</div>
+        <div>Le ${dateFr(p.date)} à ${heure(p)}</div>
+      </div>
+      ${p.annule ? `<hr class="sep"><div class="t-annulation"><b>Annulé le</b> ${echapper(p.dateAnnulation)}<br><b>Par</b> ${echapper(p.annulePar)}<br><b>Motif :</b> ${echapper(p.motifAnnulation)}</div>` : ""}
+      <hr class="sep">
+      <div class="t-etu">
+        <b>${nomComplet(e)}</b>
+        <span>Matricule ${e.matricule}</span>
+        <span>${FILIERES[e.filiere].nom} · ${niveau(e.niveau)} · ${ANNEE.libelle}</span>
+      </div>
+      <hr class="sep">
+      <div class="lignes">
+        ${r.lignes.map((l) => `<div class="ligne"><span>${l.libelle}${l.partiel ? `<small>acompte, reste ${ar(l.reste)}</small>` : l.complement ? `<small>solde</small>` : ""}</span><span class="m">${ar(l.impute)}</span></div>`).join("")}
+      </div>
+      <div class="ligne t-total"><span>TOTAL</span><span>${ar(p.montant)}</span></div>
+      <p class="lettres">Arrêté à : <b>${enLettres(p.montant)}</b></p>
+      <hr class="sep">
+      <div class="infos">
+        <div class="ligne"><span>Mode</span><span>${modeLibelle(p.mode)}${mm ? " (Mobile Money)" : ""}</span></div>
+        ${mm ? `<div class="ligne"><span>Réf.</span><span>${echapper(p.reference || "non saisie")}</span></div>` : ""}
+        <div class="ligne"><span>Caissier</span><span>${echapper(p.caissier)}</span></div>
+      </div>
+      <hr class="sep">
+      <div class="t-reste">
+        <div class="ligne"><span>Reste en retard</span><span class="m">${r.retardApres ? ar(r.retardApres) : "Néant, à jour"}</span></div>
+        <div class="ligne"><span>Reste à payer sur l'année</span><span class="m">${ar(r.resteAnnee)}</span></div>
+      </div>
+      <hr class="sep">
+      <div class="t-centre">
+        <div class="t-qr" data-qr="${url}"></div>
+        <div class="t-verif">Scannez pour vérifier<small>${url}</small></div>
+      </div>
+      <hr class="sep sep-plein">
+      <footer class="t-centre">
+        <div class="t-merci">Merci. Conservez ce reçu.</div>
+        <div class="t-agrement">Établissement agréé · arrêtés n° 04460/2011-MESupRes et n° 15482/2011-MESupRES · renouvellement n° 056/2024</div>
+      </footer>
+    </article>`;
+  }
+
+  function afficher(p) {
+    document.title = `Reçu ${p.recu} · IFSPA`;
+    $("#outils-titre").innerHTML = `Reçu ${p.recu}<span>${nomComplet(p.etudiant)} · aperçu du ticket de caisse</span>`;
+    if (p.nouveau) $("#retour").href = "encaissement.html";
+    const r = repartition(p);
+    $("#tickets").innerHTML = ticket(p, r, false) + ticket(p, r, true);
+
+    const msgs = [];
+    if (p.nouveau) msgs.push(`<div class="alerte alerte-succes" role="status"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg><div><b>Paiement enregistré</b>Reçu ${p.recu} émis pour ${nomComplet(p.etudiant)} (${ar(p.montant)}). Imprimez le ticket et remettez-le au payeur.</div></div>`);
+    if (p.annule) msgs.push(`<div class="alerte alerte-erreur"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg><div><b>Ce reçu a été annulé</b>Le ${echapper(p.dateAnnulation)} par ${echapper(p.annulePar)}. Toute réimpression porte la mention ANNULÉ.</div></div>`);
+    $("#messages").innerHTML = msgs.join("");
+
+    document.querySelectorAll("[data-qr]").forEach((el) => {
+      if (typeof qrcode !== "function") { el.innerHTML = `<div class="t-qr-repli">QR code</div>`; return; }
+      const qr = qrcode(0, "M"); qr.addData(new URL(el.dataset.qr, location.href).href); qr.make();
+      el.innerHTML = qr.createSvgTag({ cellSize: 2, margin: 0, scalable: true });
+      const svg = el.querySelector("svg"); if (svg) { svg.setAttribute("shape-rendering", "crispEdges"); svg.setAttribute("aria-label", "QR code de vérification"); }
+    });
+  }
+</script>
+</body>
+</html>

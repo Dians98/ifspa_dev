@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paramètres · IFSPA</title>
+<link rel="icon" href="assets/img/logo-ifspa.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  [hidden] { display: none !important; }
+  .acces-refuse { max-width: 560px; margin: 3rem auto; text-align: center; padding: 2.5rem 1.5rem; }
+  .acces-refuse .icone { width: 48px; height: 48px; margin: 0 auto 1rem; border-radius: 50%; display: grid; place-items: center; background: var(--primaire-pale); color: var(--primaire); }
+  .acces-refuse .icone svg { width: 22px; height: 22px; }
+  .acces-refuse h1 { font: 700 1.5rem/1.2 var(--police-titre); color: var(--primaire); }
+  .acces-refuse p { color: var(--texte-2); margin: .6rem 0 1.5rem; }
+
+  .etablissement { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 1.25rem; align-items: start; }
+  .logo-bloc { text-align: center; }
+  .logo-bloc img { width: 140px; margin: .5rem auto 1rem; }
+  .saisie.a-completer::placeholder { color: var(--partiel); font-style: italic; }
+  .pied-form { display: flex; justify-content: flex-end; align-items: center; gap: .75rem; padding: 1rem 1.25rem; border-top: 1px solid var(--bordure); background: var(--fond-2); border-radius: 0 0 12px 12px; }
+  .pied-form .muet { margin-right: auto; font-size: .82rem; }
+
+  .cellule-montant { width: 9.5rem; }
+  .cellule-montant .saisie { text-align: right; font-variant-numeric: tabular-nums; height: 34px; }
+  .cellule-mois .saisie { width: 4.5rem; text-align: right; height: 34px; }
+  .saisie.manquant { border-color: #f5d3a8; background: var(--partiel-pale); }
+  .unite { font-size: .75rem; color: var(--texte-2); margin-left: .35rem; }
+  .actions-ligne { display: flex; gap: .35rem; justify-content: flex-end; flex-wrap: wrap; }
+  .courante { color: var(--rose-fonce); font-weight: 600; font-size: .78rem; display: block; }
+  .mdp { font: 600 1.1rem var(--police-texte); letter-spacing: .08em; background: var(--fond-2); border: 1px dashed var(--champ); border-radius: var(--rayon); padding: .6rem .8rem; text-align: center; font-variant-numeric: tabular-nums; }
+
+  @media (max-width: 860px) {
+    .etablissement { grid-template-columns: 1fr; }
+    .logo-bloc { order: -1; }
+    .tableau td, .tableau th { padding-left: .75rem; padding-right: .75rem; }
+    .col-mobile-masquee { display: none; }
+    .panneau-tete { flex-wrap: wrap; }
+    .pied-form { flex-wrap: wrap; }
+    .pied-form .muet { width: 100%; }
+    .cartes thead { display: none; }
+    .cartes tbody tr { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem .75rem; padding: .85rem .75rem; border-bottom: 1px solid var(--bordure); }
+    .cartes tbody tr:last-child { border-bottom: 0; }
+    .cartes tbody td { display: block; padding: 0; border: 0; text-align: left !important; background: none !important; }
+    .cartes td[data-label]::before { content: attr(data-label); display: block; font-size: .72rem; font-weight: 600; color: var(--texte-2); margin-bottom: .2rem; }
+    .cartes .pleine { grid-column: 1 / -1; }
+    .cellule-montant, .cellule-montant .saisie, .cellule-mois .saisie { width: 100%; }
+    #t-tarifs td[rowspan] { grid-column: 1 / -1; }
+    #t-tarifs td[rowspan] + td { grid-column: 1 / -1; font-weight: 600; margin-top: .25rem; }
+    #t-tarifs tr:not(:has(td[rowspan])) td:first-child { grid-column: 1 / -1; font-weight: 600; }
+    .actions-ligne { justify-content: flex-start; }
+  }
+</style>
+</head>
+<body data-page="parametres" data-fil="Administration/Paramètres">
+<div class="coquille">
+  <aside class="barre" data-barre></aside>
+  <div class="contenu">
+    <header class="entete" data-entete></header>
+    <main class="page">
+      <!-- Accès refusé (secrétariat) -->
+      <div class="panneau acces-refuse" id="acces-refuse" hidden>
+        <div class="icone" id="ic-verrou"></div>
+        <h1>Accès réservé à l'administrateur</h1>
+        <p>Les paramètres (filières, années scolaires, tarifs et comptes utilisateurs) ne peuvent être modifiés que par un administrateur. Si un réglage doit changer, adressez-vous à lui.</p>
+        <a class="btn btn-primaire" href="dashboard.html">Retour au tableau de bord</a>
+      </div>
+
+      <div id="contenu-admin">
+      <div class="page-titre">
+        <div>
+          <h1>Paramètres</h1>
+          <p>Filières, années scolaires, tarifs et comptes utilisateurs.</p>
+        </div>
+      </div>
+
+      <div class="onglets" data-onglets role="tablist" aria-label="Paramètres">
+        <button type="button" role="tab" aria-controls="filieres">Filières</button>
+        <button type="button" role="tab" aria-controls="annees">Années scolaires</button>
+        <button type="button" role="tab" aria-controls="tarifs">Tarifs</button>
+        <button type="button" role="tab" aria-controls="utilisateurs">Utilisateurs</button>
+      </div>
+
+      <!-- ══ Filières ══ -->
+      <section data-panneau="filieres">
+        <div class="panneau">
+          <div class="panneau-tete">
+            <div><h2>Filières</h2><p>Le code sert de préfixe au matricule (ex. IF-2026-0001). Il ne peut plus changer une fois des étudiants inscrits.</p></div>
+            <button class="btn btn-primaire" type="button" data-ouvrir="dlg-filiere" id="btn-filiere">Ajouter une filière</button>
+          </div>
+          <div class="tableau-conteneur">
+            <table class="tableau">
+              <thead><tr><th>Code</th><th>Filière</th><th class="a-droite">Durée</th><th class="a-droite col-mobile-masquee">Étudiants actifs</th><th>État</th><th><span class="sr-only">Actions</span></th></tr></thead>
+              <tbody>
+                <tr><td><span class="matricule">IF</span></td><td><span class="badge badge-if">Infirmier(e)s</span></td><td class="a-droite montant">3 ans</td><td class="a-droite montant col-mobile-masquee">112</td><td><span class="badge badge-paye">Active</span></td><td class="a-droite"><button class="btn btn-fantome btn-petit" type="button" data-ouvrir="dlg-filiere">Modifier</button></td></tr>
+                <tr><td><span class="matricule">SF</span></td><td><span class="badge badge-sf">Sage-femmes</span></td><td class="a-droite montant">3 ans</td><td class="a-droite montant col-mobile-masquee">72</td><td><span class="badge badge-paye">Active</span></td><td class="a-droite"><button class="btn btn-fantome btn-petit" type="button" data-ouvrir="dlg-filiere">Modifier</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ Années scolaires ══ -->
+      <section data-panneau="annees" hidden>
+        <div class="panneau">
+          <div class="panneau-tete">
+            <div><h2>Années scolaires</h2><p>L'année courante est celle proposée par défaut à l'encaissement et sur le tableau de bord.</p></div>
+            <button class="btn btn-primaire" type="button" data-ouvrir="dlg-annee" id="btn-annee">Nouvelle année</button>
+          </div>
+          <div class="tableau-conteneur">
+            <table class="tableau cartes">
+              <thead><tr><th>Année</th><th class="col-mobile-masquee">Période des mensualités</th><th>État</th><th><span class="sr-only">Actions</span></th></tr></thead>
+              <tbody id="t-annees"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ Tarifs ══ -->
+      <section data-panneau="tarifs" hidden>
+        <div class="panneau">
+          <div class="panneau-tete">
+            <div><h2>Tarifs par filière et par niveau</h2><p>Montants en ariary, sans décimales. Un tarif identique pour tous les étudiants d'une même filière, année et niveau.</p></div>
+            <select class="saisie" id="annee-tarif" aria-label="Année scolaire" style="width:auto">
+              <option value="2025-2026">2025-2026 (clôturée)</option>
+              <option value="2026-2027" selected>2026-2027 (courante)</option>
+              <option value="2027-2028">2027-2028 (en préparation)</option>
+            </select>
+          </div>
+          <div class="panneau-corps" style="padding-bottom:0" id="alertes-tarifs"></div>
+          <div class="tableau-conteneur">
+            <table class="tableau cartes">
+              <thead><tr><th>Filière</th><th>Niveau</th><th class="a-droite">Droits d'inscription</th><th class="a-droite">Mensualité</th><th class="a-droite">Nombre de mois</th><th class="a-droite">Total annuel</th></tr></thead>
+              <tbody id="t-tarifs"></tbody>
+            </table>
+          </div>
+          <div class="pied-form">
+            <span class="muet" id="tarifs-etat">Modifiez directement les montants dans le tableau.</span>
+            <button class="btn btn-secondaire" type="button" id="annuler-tarifs">Annuler les modifications</button>
+            <button class="btn btn-accent" type="button" id="enregistrer-tarifs">Enregistrer les tarifs</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ Utilisateurs ══ -->
+      <section data-panneau="utilisateurs" hidden>
+        <div class="panneau">
+          <div class="panneau-tete">
+            <div><h2>Utilisateurs</h2><p>Pas d'inscription libre : seuls les comptes créés ici peuvent se connecter.</p></div>
+            <button class="btn btn-primaire" type="button" data-ouvrir="dlg-utilisateur" id="btn-utilisateur">Nouvel utilisateur</button>
+          </div>
+          <div class="tableau-conteneur">
+            <table class="tableau cartes">
+              <thead><tr><th>Utilisateur</th><th>Rôle</th><th>Statut</th><th class="col-mobile-masquee">Dernière connexion</th><th><span class="sr-only">Actions</span></th></tr></thead>
+              <tbody id="t-utilisateurs"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="alerte alerte-info" style="margin-top:1.25rem"><span class="ic-info"></span><div><b>Deux rôles</b>Le <b style="display:inline">Secrétariat</b> inscrit les étudiants, encaisse, imprime les reçus et lance les admissions. Il ne peut ni supprimer ni annuler, et n'accède pas aux Paramètres. L'<b style="display:inline">Administrateur</b> a tous les droits.</div></div>
+      </section>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Filière -->
+<dialog class="dialogue" id="dlg-filiere" aria-labelledby="dlg-filiere-titre">
+  <form method="dialog">
+    <div class="dialogue-tete"><h2 id="dlg-filiere-titre">Ajouter une filière</h2><p>Les tarifs de la nouvelle filière se saisissent ensuite dans l'onglet Tarifs.</p></div>
+    <div class="dialogue-corps formulaire-grille">
+      <div class="champ"><label for="f-code">Code</label><input class="saisie" id="f-code" placeholder="ex. KN" maxlength="4" style="text-transform:uppercase"><span class="aide">2 à 4 lettres, préfixe du matricule.</span></div>
+      <div class="champ"><label for="f-duree">Durée des études</label><select class="saisie" id="f-duree"><option>2 ans</option><option selected>3 ans</option><option>4 ans</option><option>5 ans</option></select></div>
+      <div class="champ large"><label for="f-nom">Nom de la filière</label><input class="saisie" id="f-nom" placeholder="ex. Kinésithérapeutes"></div>
+      <label class="large" style="display:flex;gap:.5rem;align-items:center;font-size:.875rem"><input type="checkbox" checked> Filière active (proposée à l'inscription)</label>
+    </div>
+    <div class="dialogue-pied">
+      <button class="btn btn-secondaire" type="button" data-fermer>Annuler</button>
+      <button class="btn btn-primaire" type="submit" data-toast="Filière enregistrée.">Enregistrer la filière</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Nouvelle année -->
+<dialog class="dialogue" id="dlg-annee" aria-labelledby="dlg-annee-titre">
+  <form method="dialog">
+    <div class="dialogue-tete"><h2 id="dlg-annee-titre">Nouvelle année scolaire</h2><p>L'année est créée « en préparation » ; elle ne devient courante que sur votre demande.</p></div>
+    <div class="dialogue-corps formulaire-grille">
+      <div class="champ"><label for="a-libelle">Année</label><input class="saisie" id="a-libelle" value="2028-2029"></div>
+      <div class="champ"><label for="a-mois">Premier mois des mensualités</label><select class="saisie" id="a-mois"><option selected>Octobre</option><option>Septembre</option><option>Novembre</option></select></div>
+    </div>
+    <div class="dialogue-pied">
+      <button class="btn btn-secondaire" type="button" data-fermer>Annuler</button>
+      <button class="btn btn-primaire" type="submit" data-toast="Année 2028-2029 créée (en préparation).">Créer l'année</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Action sur une année -->
+<dialog class="dialogue" id="dlg-annee-action" aria-labelledby="dlg-annee-action-titre">
+  <div class="dialogue-tete"><h2 id="dlg-annee-action-titre"></h2><p id="dlg-annee-action-texte"></p></div>
+  <div class="dialogue-pied">
+    <button class="btn btn-secondaire" type="button" data-fermer>Annuler</button>
+    <button class="btn btn-primaire" type="button" id="dlg-annee-action-ok"></button>
+  </div>
+</dialog>
+
+<!-- Nouvel utilisateur -->
+<dialog class="dialogue" id="dlg-utilisateur" aria-labelledby="dlg-utilisateur-titre">
+  <form method="dialog">
+    <div class="dialogue-tete"><h2 id="dlg-utilisateur-titre">Nouvel utilisateur</h2><p>Un mot de passe provisoire est généré ; l'utilisateur le changera à sa première connexion.</p></div>
+    <div class="dialogue-corps formulaire-grille">
+      <div class="champ large"><label for="u-nom">Nom complet</label><input class="saisie" id="u-nom" placeholder="ex. Fara RASOLO"></div>
+      <div class="champ large"><label for="u-mail">Courriel</label><input class="saisie" id="u-mail" type="email" placeholder="prenom@ifspa.mg"><span class="aide">Sert d'identifiant de connexion.</span></div>
+      <div class="champ large">
+        <span class="etiquette" id="lbl-role">Rôle</span>
+        <div class="choix" role="radiogroup" aria-labelledby="lbl-role">
+          <label><input type="radio" name="role" checked> Secrétariat</label>
+          <label><input type="radio" name="role"> Administrateur</label>
+        </div>
+        <span class="aide">Le secrétariat ne peut ni supprimer ni annuler, et n'accède pas aux Paramètres.</span>
+      </div>
+    </div>
+    <div class="dialogue-pied">
+      <button class="btn btn-secondaire" type="button" data-fermer>Annuler</button>
+      <button class="btn btn-primaire" type="submit" data-toast="Compte créé. Transmettez le mot de passe provisoire en main propre.">Créer le compte</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Réinitialiser le mot de passe -->
+<dialog class="dialogue" id="dlg-mdp" aria-labelledby="dlg-mdp-titre">
+  <div class="dialogue-tete"><h2 id="dlg-mdp-titre">Réinitialiser le mot de passe</h2><p id="dlg-mdp-texte"></p></div>
+  <div class="dialogue-corps">
+    <div class="mdp">K7m-Tq4r-9Wz</div>
+    <p class="petit muet" style="margin:.6rem 0 0">Mot de passe provisoire affiché une seule fois. Il devra être changé à la prochaine connexion ; les sessions ouvertes sont fermées.</p>
+  </div>
+  <div class="dialogue-pied">
+    <button class="btn btn-secondaire" type="button" data-fermer>Annuler</button>
+    <button class="btn btn-primaire" type="button" data-fermer data-toast="Mot de passe réinitialisé.">Confirmer la réinitialisation</button>
+  </div>
+</dialog>
+
+<!-- Désactiver -->
+<dialog class="dialogue" id="dlg-desactiver" aria-labelledby="dlg-desactiver-titre">
+  <div class="dialogue-tete"><h2 id="dlg-desactiver-titre">Désactiver ce compte ?</h2><p id="dlg-desactiver-texte"></p></div>
+  <div class="dialogue-corps"><p class="petit muet" style="margin:0">Le compte n'est pas supprimé : ses paiements saisis restent attribués à son nom. Vous pourrez le réactiver.</p></div>
+  <div class="dialogue-pied">
+    <button class="btn btn-secondaire" type="button" data-fermer>Annuler</button>
+    <button class="btn btn-danger" type="button" id="confirmer-desactiver">Désactiver le compte</button>
+  </div>
+</dialog>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+  const { ar, FILIERES, UTILISATEURS, niveau } = IFSPA;
+  const { svg, toast, role } = PROTO;
+  const $ = (id) => document.getElementById(id);
+  const icInfo = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>';
+  document.querySelectorAll(".ic-info").forEach((el) => (el.outerHTML = icInfo));
+  $("ic-verrou").innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+  ["btn-filiere", "btn-annee", "btn-utilisateur"].forEach((id) => $(id).insertAdjacentHTML("afterbegin", svg("plus")));
+
+  // Accès réservé à l'administrateur
+  if (role !== "admin") {
+    $("contenu-admin").hidden = true;
+    $("acces-refuse").hidden = false;
+    document.title = "Accès réservé · IFSPA";
+  }
+
+  // ── Années scolaires ──
+  const ANNEES = [
+    { lib: "2025-2026", periode: "octobre 2025 → juillet 2026", etat: "cloturee" },
+    { lib: "2026-2027", periode: "octobre 2026 → juillet 2027", etat: "courante" },
+    { lib: "2027-2028", periode: "octobre 2027 → juillet 2028", etat: "preparation" },
+  ];
+  function afficherAnnees() {
+    $("t-annees").innerHTML = ANNEES.map((a, i) => `
+      <tr>
+        <td><b class="montant">${a.lib}</b>${a.etat === "courante" ? '<span class="courante">Année courante</span>' : ""}</td>
+        <td class="col-mobile-masquee muet">${a.periode}</td>
+        <td>${{ cloturee: '<span class="badge badge-avenir">Clôturée</span>', courante: '<span class="badge badge-paye">En cours</span>', preparation: '<span class="badge badge-neutre">En préparation</span>', ouverte: '<span class="badge badge-partiel">Ouverte · à clôturer</span>' }[a.etat]}</td>
+        <td class="pleine"><div class="actions-ligne">
+          ${a.etat === "preparation" ? `<button class="btn btn-secondaire btn-petit" type="button" data-annee="${i}" data-action="courante">Définir comme année courante</button>` : ""}
+          ${a.etat === "courante" || a.etat === "ouverte" ? `<button class="btn btn-secondaire btn-petit" type="button" data-annee="${i}" data-action="cloturer">Clôturer</button>` : ""}
+          <a class="btn btn-fantome btn-petit" href="#tarifs" data-voir-tarifs="${a.lib}">Tarifs</a>
+        </div></td>
+      </tr>`).join("");
+  }
+  let actionAnnee = null;
+  $("t-annees").addEventListener("click", (ev) => {
+    const v = ev.target.closest("[data-voir-tarifs]");
+    if (v) { ev.preventDefault(); $("annee-tarif").value = v.dataset.voirTarifs; afficherTarifs(); document.querySelector('[aria-controls="tarifs"]').click(); return; }
+    const b = ev.target.closest("[data-action]"); if (!b) return;
+    const a = ANNEES[b.dataset.annee];
+    actionAnnee = { a, action: b.dataset.action };
+    if (b.dataset.action === "courante") {
+      $("dlg-annee-action-titre").textContent = `Faire de ${a.lib} l'année courante ?`;
+      $("dlg-annee-action-texte").textContent = `L'encaissement, les impayés et le tableau de bord porteront sur ${a.lib}. L'année 2026-2027 reste ouverte : ses impayés restent encaissables.`;
+      $("dlg-annee-action-ok").textContent = "Définir comme année courante";
+    } else {
+      $("dlg-annee-action-titre").textContent = `Clôturer l'année ${a.lib} ?`;
+      $("dlg-annee-action-texte").textContent = `Plus aucune inscription ni aucun tarif ne pourra être modifié sur ${a.lib}. Les impayés restants restent dus sur cette année et visibles dans la fiche de chaque étudiant. À faire après les admissions de fin d'année.`;
+      $("dlg-annee-action-ok").textContent = "Clôturer l'année";
+    }
+    $("dlg-annee-action").showModal();
+  });
+  $("dlg-annee-action-ok").addEventListener("click", () => {
+    const { a, action } = actionAnnee;
+    if (action === "courante") { ANNEES.forEach((x) => { if (x.etat === "courante") x.etat = "ouverte"; }); a.etat = "courante"; toast(`${a.lib} est désormais l'année courante.`); }
+    else { a.etat = "cloturee"; toast(`Année ${a.lib} clôturée.`); }
+    $("dlg-annee-action").close();
+    afficherAnnees();
+  });
+
+  // ── Tarifs ──
+  const T = (droits, mensuel, mois = 10) => ({ droits, mensuel, mois });
+  const TARIFS = {
+    "2025-2026": { IF: [T(100000, 80000), T(100000, 80000), T(100000, 80000)], SF: [T(100000, 80000), T(100000, 80000), T(100000, 80000)] },
+    "2026-2027": { IF: [T(100000, 80000), T(100000, 80000), T(100000, 80000)], SF: [T(100000, 80000), T(100000, 80000), T(100000, 80000)] },
+    "2027-2028": { IF: [T(100000, 85000), T(100000, 85000), T(100000, 85000)], SF: [T(null, null, 10), T(null, null, 10), T(null, null, 10)] },
+  };
+  const fmt = (n) => (n == null ? "" : n.toLocaleString("fr-FR").replace(/\s/g, " "));
+  const lire = (v) => { const n = parseInt(String(v).replace(/\D/g, ""), 10); return Number.isFinite(n) ? n : null; };
+
+  function afficherTarifs() {
+    const an = $("annee-tarif").value, verrou = an === "2025-2026";
+    const d = TARIFS[an];
+    const manquants = Object.values(d).flat().filter((t) => t.droits == null || t.mensuel == null).length;
+    let alertes = `<div class="alerte alerte-info">${icInfo}<div><b>Modifier un tarif n'affecte pas les échéances déjà générées</b>Chaque échéance garde le montant du tarif en vigueur au moment de l'inscription. Le nouveau tarif s'applique aux prochaines inscriptions et admissions.</div></div>`;
+    if (verrou) alertes = `<div class="alerte alerte-info">${icInfo}<div><b>Année clôturée</b>Les tarifs de 2025-2026 sont affichés pour consultation et ne peuvent plus être modifiés.</div></div>`;
+    if (manquants) alertes += `<div class="alerte alerte-attention" style="margin-top:.75rem">${svg("impayes")}<div><b>Tarifs Sage-femmes ${an} à saisir</b>Tant qu'ils manquent, l'admission des Sage-femmes vers ${an} est bloquée.</div></div>`;
+    $("alertes-tarifs").innerHTML = alertes;
+    $("t-tarifs").innerHTML = Object.keys(d).map((f) => d[f].map((t, i) => `
+      <tr data-f="${f}" data-n="${i}">
+        ${i === 0 ? `<td rowspan="3" style="vertical-align:top"><span class="badge badge-${f.toLowerCase()}">${FILIERES[f].nom}</span></td>` : ""}
+        <td>${niveau(i + 1)}</td>
+        <td class="a-droite cellule-montant" data-label="Droits d'inscription"><input class="saisie ${t.droits == null ? "manquant" : ""}" data-champ="droits" inputmode="numeric" value="${fmt(t.droits)}" placeholder="À saisir" ${verrou ? "readonly" : ""} aria-label="Droits d'inscription ${FILIERES[f].nom} ${niveau(i + 1)}"></td>
+        <td class="a-droite cellule-montant" data-label="Mensualité"><input class="saisie ${t.mensuel == null ? "manquant" : ""}" data-champ="mensuel" inputmode="numeric" value="${fmt(t.mensuel)}" placeholder="À saisir" ${verrou ? "readonly" : ""} aria-label="Mensualité ${FILIERES[f].nom} ${niveau(i + 1)}"></td>
+        <td class="a-droite cellule-mois" data-label="Nombre de mois"><input class="saisie" data-champ="mois" inputmode="numeric" value="${t.mois}" ${verrou ? "readonly" : ""} aria-label="Nombre de mois ${FILIERES[f].nom} ${niveau(i + 1)}"></td>
+        <td class="a-droite montant fort" data-total data-label="Total annuel">${total(t)}</td>
+      </tr>`).join("")).join("");
+    $("enregistrer-tarifs").disabled = $("annuler-tarifs").disabled = true;
+    $("enregistrer-tarifs").hidden = $("annuler-tarifs").hidden = verrou;
+    $("tarifs-etat").textContent = verrou ? "Consultation seule." : "Modifiez directement les montants dans le tableau.";
+  }
+  const total = (t) => (t.droits == null || t.mensuel == null ? '<span class="muet" style="font-weight:500">—</span>' : ar(t.droits + t.mensuel * t.mois));
+
+  $("t-tarifs").addEventListener("input", (ev) => {
+    const inp = ev.target; if (!inp.dataset.champ) return;
+    const tr = inp.closest("tr");
+    const t = TARIFS[$("annee-tarif").value][tr.dataset.f][tr.dataset.n];
+    t[inp.dataset.champ] = lire(inp.value);
+    inp.classList.toggle("manquant", t[inp.dataset.champ] == null);
+    tr.querySelector("[data-total]").innerHTML = total(t);
+    $("enregistrer-tarifs").disabled = $("annuler-tarifs").disabled = false;
+    $("tarifs-etat").textContent = "Modifications non enregistrées.";
+  });
+  $("t-tarifs").addEventListener("focusout", (ev) => { const i = ev.target; if (i.dataset.champ && i.dataset.champ !== "mois") i.value = fmt(lire(i.value)); });
+  $("annee-tarif").addEventListener("change", afficherTarifs);
+  $("enregistrer-tarifs").addEventListener("click", () => { toast(`Tarifs ${$("annee-tarif").value} enregistrés. Les échéances existantes ne changent pas.`); $("enregistrer-tarifs").disabled = $("annuler-tarifs").disabled = true; $("tarifs-etat").textContent = "Tarifs enregistrés."; });
+  $("annuler-tarifs").addEventListener("click", () => location.reload());
+
+  // ── Utilisateurs ──
+  function afficherUtilisateurs() {
+    $("t-utilisateurs").innerHTML = UTILISATEURS.map((u) => {
+      const moi = u.id === "u1";
+      const init = u.nom.split(" ").map((m) => m[0]).slice(0, 2).join("");
+      return `<tr class="${u.actif ? "" : "ligne-annulee"}">
+        <td class="pleine"><div class="personne"><span class="avatar-initiales" aria-hidden="true">${init}</span><div><b>${u.nom}${moi ? ' <span class="badge badge-neutre badge-sans-point" style="margin-left:.25rem">Vous</span>' : ""}</b><span>${u.email}</span></div></div></td>
+        <td>${u.role === "admin" ? '<span class="badge badge-neutre badge-sans-point">Administrateur</span>' : '<span class="badge badge-avenir badge-sans-point">Secrétariat</span>'}</td>
+        <td>${u.actif ? '<span class="badge badge-paye">Actif</span>' : '<span class="badge badge-avenir">Désactivé</span>'}</td>
+        <td class="col-mobile-masquee montant">${u.derniere}</td>
+        <td class="pleine"><div class="actions-ligne">
+          <button class="btn btn-fantome btn-petit" type="button" data-mdp="${u.id}">Réinitialiser le mot de passe</button>
+          ${moi ? "" : u.actif ? `<button class="btn btn-danger-contour btn-petit" type="button" data-desactiver="${u.id}">Désactiver</button>` : `<button class="btn btn-secondaire btn-petit" type="button" data-reactiver="${u.id}">Réactiver</button>`}
+        </div></td>
+      </tr>`;
+    }).join("");
+  }
+  let utilCourant = null;
+  $("t-utilisateurs").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button"); if (!b) return;
+    const u = UTILISATEURS.find((x) => x.id === (b.dataset.mdp || b.dataset.desactiver || b.dataset.reactiver));
+    utilCourant = u;
+    if (b.dataset.mdp) { $("dlg-mdp-texte").textContent = `Compte de ${u.nom} (${u.email}).`; $("dlg-mdp").showModal(); }
+    if (b.dataset.desactiver) { $("dlg-desactiver-texte").textContent = `${u.nom} (${u.email}) ne pourra plus se connecter.`; $("dlg-desactiver").showModal(); }
+    if (b.dataset.reactiver) { u.actif = true; afficherUtilisateurs(); toast(`Compte de ${u.nom} réactivé.`); }
+  });
+  $("confirmer-desactiver").addEventListener("click", () => { utilCourant.actif = false; $("dlg-desactiver").close(); afficherUtilisateurs(); toast(`Compte de ${utilCourant.nom} désactivé.`); });
+
+  afficherAnnees();
+  afficherTarifs();
+  afficherUtilisateurs();
+</script>
+</body>
+</html>

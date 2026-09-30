@@ -1,0 +1,25 @@
+# Base de données de développement.
+# Démarrer : docker compose up -d   |   Arrêter : docker compose down
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: ifspa-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ifspa
+      POSTGRES_PASSWORD: ifspa_dev
+      POSTGRES_DB: ifspa
+      TZ: Indian/Antananarivo
+      PGTZ: Indian/Antananarivo
+    ports:
+      - "5434:5432"
+    volumes:
+      - ifspa-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ifspa -d ifspa"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  ifspa-db-data:

@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paiements · IFSPA</title>
+<link rel="icon" href="assets/img/logo-ifspa.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  .tableau-conteneur { position: relative; }
+  @media (max-width: 860px) { .coquille { grid-template-columns: minmax(0, 1fr); } }
+  .totaux { margin: 0; display: flex; flex-wrap: wrap; gap: .75rem 0; padding: .9rem 1.25rem; border-bottom: 1px solid var(--bordure); background: var(--rose-pale); }
+  .totaux > div { padding: 0 1.5rem; border-left: 1px solid #f0d9df; }
+  .totaux > div:first-child { padding-left: 0; border-left: 0; }
+  .totaux dt { font-size: .75rem; font-weight: 600; color: var(--rose-fonce); }
+  .totaux dd { margin: .15rem 0 0; font-weight: 700; font-size: 1.1rem; font-variant-numeric: tabular-nums; color: var(--texte); }
+  .totaux dd small { font-size: .78rem; font-weight: 500; color: var(--texte-2); }
+  .recu-num { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ref { display: block; font-size: .74rem; color: var(--texte-2); font-variant-numeric: tabular-nums; }
+  .motif { display: block; margin-top: .25rem; font-size: .74rem; color: var(--texte-2); max-width: 16rem; white-space: normal; }
+  .actions-ligne { display: flex; gap: .35rem; justify-content: flex-end; }
+  .tableau tr.ligne-annulee .recu-num { text-decoration: line-through; }
+  .tableau tr.ligne-annulee .personne img { opacity: .55; }
+  .dialogue .recap-annul { margin: 0 0 1rem; display: grid; grid-template-columns: 7rem 1fr; gap: .35rem 1rem; font-size: .875rem; }
+  .dialogue .recap-annul dt { color: var(--texte-2); }
+  .dialogue .recap-annul dd { margin: 0; font-weight: 600; }
+  @media (max-width: 860px) {
+    .col-2 { display: none; }
+    .tableau-conteneur { position: relative; }
+  @media (max-width: 860px) { .coquille { grid-template-columns: minmax(0, 1fr); } }
+  .totaux { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem 1rem; }
+    .totaux > div { padding: 0; border-left: 0; }
+  }
+  @media (max-width: 560px) {
+    .col-3 { display: none; }
+    .barre-outils .saisie { flex: 1 1 140px; min-width: 0; }
+    .tableau td, .tableau th { padding-left: .65rem; padding-right: .65rem; }
+    .personne b { white-space: normal; }
+    .personne img { width: 32px; height: 32px; }
+    .actions-ligne { flex-direction: column; align-items: flex-end; }
+  }
+</style>
+</head>
+<body data-page="paiements" data-fil="Écolage/Paiements">
+<div class="coquille">
+  <aside class="barre" data-barre></aside>
+  <div class="contenu">
+    <header class="entete" data-entete></header>
+    <main class="page">
+      <div class="page-titre">
+        <div>
+          <h1>Historique des paiements</h1>
+          <p>Tous les reçus émis, y compris les annulés. Un paiement n'est jamais supprimé.</p>
+        </div>
+        <div class="actions">
+          <button class="btn btn-secondaire" type="button" data-toast="Export Excel de l'historique en cours de préparation (prototype).">Exporter en Excel</button>
+        </div>
+      </div>
+
+      <section class="panneau">
+        <div class="barre-outils" role="search">
+          <div class="recherche">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input class="saisie" type="search" id="f-q" placeholder="N° de reçu, étudiant, matricule, référence…" aria-label="Rechercher un paiement">
+          </div>
+          <select class="saisie" id="f-periode" aria-label="Période">
+            <option value="">Année 2026-2027</option>
+            <option value="2027-03">Mars 2027</option>
+            <option value="2027-02">Février 2027</option>
+            <option value="2027-01">Janvier 2027</option>
+            <option value="2026-12">Décembre 2026</option>
+            <option value="2026-11">Novembre 2026</option>
+            <option value="2026-10">Octobre 2026</option>
+          </select>
+          <select class="saisie" id="f-mode" aria-label="Mode de paiement">
+            <option value="">Tous les modes</option>
+            <option value="ESPECES">Espèces</option>
+            <option value="MM">Mobile Money (tous)</option>
+            <option value="MVOLA">MVola</option>
+            <option value="ORANGE_MONEY">Orange Money</option>
+            <option value="AIRTEL_MONEY">Airtel Money</option>
+          </select>
+          <select class="saisie" id="f-caissier" aria-label="Caissier"></select>
+          <select class="saisie" id="f-statut" aria-label="Statut">
+            <option value="">Valides et annulés</option>
+            <option value="valide">Valides seulement</option>
+            <option value="annule">Annulés seulement</option>
+          </select>
+        </div>
+
+        <dl class="totaux" id="totaux"></dl>
+
+        <div class="tableau-conteneur">
+          <table class="tableau">
+            <thead>
+              <tr>
+                <th>Reçu · date</th>
+                <th>Étudiant</th>
+                <th class="a-droite">Montant</th>
+                <th class="col-2">Mode</th>
+                <th class="col-2">Caissier</th>
+                <th class="col-3">Statut</th>
+                <th class="a-droite"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody id="lignes"></tbody>
+          </table>
+        </div>
+        <div class="pagination"><span id="pagination-texte"></span><span>Page 1 sur 1</span></div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<dialog class="dialogue" id="annulation" aria-labelledby="annulation-titre">
+  <form id="form-annulation" novalidate>
+    <div class="dialogue-tete">
+      <h2 id="annulation-titre">Annuler le paiement</h2>
+      <p>À utiliser pour une erreur de saisie, un doublon ou un paiement rejeté.</p>
+    </div>
+    <div class="dialogue-corps">
+      <dl class="recap-annul" id="annulation-recap"></dl>
+      <div class="champ">
+        <label for="motif">Motif de l'annulation <span class="retard">*</span></label>
+        <textarea class="saisie" id="motif" placeholder="Ex. doublon de saisie avec le reçu R-2027-00016" aria-describedby="motif-erreur"></textarea>
+        <p class="erreur" id="motif-erreur" hidden>Indiquez le motif de l'annulation (au moins 5 caractères).</p>
+      </div>
+      <div class="alerte alerte-info" style="margin-top:1rem">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <div>Le reçu reste dans l'historique, marqué <b style="display:inline">ANNULÉ</b>. Les échéances qu'il couvrait redeviennent dues. L'annulation est enregistrée à votre nom.</div>
+      </div>
+    </div>
+    <div class="dialogue-pied">
+      <button class="btn btn-secondaire" type="button" data-fermer>Retour</button>
+      <button class="btn btn-danger" type="submit">Annuler le paiement</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+  const { PAIEMENTS, UTILISATEURS, ar, dateFr, photo, nomComplet, modeLibelle } = IFSPA;
+  const { toast, UTIL } = PROTO;
+  const $ = (s) => document.querySelector(s);
+  const norm = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const heure = (p) => {
+    if (p.reference) { const h = p.reference.split(".")[1]; return h.slice(0, 2) + ":" + h.slice(2); }
+    const n = Number(p.recu.slice(-5)); return String(8 + (n % 8)).padStart(2, "0") + ":" + String((n * 7) % 60).padStart(2, "0");
+  };
+
+  $("#f-caissier").innerHTML = `<option value="">Tous les caissiers</option>` + UTILISATEURS.map((u) => `<option>${u.nom}</option>`).join("");
+
+  function filtrer() {
+    const q = norm($("#f-q").value.trim()), per = $("#f-periode").value, mode = $("#f-mode").value, cai = $("#f-caissier").value, st = $("#f-statut").value;
+    return [...PAIEMENTS].reverse().filter((p) => {
+      if (per && !p.date.startsWith(per)) return false;
+      if (mode === "MM" ? p.mode === "ESPECES" : mode && p.mode !== mode) return false;
+      if (cai && p.caissier !== cai) return false;
+      if (st === "valide" && p.annule) return false;
+      if (st === "annule" && !p.annule) return false;
+      if (q && !norm([p.recu, nomComplet(p.etudiant), p.etudiant.matricule, p.reference || ""].join(" ")).includes(q)) return false;
+      return true;
+    });
+  }
+
+  function afficher() {
+    const liste = filtrer();
+    const valides = liste.filter((p) => !p.annule);
+    const total = valides.reduce((s, p) => s + p.montant, 0);
+    const esp = valides.filter((p) => p.mode === "ESPECES").reduce((s, p) => s + p.montant, 0);
+    const nbAnn = liste.length - valides.length;
+    $("#totaux").innerHTML = `
+      <div><dt>Reçus</dt><dd>${liste.length}${nbAnn ? ` <small>dont ${nbAnn} annulé${nbAnn > 1 ? "s" : ""}</small>` : ""}</dd></div>
+      <div><dt>Total encaissé (hors annulés)</dt><dd>${ar(total)}</dd></div>
+      <div><dt>dont espèces</dt><dd>${ar(esp)}</dd></div>
+      <div><dt>dont Mobile Money</dt><dd>${ar(total - esp)}</dd></div>`;
+
+    $("#lignes").innerHTML = liste.length ? liste.map((p) => {
+      const i = PAIEMENTS.indexOf(p);
+      return `<tr class="${p.annule ? "ligne-annulee" : ""}">
+        <td><a class="recu-num" href="recu.html?recu=${p.recu}">${p.recu}</a><span class="ref">${dateFr(p.date)} · ${heure(p)}</span></td>
+        <td><div class="personne"><img src="${photo(p.etudiant)}" alt=""><div><b>${nomComplet(p.etudiant)}</b><span class="matricule">${p.etudiant.matricule}</span></div></div></td>
+        <td class="a-droite"><b class="montant">${ar(p.montant)}</b></td>
+        <td class="col-2">${modeLibelle(p.mode)}${p.reference ? `<span class="ref">${p.reference}</span>` : ""}</td>
+        <td class="col-2">${p.caissier}</td>
+        <td class="col-3">${p.annule
+          ? `<span class="badge badge-annule badge-sans-point" title="Motif : ${p.motifAnnulation}">Annulé</span><span class="motif">${p.motifAnnulation} — par ${p.annulePar} le ${p.dateAnnulation}</span>`
+          : `<span class="badge badge-paye">Valide</span>`}</td>
+        <td><div class="actions-ligne">
+          <a class="btn btn-fantome btn-petit" href="recu.html?recu=${p.recu}">Voir le reçu</a>
+          ${p.annule ? "" : `<button class="btn btn-danger-contour btn-petit" type="button" data-admin data-annuler="${i}">Annuler</button>`}
+        </div></td>
+      </tr>`;
+    }).join("") : `<tr><td colspan="7" class="vide">Aucun paiement ne correspond à ces filtres.</td></tr>`;
+    $("#pagination-texte").textContent = `${liste.length} reçu${liste.length > 1 ? "s" : ""} affiché${liste.length > 1 ? "s" : ""} sur ${PAIEMENTS.length}`;
+  }
+
+  ["#f-q", "#f-periode", "#f-mode", "#f-caissier", "#f-statut"].forEach((s) => $(s).addEventListener("input", afficher));
+
+  /* ── Annulation (admin uniquement) ── */
+  let aAnnuler = null;
+  $("#lignes").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-annuler]"); if (!b) return;
+    aAnnuler = PAIEMENTS[Number(b.dataset.annuler)];
+    $("#annulation-recap").innerHTML = `
+      <dt>Reçu</dt><dd>${aAnnuler.recu} du ${dateFr(aAnnuler.date)}</dd>
+      <dt>Étudiant</dt><dd>${nomComplet(aAnnuler.etudiant)} <span class="matricule">${aAnnuler.etudiant.matricule}</span></dd>
+      <dt>Montant</dt><dd>${ar(aAnnuler.montant)} · ${modeLibelle(aAnnuler.mode)}${aAnnuler.reference ? " · " + aAnnuler.reference : ""}</dd>`;
+    $("#motif").value = ""; $("#motif-erreur").hidden = true; $("#motif").removeAttribute("aria-invalid");
+    $("#annulation").showModal(); $("#motif").focus();
+  });
+  $("#form-annulation").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const motif = $("#motif").value.trim();
+    if (motif.length < 5) { $("#motif-erreur").hidden = false; $("#motif").setAttribute("aria-invalid", "true"); $("#motif").focus(); return; }
+    Object.assign(aAnnuler, { annule: true, motifAnnulation: motif, annulePar: UTIL.nom, dateAnnulation: "12/03/2027 10:24" });
+    $("#annulation").close();
+    afficher();
+    toast(`Reçu ${aAnnuler.recu} annulé. Il reste consultable dans l'historique.`);
+  });
+
+  afficher();
+</script>
+</body>
+</html>

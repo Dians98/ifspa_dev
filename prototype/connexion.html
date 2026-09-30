@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connexion · IFSPA</title>
+<link rel="icon" href="assets/img/logo-ifspa.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  /* Exactement un écran : pas de défilement de page. */
+  html, body { height: 100%; overflow: hidden; }
+  body { background: #fff; }
+  .ecran { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); height: 100svh; }
+  .colonne { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; padding: clamp(1rem, 3vh, 2rem) clamp(1.25rem, 5vw, 4rem); }
+  .retour { display: inline-flex; align-items: center; gap: .4rem; font-size: .875rem; font-weight: 500; color: var(--texte-2); text-decoration: none; width: fit-content; }
+  .retour:hover { color: var(--primaire); }
+  .retour svg { width: 16px; height: 16px; }
+  .boite { width: 100%; max-width: 400px; margin: auto; padding: clamp(.75rem, 2.5vh, 2rem) 0; }
+  .boite > img { width: clamp(72px, 11vh, 104px); height: auto; }
+  .boite h1 { margin-top: clamp(.75rem, 2.5vh, 1.5rem); font: 700 clamp(1.6rem, 3.6vh, 2rem)/1.15 var(--police-titre); color: var(--primaire); }
+  .boite h1::after { content: ""; display: block; width: 44px; height: 4px; border-radius: 999px; background: var(--rose); margin-top: .6rem; }
+  .boite > p { margin: .5rem 0 clamp(1rem, 3vh, 1.75rem); color: var(--texte-2); }
+  .boite form { display: grid; gap: clamp(.75rem, 1.8vh, 1.1rem); }
+  .champ-mdp { position: relative; }
+  .champ-mdp .saisie { padding-right: 2.75rem; }
+  .champ-mdp button { position: absolute; inset: 0 0 0 auto; width: 2.75rem; background: none; border: 0; color: var(--texte-3); cursor: pointer; display: grid; place-items: center; }
+  .champ-mdp button:hover { color: var(--primaire); }
+  .champ-mdp svg { width: 18px; height: 18px; }
+  .saisie { height: 44px; }
+  .demo { margin-top: clamp(1rem, 3vh, 1.75rem); padding-top: clamp(.9rem, 2.5vh, 1.4rem); border-top: 1px solid var(--bordure); }
+  .demo h2 { font: 600 .875rem var(--police-texte); color: var(--texte); margin-bottom: .75rem; }
+  .demo p { margin: .25rem 0 1rem; font-size: .82rem; color: var(--texte-2); }
+  .comptes { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+  .compte {
+    display: grid; gap: .15rem; padding: .85rem 1rem; border: 1px solid var(--champ); border-radius: 10px; text-decoration: none; color: var(--texte);
+    transition: border-color .15s, background-color .15s, box-shadow .15s;
+  }
+  .compte:hover { border-color: var(--primaire); background: var(--primaire-pale); box-shadow: var(--ombre-1); }
+  .compte b { font-size: .92rem; color: var(--primaire); }
+  .compte span { font-size: .78rem; color: var(--texte-2); }
+  .aide-mdp { margin: clamp(.6rem, 1.8vh, 1.1rem) 0 0; font-size: .82rem; color: var(--texte-2); }
+  .credit { font-size: .75rem; color: var(--texte-3); }
+  .credit a { color: var(--texte-2); }
+
+  .visuel { position: relative; overflow: hidden; background: var(--primaire); }
+  .visuel img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 35%; }
+  .visuel::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgb(18 36 60 / .15) 0%, rgb(18 36 60 / .55) 55%, rgb(18 36 60 / .94) 100%); }
+  .visuel-texte { position: absolute; inset: auto 0 0 0; z-index: 1; padding: 3rem; color: #fff; }
+  .visuel-texte i { display: block; width: 72px; height: 5px; border-radius: 999px; background: var(--rose); margin-bottom: 1.5rem; }
+  .visuel-texte p { font: 600 1.9rem/1.25 var(--police-titre); margin: 0; max-width: 24ch; }
+  .visuel-texte span { display: block; margin-top: .75rem; color: rgb(255 255 255 / .8); }
+  .visuel small { position: absolute; top: 1rem; right: 1rem; z-index: 1; font-size: .7rem; color: rgb(255 255 255 / .75); }
+  @media (max-width: 900px) {
+    .ecran { grid-template-columns: 1fr; }
+    .visuel { display: none; }
+    .colonne { padding-block: .9rem; }
+  }
+  /* Écrans peu hauts (portables, téléphones) : on resserre pour tenir sans défilement. */
+  @media (max-height: 860px) {
+    .compte span { display: none; }
+    .compte { padding: .7rem .9rem; }
+  }
+  @media (max-height: 800px) {
+    .boite > img { width: 64px; }
+    .saisie { height: 40px; }
+    .btn-grand { height: 42px; }
+  }
+</style>
+</head>
+<body>
+<div class="ecran">
+  <div class="colonne">
+    <a class="retour" href="index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+      Retour au site
+    </a>
+    <div class="boite">
+      <img src="assets/img/logo-ifspa.png" alt="Logo de l'IFSPA">
+      <h1>Espace du personnel</h1>
+      <p>Connectez-vous pour gérer les étudiants et l'écolage.</p>
+      <form id="formulaire" novalidate>
+        <div class="champ">
+          <label for="email">Adresse e-mail</label>
+          <input class="saisie" id="email" type="email" autocomplete="username" placeholder="nom@ifspa.mg">
+        </div>
+        <div class="champ">
+          <label for="mdp">Mot de passe</label>
+          <div class="champ-mdp">
+            <input class="saisie" id="mdp" type="password" autocomplete="current-password">
+            <button type="button" id="voir" aria-label="Afficher le mot de passe">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="alerte alerte-erreur" id="erreur" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+          <span>E-mail ou mot de passe incorrect. Utilisez un compte de démonstration ci-dessous.</span>
+        </div>
+        <button class="btn btn-primaire btn-grand" type="submit">Se connecter</button>
+      </form>
+      <p class="aide-mdp">Mot de passe oublié ? Demandez à l'administrateur de le réinitialiser.</p>
+
+      <div class="demo">
+        <h2>Comptes de démonstration</h2>
+        <div class="comptes">
+          <a class="compte" href="dashboard.html?role=admin"><b>Administrateur</b><span>Tous les droits : paramètres et annulations</span></a>
+          <a class="compte" href="dashboard.html?role=secretariat"><b>Secrétariat</b><span>Inscriptions et encaissements, sans suppression</span></a>
+        </div>
+      </div>
+    </div>
+    <p class="credit">© 2027 IFSPA — Conçu et réalisé par <a href="https://portfolio-blue-iota-21.vercel.app/" target="_blank" rel="noopener">Diano ANDRIANTSALAMA</a></p>
+  </div>
+
+  <aside class="visuel" aria-hidden="true">
+    <img src="assets/img/hero-etudiants-1920.webp" alt="">
+    <small>Photo d'illustration</small>
+    <div class="visuel-texte">
+      <i></i>
+      <p>Institut de Formation Supérieur des Paramédicaux Atsinanana</p>
+      <span>Toamasina · Infirmier(e)s et Sage-femmes</span>
+    </div>
+  </aside>
+</div>
+<script>
+  document.getElementById("formulaire").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const email = document.getElementById("email").value.trim().toLowerCase();
+    if (email.startsWith("admin")) location.href = "dashboard.html?role=admin";
+    else if (email.startsWith("secretariat")) location.href = "dashboard.html?role=secretariat";
+    else document.getElementById("erreur").hidden = false;
+  });
+  document.getElementById("voir").addEventListener("click", () => {
+    const c = document.getElementById("mdp");
+    c.type = c.type === "password" ? "text" : "password";
+  });
+</script>
+</body>
+</html>
