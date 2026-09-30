@@ -125,20 +125,6 @@
           </section>
 
           <section class="panneau">
-            <div class="panneau-tete"><div><h2>Parent ou tuteur</h2><p>Contact pour les questions d'écolage.</p></div></div>
-            <div class="panneau-corps formulaire-grille">
-              <div class="champ">
-                <label for="tuteur">Nom et prénoms <span class="obligatoire">*</span></label>
-                <input class="saisie" id="tuteur" data-requis="Indiquez le nom du parent ou tuteur.">
-              </div>
-              <div class="champ">
-                <label for="tel-tuteur">Téléphone <span class="obligatoire">*</span></label>
-                <input class="saisie" type="tel" id="tel-tuteur" placeholder="032 45 678 90" data-requis="Indiquez le téléphone du parent ou tuteur." data-tel>
-              </div>
-            </div>
-          </section>
-
-          <section class="panneau">
             <div class="panneau-tete"><div><h2>Inscription</h2><p>La filière détermine le matricule : elle ne pourra plus être changée ensuite.</p></div></div>
             <div class="panneau-corps formulaire-grille">
               <div class="champ large">
@@ -163,6 +149,17 @@
                   <option value="2">2e année</option>
                   <option value="3">3e année</option>
                 </select>
+              </div>
+              <div class="champ large">
+                <fieldset id="droits-en">
+                  <legend class="etiquette">Paiement des droits d'inscription</legend>
+                  <div class="choix">
+                    <label><input type="radio" name="droits" value="1" checked> En 1 fois</label>
+                    <label><input type="radio" name="droits" value="2"> En 2 fois</label>
+                    <label><input type="radio" name="droits" value="3"> En 3 fois</label>
+                  </div>
+                  <span class="aide" id="droits-aide"></span>
+                </fieldset>
               </div>
             </div>
           </section>
@@ -231,10 +228,21 @@
 
   // Récapitulatif
   const total = TARIF.droits + TARIF.mensuel * TARIF.nombreMois;
-  document.getElementById("echeances").innerHTML = `
-    <li><span>Droits d'inscription</span><span>${ar(TARIF.droits)}</span></li>
-    <li><span>${TARIF.nombreMois} mensualités × ${ar(TARIF.mensuel)}</span><span>${ar(TARIF.mensuel * TARIF.nombreMois)}</span></li>
-    <li class="total"><span>Total de l'année</span><span>${ar(total)}</span></li>`;
+  const MOIS_TRANCHE = ["à l'inscription (octobre)", "en novembre", "en décembre"];
+  const droitsEn = () => Number(form.querySelector("input[name=droits]:checked").value);
+  function majEcheances() {
+    const n = droitsEn(), t = IFSPA.tranchesDroits(n);
+    document.getElementById("droits-aide").textContent = n === 1
+      ? `${ar(TARIF.droits)} à payer à l'inscription.`
+      : t.map((m, k) => `${ar(m)} ${MOIS_TRANCHE[k]}`).join(" · ");
+    document.getElementById("echeances").innerHTML = `
+      ${n === 1 ? `<li><span>Droits d'inscription</span><span>${ar(TARIF.droits)}</span></li>`
+        : t.map((m, k) => `<li><span>Droits ${k + 1}/${n} · ${MOIS[k]}</span><span>${ar(m)}</span></li>`).join("")}
+      <li><span>${TARIF.nombreMois} mensualités × ${ar(TARIF.mensuel)}</span><span>${ar(TARIF.mensuel * TARIF.nombreMois)}</span></li>
+      <li class="total"><span>Total de l'année</span><span>${ar(total)}</span></li>`;
+  }
+  form.querySelectorAll("input[name=droits]").forEach((r) => r.addEventListener("change", majEcheances));
+  majEcheances();
   document.getElementById("mois-puces").innerHTML = MOIS.map((m) => `<span>${m}</span>`).join("");
 
   const filiere = () => form.querySelector("input[name=filiere]:checked")?.value;
@@ -300,7 +308,9 @@
       <dt>Étudiant</dt><dd>${val("nom").toUpperCase()} ${val("prenoms")}</dd>
       <dt>Filière</dt><dd>${FILIERES[f].nom} · ${niv.options[niv.selectedIndex].text}</dd>
       <dt>Matricule</dt><dd><span class="matricule" style="font-size:1rem">${PROCHAIN[f]}</span></dd>
-      <dt>Échéancier 2026-2027</dt><dd>${ar(TARIF.droits)} + ${TARIF.nombreMois} × ${ar(TARIF.mensuel)} = <b>${ar(total)}</b></dd>`;
+      <dt>Droits d'inscription</dt><dd>${droitsEn() === 1 ? `${ar(TARIF.droits)} en une fois` : `en ${droitsEn()} fois : ${IFSPA.tranchesDroits(droitsEn()).map(ar).join(" + ")}`}</dd>
+      <dt>Échéancier 2026-2027</dt><dd>droits + ${TARIF.nombreMois} × ${ar(TARIF.mensuel)} = <b>${ar(total)}</b></dd>
+      <dt>À encaisser</dt><dd>${droitsEn() === 1 ? "Les droits" : "La 1re tranche des droits"} au guichet, dès l'inscription.</dd>`;
     document.getElementById("dlg-confirmer").showModal();
   });
 

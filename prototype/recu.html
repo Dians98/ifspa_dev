@@ -93,11 +93,6 @@
   .t-reste { display: grid; gap: .8mm; }
   .t-reste .ligne > * { font-weight: 700; }
 
-  .t-qr { width: calc(26mm * var(--k)); height: calc(26mm * var(--k)); margin: 0 auto 1.2mm; }
-  .t-qr svg { display: block; width: 100%; height: 100%; }
-  .t-qr-repli { display: grid; place-items: center; height: 100%; border: .3mm dashed #000; font-size: .85em; }
-  .t-verif { font-weight: 600; }
-  .t-verif small { display: block; font-size: .82em; font-weight: 500; word-break: break-all; }
   .t-merci { font-size: 1.05em; font-weight: 700; }
   .t-agrement { margin-top: 1mm; font-size: .8em; font-weight: 500; line-height: 1.3; }
 
@@ -141,7 +136,6 @@
   <label class="options-impression" id="option-double"><input type="checkbox" id="double"><span>Imprimer aussi un double pour l'institut <small>(2 tickets)</small></span></label>
 </main>
 
-<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script src="assets/data.js"></script>
 <script src="assets/app.js"></script>
 <script>
@@ -217,6 +211,8 @@
     afficher(p);
     appliquerLargeur(largeur);
     if (document.fonts) document.fonts.ready.then(taillePage);
+    // Ouvert depuis le guichet : impression automatique du ticket (page et logo chargés)
+    if (params.get("imprimer") === "1") window.addEventListener("load", () => setTimeout(() => { taillePage(); window.print(); }, 500));
   }
 
   function heure(p) {
@@ -225,11 +221,6 @@
     const n = Number(p.recu.slice(-5)); return String(8 + (n % 8)).padStart(2, "0") + ":" + String((n * 7) % 60).padStart(2, "0");
   }
 
-  /** Échéancier de l'année en cours : droits d'inscription + mensualités (octobre → juillet). */
-  function echeances() {
-    return [{ court: "Droits d'inscription", du: TARIF.droits, mois: null },
-      ...MOIS_LONGS.map((m, i) => ({ court: "Mens. " + m, du: TARIF.mensuel, mois: i }))];
-  }
 
   /** Reconstitue l'imputation : les paiements valides antérieurs remplissent l'échéancier, puis celui-ci. */
   function repartition(p) {
@@ -242,21 +233,20 @@
     const apres = avant + p.montant;
     let pos = 0, duEchu = 0;
     const lignes = [];
-    echeances().forEach((l) => {
+    IFSPA.echeances(e).forEach((l) => {
       const debut = pos, fin = pos + l.du; pos = fin;
-      if (l.mois === null || moisDebut + l.mois <= moisPaiement) duEchu += l.du;
+      if (moisDebut + l.mois <= moisPaiement) duEchu += l.du;
       const impute = Math.max(0, Math.min(fin, apres) - Math.max(debut, avant));
-      if (impute > 0) lignes.push({ libelle: l.court, impute, reste: fin - apres, partiel: apres < fin, complement: debut < avant });
+      if (impute > 0) lignes.push({ libelle: l.type === "DROITS" ? l.libelle : "Mens. " + MOIS_LONGS[l.mois], impute });
     });
     const excedent = Math.max(0, apres - pos);
-    if (excedent) lignes.push({ libelle: "Avance", impute: excedent, reste: 0 });
+    if (excedent) lignes.push({ libelle: "Avance", impute: excedent });
     return { lignes, retardApres: Math.max(0, duEchu - apres), resteAnnee: Math.max(0, pos - apres) };
   }
 
   function ticket(p, r, double) {
     const e = p.etudiant;
     const mm = p.mode !== "ESPECES";
-    const url = "verification.html?recu=" + p.recu;
     return `<article class="ticket${p.annule ? " t-barre" : ""}" aria-label="Reçu ${p.recu}${double ? ", double pour l'institut" : ""}">
       ${p.annule ? `<div class="t-bandeau" role="note"><b>*** ANNULÉ ***</b><span>Sans valeur de paiement</span></div>` : ""}
       <header class="t-centre">
@@ -281,7 +271,7 @@
       </div>
       <hr class="sep">
       <div class="lignes">
-        ${r.lignes.map((l) => `<div class="ligne"><span>${l.libelle}${l.partiel ? `<small>acompte, reste ${ar(l.reste)}</small>` : l.complement ? `<small>solde</small>` : ""}</span><span class="m">${ar(l.impute)}</span></div>`).join("")}
+        ${r.lignes.map((l) => `<div class="ligne"><span>${l.libelle}</span><span class="m">${ar(l.impute)}</span></div>`).join("")}
       </div>
       <div class="ligne t-total"><span>TOTAL</span><span>${ar(p.montant)}</span></div>
       <p class="lettres">Arrêté à : <b>${enLettres(p.montant)}</b></p>
@@ -295,11 +285,6 @@
       <div class="t-reste">
         <div class="ligne"><span>Reste en retard</span><span class="m">${r.retardApres ? ar(r.retardApres) : "Néant, à jour"}</span></div>
         <div class="ligne"><span>Reste à payer sur l'année</span><span class="m">${ar(r.resteAnnee)}</span></div>
-      </div>
-      <hr class="sep">
-      <div class="t-centre">
-        <div class="t-qr" data-qr="${url}"></div>
-        <div class="t-verif">Scannez pour vérifier<small>${url}</small></div>
       </div>
       <hr class="sep sep-plein">
       <footer class="t-centre">
@@ -321,12 +306,6 @@
     if (p.annule) msgs.push(`<div class="alerte alerte-erreur"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg><div><b>Ce reçu a été annulé</b>Le ${echapper(p.dateAnnulation)} par ${echapper(p.annulePar)}. Toute réimpression porte la mention ANNULÉ.</div></div>`);
     $("#messages").innerHTML = msgs.join("");
 
-    document.querySelectorAll("[data-qr]").forEach((el) => {
-      if (typeof qrcode !== "function") { el.innerHTML = `<div class="t-qr-repli">QR code</div>`; return; }
-      const qr = qrcode(0, "M"); qr.addData(new URL(el.dataset.qr, location.href).href); qr.make();
-      el.innerHTML = qr.createSvgTag({ cellSize: 2, margin: 0, scalable: true });
-      const svg = el.querySelector("svg"); if (svg) { svg.setAttribute("shape-rendering", "crispEdges"); svg.setAttribute("aria-label", "QR code de vérification"); }
-    });
   }
 </script>
 </body>

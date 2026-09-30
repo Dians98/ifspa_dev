@@ -18,7 +18,6 @@
   .synthese b.retard { color: var(--retard); }
   .mois-liste { display: block; font-size: .74rem; color: var(--texte-2); white-space: nowrap; }
   .tel { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .tuteur { display: block; font-size: .74rem; color: var(--texte-2); white-space: nowrap; }
   .actions-ligne { display: flex; gap: .35rem; justify-content: flex-end; }
   @media (max-width: 1180px) { .col-3 { display: none; } }
   @media (max-width: 860px) { .col-2 { display: none; } }
@@ -74,7 +73,7 @@
                 <th class="col-1">Mois en retard</th>
                 <th class="a-droite">Montant du retard</th>
                 <th class="col-2">Dernier paiement</th>
-                <th class="col-1">Tuteur à relancer</th>
+                <th class="col-1">Téléphone</th>
                 <th class="a-droite col-1"><span class="sr-only">Actions</span></th>
               </tr>
             </thead>
@@ -95,10 +94,9 @@
 
   const base = ETUDIANTS.filter((e) => e.statut === "ACTIF").map((e) => {
     const s = situation(e);
-    const impayes = echeancier(e).filter((l) => l.echue && l.statut !== "paye").map((l) => l.court === "Droits" ? "droits" : l.court);
-    const arr = false;
+    const impayes = echeancier(e).filter((l) => l.echue && l.statut !== "paye").map((l) => l.type === "DROITS" ? l.court.toLowerCase() : l.court);
     const dernier = PAIEMENTS.filter((p) => p.etudiant === e && !p.annule).pop();
-    return { e, s, impayes, dernier, arr };
+    return { e, s, impayes, dernier };
   }).filter((x) => x.s.retard > 0).sort((a, b) => b.s.retard - a.s.retard);
 
   function afficher() {
@@ -109,14 +107,14 @@
     const total = liste.reduce((t, x) => t + x.s.retard, 0);
     const lourds = liste.filter((x) => x.s.moisRetard >= 3).length;
     $("#synthese").innerHTML = `<span><b>${liste.length}</b> étudiant${liste.length > 1 ? "s" : ""} en retard</span><span><b class="retard">${ar(total)}</b> à recouvrer</span><span><b>${lourds}</b> avec 3 mois ou plus</span>`;
-    $("#lignes").innerHTML = liste.length ? liste.map(({ e, s, impayes, dernier, arr }) => `
+    $("#lignes").innerHTML = liste.length ? liste.map(({ e, s, impayes, dernier }) => `
       <tr>
         <td><div class="personne"><img src="${photo(e)}" alt=""><div><b><a href="etudiant.html?id=${e.id}" style="color:inherit;text-decoration:none">${nomComplet(e)}</a></b><span class="matricule">${e.matricule}</span></div></div></td>
         <td class="col-3"><span class="badge badge-${e.filiere.toLowerCase()}">${FILIERES[e.filiere].nom}</span><span class="mois-liste" style="margin-top:.2rem">${niveau(e.niveau)}${e.redoublant ? " · redoublant(e)" : ""}</span></td>
-        <td class="col-1"><span class="badge ${s.moisRetard >= 2 || arr ? "badge-retard" : "badge-partiel"}">${s.moisRetard} mois</span><span class="mois-liste" style="margin-top:.2rem">${impayes.join(", ")}</span></td>
+        <td class="col-1"><span class="badge badge-retard">${s.moisRetard} mois</span><span class="mois-liste" style="margin-top:.2rem">${impayes.join(", ")}</span></td>
         <td class="a-droite"><b class="montant retard">${ar(s.retard)}</b><span class="mois-liste mob">${s.moisRetard} mois</span><span class="mob" style="margin-top:.4rem"><a class="btn btn-accent btn-petit" href="encaissement.html?id=${e.id}">Encaisser</a></span></td>
         <td class="col-2">${dernier ? `<span class="montant">${dateFr(dernier.date)}</span><span class="mois-liste">${ar(dernier.montant)}</span>` : `<span class="muet">Aucun</span>`}</td>
-        <td class="col-1"><a class="tel" href="tel:${e.telTuteur.replace(/\s/g, "")}">${e.telTuteur}</a><span class="tuteur">${e.tuteur}</span></td>
+        <td class="col-1"><a class="tel" href="tel:${e.tel.replace(/\s/g, "")}">${e.tel}</a></td>
         <td class="col-1"><div class="actions-ligne">
           <a class="btn btn-fantome btn-petit" href="releve.html?id=${e.id}">Relevé</a>
           <a class="btn btn-accent btn-petit" href="encaissement.html?id=${e.id}">Encaisser</a>

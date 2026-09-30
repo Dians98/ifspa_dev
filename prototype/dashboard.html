@@ -31,7 +31,7 @@
         </div>
       </div>
 
-      <dl class="indicateurs" id="indicateurs"></dl>
+      <dl class="indicateurs indicateurs-3" id="indicateurs"></dl>
 
       <div class="panneau" style="margin-bottom:1.25rem">
         <div class="panneau-tete">
@@ -47,32 +47,24 @@
         </div>
       </div>
 
-      <div class="grille grille-2">
-        <section class="panneau">
-          <div class="panneau-tete"><div><h2>Plus gros impayés</h2><p>Étudiants actifs, retard cumulé à date.</p></div><a class="btn btn-fantome btn-petit" href="impayes.html">Tout voir</a></div>
-          <div class="tableau-conteneur"><table class="tableau"><tbody id="top-impayes"></tbody></table></div>
-        </section>
-        <section class="panneau">
-          <div class="panneau-tete"><div><h2>Derniers paiements</h2><p>Reçus émis récemment.</p></div><a class="btn btn-fantome btn-petit" href="paiements.html">Tout voir</a></div>
-          <div class="tableau-conteneur"><table class="tableau"><tbody id="derniers"></tbody></table></div>
-        </section>
-      </div>
+      <section class="panneau">
+        <div class="panneau-tete"><div><h2>Derniers paiements</h2><p>Reçus émis récemment.</p></div><a class="btn btn-fantome btn-petit" href="paiements.html">Tout voir</a></div>
+        <div class="tableau-conteneur"><table class="tableau"><tbody id="derniers"></tbody></table></div>
+      </section>
     </main>
   </div>
 </div>
 <script src="assets/data.js"></script>
 <script src="assets/app.js"></script>
 <script>
-  const { GLOBAL: G, ar, ETUDIANTS, PAIEMENTS, situation, photo, nomComplet, niveau, dateFr, modeLibelle } = IFSPA;
+  const { GLOBAL: G, ar, PAIEMENTS, photo, nomComplet, niveau, dateFr, modeLibelle } = IFSPA;
   const { svg } = PROTO;
   const pct = (a, b) => Math.round((a / b) * 1000) / 10;
   const taux = pct(G.encaisse, G.attendu);
 
   document.getElementById("indicateurs").innerHTML = `
     <div class="indicateur"><dt>${svg("etudiants")}Effectif actif</dt><dd>${G.effectif}</dd><p class="detail">${G.effectifIF} Infirmier(e)s · ${G.effectifSF} Sage-femmes</p></div>
-    <div class="indicateur"><dt>${svg("encaisser")}Encaissé sur l'année</dt><dd>${ar(G.encaisse)}</dd><p class="detail">sur ${ar(G.attendu)} attendus à date</p></div>
     <div class="indicateur"><dt>${svg("tableau")}Taux de recouvrement</dt><dd>${taux.toLocaleString("fr-FR")} %</dd><div class="jauge"><i style="width:${taux}%"></i></div></div>
-    <div class="indicateur"><dt>${svg("impayes")}Reste à recouvrer</dt><dd>${ar(G.attendu - G.encaisse)}</dd><p class="detail">échéances échues non payées au 12 mars 2027</p></div>
     <div class="indicateur"><dt>${svg("impayes")}Étudiants en retard</dt><dd>${G.enRetard} <small>sur ${G.effectif}</small></dd><p class="detail">au moins une échéance impayée · <a href="impayes.html">voir la liste</a></p></div>`;
 
   const lignes = G.parNiveau.map((r) => {
@@ -84,19 +76,12 @@
       <td class="a-droite montant">${ar(r.attendu)}</td>
       <td class="a-droite montant">${ar(r.encaisse)}</td>
       <td class="a-droite montant">${ar(r.attendu - r.encaisse)}</td>
-      <td><div style="display:flex;align-items:center;gap:.6rem"><div class="jauge" style="flex:1;margin:0"><i style="width:${t}%;background:${t < 85 ? "var(--partiel)" : "var(--primaire)"}"></i></div><span class="montant fort" style="width:3.2rem;text-align:right">${t.toLocaleString("fr-FR")} %</span></div></td>
+      <td><div style="display:flex;align-items:center;gap:.6rem"><div class="jauge" style="flex:1;margin:0"><i style="width:${t}%;background:${t < 85 ? "var(--attention)" : "var(--primaire)"}"></i></div><span class="montant fort" style="width:3.2rem;text-align:right">${t.toLocaleString("fr-FR")} %</span></div></td>
       <td class="a-droite"><a href="impayes.html" class="montant ${r.retard >= 8 ? "retard fort" : ""}">${r.retard}</a></td>
     </tr>`;
   });
   document.getElementById("par-niveau").innerHTML = lignes.join("");
   document.getElementById("par-niveau-total").innerHTML = `<tr><td colspan="2">Total</td><td class="a-droite montant">${G.effectif}</td><td class="a-droite montant">${ar(G.attendu)}</td><td class="a-droite montant">${ar(G.encaisse)}</td><td class="a-droite montant">${ar(G.attendu - G.encaisse)}</td><td><span class="montant">${taux.toLocaleString("fr-FR")} %</span></td><td class="a-droite montant">${G.enRetard}</td></tr>`;
-
-  const impayes = ETUDIANTS.filter((e) => e.statut === "ACTIF").map((e) => ({ e, s: situation(e) })).filter((x) => x.s.retard > 0).sort((a, b) => b.s.retard - a.s.retard).slice(0, 6);
-  document.getElementById("top-impayes").innerHTML = impayes.map(({ e, s }) => `
-    <tr class="ligne-lien" data-lien="etudiant.html?id=${e.id}">
-      <td><div class="personne"><img src="${photo(e)}" alt=""><div><b><a href="etudiant.html?id=${e.id}" style="color:inherit;text-decoration:none">${nomComplet(e)}</a></b><span class="matricule">${e.matricule}</span> · <span>${niveau(e.niveau)}</span></div></div></td>
-      <td class="a-droite"><b class="montant retard">${ar(s.retard)}</b><div class="petit muet">${s.moisRetard} mois</div></td>
-    </tr>`).join("");
 
   const derniers = [...PAIEMENTS].reverse().slice(0, 6);
   document.getElementById("derniers").innerHTML = derniers.map((p) => `

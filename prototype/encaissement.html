@@ -10,84 +10,164 @@
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/app.css">
 <style>
-  .grande-recherche { position: relative; margin-top: .45rem; }
-  .grande-recherche svg { position: absolute; left: 1rem; top: 50%; translate: 0 -50%; width: 20px; height: 20px; color: var(--texte-3); }
-  .grande-recherche .saisie { height: 54px; font-size: 1.05rem; padding-left: 2.9rem; }
-  .resultats-titre { margin: 1.1rem 0 .35rem; font-size: .8rem; font-weight: 600; color: var(--texte-2); }
-  .resultats { list-style: none; margin: 0; padding: 0; display: grid; gap: .2rem; }
-  .resultat {
-    width: 100%; display: flex; align-items: center; gap: .85rem; padding: .6rem .75rem;
-    border: 1px solid transparent; border-radius: 10px; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer;
-    transition: background-color .15s, border-color .15s;
+  .guichet-col { max-width: 720px; margin: 0 auto; }
+  .guichet-col .page-titre { margin-bottom: 1.25rem; }
+  ::selection { background: var(--primaire-pale); color: var(--primaire); }
+  input { caret-color: var(--rose-fonce); }
+
+  /* ── Étapes ── */
+  .guichet { overflow: hidden; }
+  .etape { padding: 1.25rem 1.5rem 1.5rem; }
+  .etape + .etape { border-top: 1px solid var(--bordure); }
+  .etape-tete { display: flex; align-items: center; gap: .7rem; min-height: 28px; }
+  .etape-tete h2 { font: 600 1.05rem/1.3 var(--police-texte); color: var(--texte); }
+  .etape-num {
+    flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+    font: 700 .8rem/1 var(--police-texte); color: var(--primaire); background: var(--primaire-pale);
+    transition: background-color .2s, color .2s;
   }
-  .resultat:hover, .resultat:focus-visible, .resultat.premier { background: var(--primaire-pale); border-color: #cddbeb; }
+  .etape-num svg { width: 14px; height: 14px; }
+  .etape.faite .etape-num { background: var(--primaire); color: #fff; }
+  .etape-corps { margin-top: 1rem; }
+  .etape.inactive { padding-bottom: 1.25rem; }
+  .etape.inactive .etape-tete h2 { color: var(--texte-2); font-weight: 500; }
+  .etape.inactive .etape-num { background: var(--fond-2); color: var(--texte-2); }
+  .etape.inactive .etape-corps { display: none; }
+
+  .lien {
+    display: inline-flex; align-items: center; min-height: 44px; padding: 0 .25rem; margin: 0 -.25rem;
+    background: none; border: 0; font: 600 .875rem var(--police-texte); color: var(--primaire);
+    text-decoration: underline; text-underline-offset: .2em; text-decoration-color: var(--champ); cursor: pointer;
+  }
+  .lien:hover { text-decoration-color: currentColor; }
+
+  /* ── 1. Recherche ── */
+  .grande-recherche { position: relative; }
+  .grande-recherche svg { position: absolute; left: 1rem; top: 50%; translate: 0 -50%; width: 20px; height: 20px; color: var(--texte-3); pointer-events: none; }
+  .grande-recherche .saisie { height: 56px; font-size: 1.05rem; padding-left: 2.9rem; }
+  .resultats-titre { margin: 1.1rem 0 .4rem; font-size: .8rem; font-weight: 600; color: var(--texte-2); }
+  .resultats { list-style: none; margin: 0 -.5rem; padding: 0; display: grid; gap: .15rem; }
+  .resultat {
+    display: flex; align-items: center; gap: .85rem; min-height: 60px; padding: .55rem .5rem;
+    border-radius: 10px; cursor: pointer; transition: background-color .12s;
+  }
+  .resultat:hover { background: var(--fond-2); }
+  .resultat[aria-selected="true"] { background: var(--primaire-pale); box-shadow: inset 0 0 0 1px #cddbeb; }
   .resultat img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex: none; background: var(--fond-2); }
   .resultat-id { flex: 1; min-width: 0; }
-  .resultat-id b { display: block; font-weight: 600; }
-  .resultat-id > span { font-size: .8rem; color: var(--texte-2); }
-  .raccourci-clavier { font-size: .75rem; color: var(--texte-3); margin-top: .6rem; }
-  .raccourci-clavier kbd { font: 600 .7rem var(--police-texte); border: 1px solid var(--bordure); border-radius: 4px; padding: .05rem .3rem; background: #fff; color: var(--texte-2); }
+  .resultat-id b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .resultat-id > span { display: block; font-size: .8rem; color: var(--texte-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .resultats .vide { padding: 1.5rem .5rem; font-size: .9rem; }
 
-  .enc-grille { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
-  .tableau-conteneur { position: relative; }
-  @media (max-width: 860px) { .coquille { grid-template-columns: minmax(0, 1fr); } }
-  [hidden] { display: none !important; }
-  .carte-etudiant { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: .75rem 1rem; padding: 1.1rem 1.25rem; border-bottom: 1px solid var(--bordure); }
-  .carte-actions { grid-column: 1 / -1; margin: -.25rem 0 -.5rem -.6rem; }
-  .repartition .libelle { white-space: nowrap; }
-  .carte-etudiant > img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; flex: none; }
-  .carte-etudiant h2 { font: 700 1.2rem/1.25 var(--police-titre); color: var(--primaire); }
-  .carte-etudiant .details { margin-top: .25rem; display: flex; flex-wrap: wrap; gap: .4rem .6rem; align-items: center; font-size: .82rem; color: var(--texte-2); }
-  .carte-retard { margin-left: auto; text-align: right; }
-  .carte-retard small { display: block; font-size: .75rem; color: var(--texte-2); }
-  .carte-retard strong { font: 700 1.35rem/1.2 var(--police-texte); font-variant-numeric: tabular-nums; }
-  .carte-actions { width: 100%; display: flex; gap: .5rem; }
+  .choisi { display: flex; align-items: center; gap: .9rem; }
+  .choisi img { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; flex: none; background: var(--fond-2); }
+  .choisi > div { flex: 1; min-width: 0; }
+  .choisi b { display: block; font-weight: 700; font-size: 1.02rem; line-height: 1.3; }
+  .choisi span { font-size: .82rem; color: var(--texte-2); }
 
-  .enc-form { display: grid; gap: 1.25rem; }
-  .montant-saisie { position: relative; }
-  .montant-saisie .saisie { height: 64px; font: 700 2rem/1 var(--police-texte); letter-spacing: -.01em; padding-right: 3.5rem; font-variant-numeric: tabular-nums; color: var(--primaire); }
-  .montant-saisie span { position: absolute; right: 1rem; top: 50%; translate: 0 -50%; font-weight: 600; color: var(--texte-2); }
-  .raccourcis { display: flex; flex-wrap: wrap; gap: .4rem; }
-  .raccourcis .btn span { color: var(--texte-2); font-weight: 500; }
-  .choix-mode label { flex: 1 1 140px; justify-content: flex-start; }
-  .enc-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1rem; padding-top: .25rem; }
+  /* ── 2. Échéances ── */
+  .deja { margin: 0 0 .75rem; font-size: .85rem; color: var(--texte-2); }
+  .cases { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: .5rem; }
+  .case {
+    position: relative; display: grid; align-content: start; gap: .1rem; min-height: 82px; padding: .6rem .7rem;
+    border: 1px solid var(--champ); border-radius: 10px; background: #fff; color: var(--texte);
+    font: inherit; text-align: left; cursor: pointer; transition: border-color .12s, background-color .12s, box-shadow .12s;
+  }
+  .case:hover { border-color: var(--bleu); }
+  .case b { font-size: .95rem; font-weight: 700; padding-right: 1.4rem; }
+  .case .reste { font-size: .85rem; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .case .reste small { display: block; font-size: .74rem; color: var(--texte-2); }
+  .case .etat { display: inline-flex; align-items: center; gap: .3rem; margin-top: .15rem; font-size: .74rem; font-weight: 600; }
+  .case .etat::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+  .etat-retard { color: var(--retard); }
+  .etat-mois { color: var(--primaire); }
+  .etat-avenir { color: var(--texte-2); }
+  .coche {
+    position: absolute; top: .55rem; right: .55rem; width: 20px; height: 20px; border-radius: 6px;
+    border: 1.5px solid var(--champ); background: #fff; display: grid; place-items: center; color: #fff;
+  }
+  .coche svg { width: 13px; height: 13px; opacity: 0; }
+  .case[aria-pressed="true"] { border-color: var(--primaire); background: var(--primaire-pale); box-shadow: inset 0 0 0 1px var(--primaire); }
+  .case[aria-pressed="true"] .coche { background: var(--primaire); border-color: var(--primaire); }
+  .case[aria-pressed="true"] .coche svg { opacity: 1; }
 
-  .repartition td, .repartition th { padding-left: .9rem; padding-right: .9rem; }
-  .repartition .libelle { font-weight: 500; }
-  .repartition .libelle small { display: block; font-size: .74rem; color: var(--texte-2); font-weight: 400; }
-  .repartition tr.touchee td { background: #fbfcfe; }
-  .repartition .impute { font-weight: 700; color: var(--primaire); }
-  .note-avenir { padding: .6rem .9rem; font-size: .8rem; color: var(--texte-2); border-top: 1px solid var(--bordure); }
-  .bilan { margin: 0; padding: 1rem 1.25rem; display: grid; grid-template-columns: 1fr auto; gap: .45rem 1rem; border-top: 1px solid #f0d9df; background: var(--rose-pale); border-radius: 0 0 12px 12px; font-size: .875rem; }
-  .bilan .final { border-top-color: #f0d9df !important; }
-  .bilan dt { color: var(--texte-2); }
-  .bilan dd { margin: 0; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .bilan .final { padding-top: .6rem; border-top: 1px solid var(--bordure); color: var(--texte); font-weight: 600; }
-  .bilan dd.final { font-size: 1.3rem; font-weight: 700; }
-  .vide-repartition { padding: 2rem 1.25rem; text-align: center; color: var(--texte-2); font-size: .875rem; }
+  .total { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: .25rem 1rem; margin-top: 1.1rem; padding-top: 1rem; border-top: 1px dashed var(--bordure); }
+  .total small { display: block; font-size: .8rem; font-weight: 600; color: var(--texte-2); }
+  .total strong { display: block; font: 700 2.25rem/1.1 var(--police-texte); letter-spacing: -.015em; color: var(--texte); font-variant-numeric: tabular-nums; }
+  .total .aide { margin: 0; max-width: 16rem; text-align: right; }
+  .solde-annee { padding: .9rem 1rem; border-radius: var(--rayon); background: var(--paye-pale); color: #17603c; font-weight: 600; }
 
-  .recap { margin: 0; display: grid; grid-template-columns: 9rem 1fr; gap: .5rem 1rem; font-size: .9rem; }
-  .recap dt { color: var(--texte-2); }
-  .recap dd { margin: 0; font-weight: 600; }
-  .recap .gros { font-size: 1.5rem; font-weight: 700; color: var(--primaire); font-variant-numeric: tabular-nums; line-height: 1.2; }
-  .recap .lettres { display: block; font-size: .8rem; font-weight: 500; color: var(--texte-2); }
-  .recap ul { margin: 0; padding-left: 1.1rem; font-weight: 500; }
+  /* ── 3. Mode ── */
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+  .mode { position: relative; }
+  .mode input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .mode span {
+    display: flex; align-items: center; justify-content: center; gap: .6rem; min-height: 64px; padding: .5rem .75rem;
+    border: 1px solid var(--champ); border-radius: 10px; background: #fff; font-weight: 600; font-size: 1rem; text-align: center;
+    transition: border-color .12s, background-color .12s;
+  }
+  .mode span svg { width: 22px; height: 22px; flex: none; color: var(--texte-2); }
+  .mode:hover span { border-color: var(--bleu); }
+  .mode input:checked + span { border-color: var(--primaire); background: var(--primaire-pale); color: var(--primaire); box-shadow: inset 0 0 0 1px var(--primaire); }
+  .mode input:checked + span svg { color: var(--primaire); }
+  .mode input:focus-visible + span { outline: 2px solid var(--bleu); outline-offset: 2px; }
 
-  .succes-corps { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.5rem; }
-  .succes-corps .personne { flex: 1 1 280px; }
-  .toast a { font-weight: 600; }
+  .mm { margin-top: 1rem; display: grid; gap: 1rem; }
+  .operateurs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
+  .operateurs .mode span { min-height: 48px; font-size: .9rem; }
+  .champ .saisie { height: 48px; font-size: 1rem; }
+  .note { margin-top: .5rem; }
 
-  @media (max-width: 1000px) { .enc-grille { grid-template-columns: 1fr; } }
+  /* ── 4. Validation ── */
+  .recap { margin: 0 0 .75rem; font-size: .9rem; font-weight: 600; color: var(--texte); }
+  .recap:empty { display: none; }
+  .btn-encaisser { width: 100%; min-height: 60px; height: auto; padding: .7rem 1.25rem; font-size: 1.05rem; white-space: normal; line-height: 1.3; }
+  .btn-encaisser[aria-busy="true"] { opacity: 1; }
+  .raison { margin: .6rem 0 0; font-size: .85rem; color: var(--texte-2); text-align: center; }
+  .raison:empty { display: none; }
+  .rouage { width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgb(255 255 255 / .35); border-top-color: #fff; animation: tourne .7s linear infinite; }
+  @keyframes tourne { to { transform: rotate(360deg); } }
+
+  /* ── Connexion et synchronisation (encaissement hors ligne) ── */
+  .connexion { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; padding: .7rem 1rem; margin-bottom: 1rem; border: 1px solid #bfe0cc; border-radius: 10px; background: var(--paye-pale); color: #17603c; font-size: .875rem; }
+  .connexion .etat-co { display: flex; align-items: center; gap: .55rem; flex: 1 1 280px; }
+  .connexion .etat-co b { display: block; }
+  .connexion .etat-co small { display: block; font-size: .8rem; opacity: .9; }
+  .connexion .pastille { width: 10px; height: 10px; border-radius: 50%; background: var(--paye); flex: none; box-shadow: 0 0 0 4px rgb(31 122 77 / .15); }
+  .connexion[data-etat="hors-ligne"] { background: var(--attention-pale); border-color: #f5d3a8; color: #8a4108; }
+  .connexion[data-etat="hors-ligne"] .pastille { background: var(--attention); box-shadow: 0 0 0 4px rgb(180 83 9 / .15); }
+  .connexion[data-etat="sync"] { background: var(--primaire-pale); border-color: #cddbeb; color: var(--primaire); }
+  .connexion[data-etat="sync"] .pastille { background: var(--bleu); animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .connexion .btn svg { width: 15px; height: 15px; }
+  .connexion[data-etat="sync"] .btn svg { animation: tourne 1s linear infinite; }
+  .demo-co { margin: -.5rem 0 1rem; font-size: .78rem; color: var(--texte-3); text-align: right; }
+  .demo-co .lien { min-height: 0; font-size: .78rem; font-weight: 500; color: var(--texte-2); }
+
+  /* ── Succès ── */
+  .succes-bloc { padding: 1.25rem 1.5rem 1.5rem; animation: entre .4s cubic-bezier(.16, 1, .3, 1); }
+  @keyframes entre { from { opacity: 0; transform: translateY(6px); } }
+  .succes-tete { display: flex; gap: .8rem; align-items: flex-start; }
+  .succes-tete > svg { width: 28px; height: 28px; flex: none; color: var(--paye); }
+  .succes-tete h2 { font: 700 1.15rem/1.3 var(--police-texte); color: #17603c; }
+  .succes-tete p { margin: .2rem 0 0; color: var(--texte-2); font-size: .9rem; }
+  .succes-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1.25rem; }
+  .succes-actions .btn { flex: 1 1 220px; }
+
+  @media (prefers-reduced-motion: reduce) { .rouage { animation-duration: 2s; } .succes-bloc { animation: none; } }
   @media (max-width: 560px) {
-    .carte-etudiant { grid-template-columns: 56px minmax(0, 1fr); }
-    .carte-etudiant > img { width: 56px; height: 56px; }
-    .carte-retard { margin-left: 0; text-align: left; grid-column: 1 / -1; }
-    .col-reste { display: none; }
-    .montant-saisie .saisie { font-size: 1.6rem; }
-    .recap { grid-template-columns: 1fr; gap: .1rem; }
-    .recap dd { margin-bottom: .5rem; }
-    .repartition td, .repartition th { padding-left: .6rem; padding-right: .6rem; }
-    .enc-actions .btn { width: 100%; }
+    .etape, .succes-bloc { padding-inline: 1rem; }
+    .cases { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem; }
+    .case { padding: .55rem .55rem; min-height: 78px; }
+    .case b { font-size: .9rem; }
+    .case .reste { font-size: .8rem; }
+    .coche { top: .5rem; right: .45rem; width: 18px; height: 18px; }
+    .total strong { font-size: 1.9rem; }
+    .operateurs .mode span { font-size: .82rem; padding-inline: .3rem; }
+    .modes .mode span { flex-direction: column; gap: .2rem; min-height: 72px; }
+    .choisi .sep-point { display: none; }
+    .choisi .fn { display: block; }
+    .total .aide { text-align: left; }
   }
 </style>
 </head>
@@ -97,345 +177,398 @@
   <div class="contenu">
     <header class="entete" data-entete></header>
     <main class="page">
-      <div class="page-titre">
-        <div>
-          <h1>Encaisser un paiement</h1>
-          <p>Guichet du 12 mars 2027 · le montant est imputé sur les échéances les plus anciennes d'abord.</p>
-        </div>
-        <div class="actions"><a class="btn btn-secondaire" href="paiements.html">Paiements du jour</a></div>
-      </div>
-
-      <!-- Étape 1 : recherche -->
-      <section class="panneau" id="etape-recherche" aria-labelledby="titre-recherche">
-        <div class="panneau-corps">
-          <label class="etiquette" id="titre-recherche" for="q">Rechercher l'étudiant</label>
-          <div class="grande-recherche">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-            <input id="q" class="saisie" type="search" placeholder="Nom, prénom ou matricule (ex. IF-2026-0001)" autocomplete="off" autofocus>
+      <div class="guichet-col">
+        <div class="page-titre">
+          <div>
+            <h1>Encaisser un paiement</h1>
+            <p>Guichet du 12 mars 2027 · année 2026-2027</p>
           </div>
-          <p class="raccourci-clavier"><kbd>Entrée</kbd> choisit le premier résultat.</p>
-          <p class="resultats-titre" id="resultats-titre">Récemment servis au guichet</p>
-          <ul class="resultats" id="resultats"></ul>
         </div>
-      </section>
 
-      <!-- Étape 2 : saisie -->
-      <div class="enc-grille" id="etape-saisie" hidden>
-        <section class="panneau" aria-label="Saisie du paiement">
-          <div class="carte-etudiant" id="carte"></div>
-          <form class="panneau-corps enc-form" id="formulaire" novalidate>
-            <div class="champ">
-              <label for="montant">Montant reçu</label>
-              <div class="montant-saisie">
-                <input id="montant" class="saisie" inputmode="numeric" autocomplete="off" placeholder="0" aria-describedby="montant-erreur">
-                <span>Ar</span>
+        <div class="connexion" id="connexion" data-etat="en-ligne" role="status" aria-live="polite">
+          <span class="etat-co"><span class="pastille" aria-hidden="true"></span><span id="co-texte"></span></span>
+          <button type="button" class="btn btn-secondaire btn-petit" id="synchroniser"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 1-15.4 6.4L3 16"/><path d="M3 12a9 9 0 0 1 15.4-6.4L21 8"/><path d="M21 3v5h-5M3 21v-5h5"/></svg><span>Synchroniser</span></button>
+        </div>
+        <p class="demo-co">Prototype : <button type="button" class="lien" id="basculer">simuler une coupure d'Internet</button></p>
+
+        <div class="panneau guichet" id="guichet">
+          <!-- 1. Étudiant -->
+          <section class="etape" id="etape-1" aria-labelledby="t1">
+            <div class="etape-tete"><span class="etape-num" aria-hidden="true">1</span><h2 id="t1">Quel étudiant ?</h2></div>
+            <div class="etape-corps" id="recherche">
+              <div class="grande-recherche">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+                <input id="q" class="saisie" type="search" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="resultats"
+                  aria-label="Rechercher l'étudiant par nom, prénoms ou matricule" placeholder="Nom, prénoms ou matricule" autocomplete="off" spellcheck="false">
               </div>
-              <p class="erreur" id="montant-erreur" hidden></p>
-              <div class="raccourcis" id="raccourcis"></div>
+              <p class="resultats-titre" id="resultats-titre">Derniers servis</p>
+              <ul class="resultats" id="resultats" role="listbox" aria-labelledby="resultats-titre"></ul>
             </div>
+            <div class="etape-corps choisi" id="choisi" hidden></div>
+          </section>
 
-            <fieldset class="champ" style="border:0;padding:0;margin:0">
-              <legend class="etiquette" style="margin-bottom:.35rem">Mode de paiement</legend>
-              <div class="choix choix-mode">
-                <label><input type="radio" name="mode" value="ESPECES" checked> Espèces</label>
-                <label><input type="radio" name="mode" value="MVOLA"> MVola</label>
-                <label><input type="radio" name="mode" value="ORANGE_MONEY"> Orange Money</label>
-                <label><input type="radio" name="mode" value="AIRTEL_MONEY"> Airtel Money</label>
+          <!-- 2. Échéances -->
+          <section class="etape inactive" id="etape-2" aria-labelledby="t2">
+            <div class="etape-tete"><span class="etape-num" aria-hidden="true">2</span><h2 id="t2">Que paie-t-il ?</h2></div>
+            <div class="etape-corps">
+              <p class="deja" id="deja"></p>
+              <div class="cases" id="cases" role="group" aria-labelledby="t2"></div>
+              <div id="bloc-montant">
+                <div class="total">
+                  <div><small>Montant à encaisser</small><strong id="total" aria-live="polite">0 Ar</strong></div>
+                  <p class="aide">Chaque échéance se paie en entier. Pas d'acompte.</p>
+                </div>
               </div>
-            </fieldset>
-
-            <div class="champ" id="champ-reference" hidden>
-              <label for="reference">Référence de la transaction <span class="retard">*</span></label>
-              <input id="reference" class="saisie" autocomplete="off" aria-describedby="reference-aide reference-erreur">
-              <p class="aide" id="reference-aide">Recopiez la référence du SMS de confirmation reçu par le payeur.</p>
-              <p class="erreur" id="reference-erreur" hidden></p>
             </div>
+          </section>
 
-            <div class="champ">
-              <label for="observation">Observation <span class="muet" style="font-weight:400">(facultatif)</span></label>
-              <input id="observation" class="saisie" placeholder="Ex. payé par la tante, reste promis pour avril">
+          <!-- 3. Mode -->
+          <section class="etape inactive" id="etape-3" aria-labelledby="t3">
+            <div class="etape-tete"><span class="etape-num" aria-hidden="true">3</span><h2 id="t3">Comment ?</h2></div>
+            <div class="etape-corps">
+              <fieldset style="border:0;margin:0;padding:0">
+                <legend class="sr-only">Mode de paiement</legend>
+                <div class="modes">
+                  <label class="mode"><input type="radio" name="mode" value="ESPECES" checked><span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg>Espèces</span></label>
+                  <label class="mode"><input type="radio" name="mode" value="MM"><span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg>Mobile Money</span></label>
+                </div>
+              </fieldset>
+              <div class="mm" id="mm" hidden>
+                <fieldset style="border:0;margin:0;padding:0">
+                  <legend class="etiquette" style="margin-bottom:.4rem">Opérateur</legend>
+                  <div class="operateurs">
+                    <label class="mode"><input type="radio" name="op" value="MVOLA"><span>MVola</span></label>
+                    <label class="mode"><input type="radio" name="op" value="ORANGE_MONEY"><span>Orange Money</span></label>
+                    <label class="mode"><input type="radio" name="op" value="AIRTEL_MONEY"><span>Airtel Money</span></label>
+                  </div>
+                </fieldset>
+                <div class="champ">
+                  <label for="reference">Référence de la transaction</label>
+                  <input id="reference" class="saisie" autocomplete="off" spellcheck="false" aria-describedby="reference-aide">
+                  <p class="aide" id="reference-aide">Recopiez la référence du SMS de confirmation reçu par le payeur.</p>
+                </div>
+              </div>
+              <div class="note">
+                <button type="button" class="lien" id="ajouter-note">Ajouter une note</button>
+                <div class="champ" id="champ-note" hidden>
+                  <label for="note">Note <span class="muet" style="font-weight:400">(facultatif)</span></label>
+                  <input id="note" class="saisie" placeholder="Ex. payé par la tante">
+                </div>
+              </div>
             </div>
+          </section>
 
-            <div class="enc-actions">
-              <button type="submit" class="btn btn-accent btn-grand" id="valider">Valider l'encaissement</button>
-              <span class="petit muet">Un reçu numéroté sera émis après confirmation.</span>
+          <!-- 4. Encaisser -->
+          <section class="etape inactive" id="etape-4" aria-labelledby="t4">
+            <div class="etape-tete"><span class="etape-num" aria-hidden="true">4</span><h2 id="t4">Encaisser</h2></div>
+            <div class="etape-corps">
+              <p class="recap" id="recap"></p>
+              <button type="button" class="btn btn-accent btn-encaisser" id="encaisser" aria-describedby="raison" disabled>Encaisser et imprimer le reçu</button>
+              <p class="raison" id="raison" aria-live="polite"></p>
             </div>
-          </form>
-        </section>
+          </section>
+        </div>
 
-        <aside class="panneau" aria-labelledby="titre-repartition">
-          <div class="panneau-tete">
-            <div><h2 id="titre-repartition">Répartition proposée</h2><p>Les échéances les plus anciennes sont réglées en premier.</p></div>
-          </div>
-          <div id="repartition" aria-live="polite"></div>
-        </aside>
-      </div>
-
-      <!-- Après validation -->
-      <section class="panneau" id="succes" hidden>
-        <div class="panneau-corps pile">
-          <div class="alerte alerte-succes" role="status">
+        <!-- Après encaissement -->
+        <section class="panneau succes-bloc" id="succes" hidden tabindex="-1" aria-labelledby="succes-titre">
+          <div class="succes-tete">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
-            <div><b id="succes-titre">Paiement enregistré</b><span id="succes-texte"></span></div>
+            <div><h2 id="succes-titre">Paiement enregistré — reçu R-2027-00023</h2><p id="succes-texte"></p></div>
           </div>
-          <div class="succes-corps">
-            <div class="personne" id="succes-personne"></div>
-            <div class="actions">
-              <a class="btn btn-primaire btn-grand" id="lien-recu" href="recu.html">Imprimer le reçu</a>
-              <a class="btn btn-secondaire btn-grand" href="encaissement.html">Nouvel encaissement</a>
-            </div>
+          <div class="succes-actions">
+            <a class="btn btn-secondaire btn-grand" id="reimprimer" href="recu.html" target="_blank" rel="noopener">Réimprimer le reçu</a>
+            <button type="button" class="btn btn-primaire btn-grand" id="autre">Encaisser pour un autre étudiant</button>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </main>
   </div>
 </div>
 
-<dialog class="dialogue" id="confirmation" aria-labelledby="confirmation-titre">
-  <div class="dialogue-tete">
-    <h2 id="confirmation-titre">Confirmer l'encaissement</h2>
-    <p>Vérifiez avec le payeur avant d'émettre le reçu.</p>
-  </div>
-  <div class="dialogue-corps" id="confirmation-corps"></div>
-  <div class="dialogue-pied">
-    <button class="btn btn-secondaire" type="button" data-fermer>Corriger</button>
-    <button class="btn btn-accent" type="button" id="confirmer">Confirmer et émettre le reçu</button>
-  </div>
-</dialog>
-
 <script src="assets/data.js"></script>
 <script src="assets/app.js"></script>
 <script>
-  const { ETUDIANTS, PAIEMENTS, echeancier, situation, ar, photo, nomComplet, niveau, FILIERES, modeLibelle, TARIF } = IFSPA;
-  const { toast } = PROTO;
+  const { ETUDIANTS, PAIEMENTS, echeancier, situation, ar, photo, nomComplet, niveau, FILIERES, modeLibelle } = IFSPA;
+  const { svg } = PROTO;
   const $ = (s) => document.querySelector(s);
-  const NOUVEAU_RECU = "R-2027-00023";
+  const MOIS_COURANT = 5; // 0 = octobre … 5 = mars (date simulée : 12/03/2027)
+  let numeroRecu = 23;           // prochain reçu de la démo : R-2027-00023
   const actifs = ETUDIANTS.filter((e) => e.statut === "ACTIF");
   const norm = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  const echapper = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  let choisi = null;
+  const echapper = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const maj = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const COCHE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>';
 
-  /* ── Montant en lettres (pour la confirmation) ── */
-  const U = ["zéro", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf", "dix", "onze", "douze", "treize", "quatorze", "quinze", "seize", "dix-sept", "dix-huit", "dix-neuf"];
-  const D = ["", "", "vingt", "trente", "quarante", "cinquante", "soixante"];
-  function deux(n) {
-    if (n < 20) return U[n];
-    const t = Math.floor(n / 10), u = n % 10;
-    if (t === 7 || t === 9) { const r = n - (t === 7 ? 60 : 80); return (t === 7 ? "soixante" : "quatre-vingt") + (r === 11 && t === 7 ? " et onze" : "-" + U[r]); }
-    if (t === 8) return u ? "quatre-vingt-" + U[u] : "quatre-vingts";
-    return u === 0 ? D[t] : u === 1 ? D[t] + " et un" : D[t] + "-" + U[u];
-  }
-  function trois(n, final) {
-    const c = Math.floor(n / 100), r = n % 100; let s = "";
-    if (c) s = (c === 1 ? "cent" : U[c] + " cent") + (r === 0 && c > 1 && final ? "s" : "");
-    if (r) { let d = deux(r); if (!final && r === 80) d = "quatre-vingt"; s += (s ? " " : "") + d; }
-    return s;
-  }
-  function enLettres(n) {
-    if (!n) return "zéro ariary";
-    const mi = Math.floor(n / 1e6), k = Math.floor(n / 1000) % 1000, r = n % 1000, parts = [];
-    if (mi) parts.push(trois(mi, true) + (mi > 1 ? " millions" : " million"));
-    if (k) parts.push(k === 1 ? "mille" : trois(k, false) + " mille");
-    if (r) parts.push(trois(r, true));
-    return parts.join(" ") + (n % 1e6 === 0 ? " d'ariary" : " ariary");
-  }
+  /* État de l'écran */
+  let etu = null, dues = [], k = 0, actif = -1, liste = [];
 
-  /* ── Étape 1 : recherche ── */
-  function ligne(e) {
+  /* ══ 1. Quel étudiant ? ══ */
+  function badge(e) {
     const s = situation(e);
-    return `<li><button type="button" class="resultat" data-id="${e.id}">
-      <img src="${photo(e)}" alt="">
-      <span class="resultat-id"><b>${nomComplet(e)}</b><span><span class="matricule">${e.matricule}</span> · ${FILIERES[e.filiere].nom} · ${niveau(e.niveau)}</span></span>
-      ${s.retard ? `<span class="badge badge-retard">Retard ${ar(s.retard)}</span>` : `<span class="badge badge-paye">À jour</span>`}
-    </button></li>`;
+    return s.retard ? `<span class="badge badge-retard">En retard ${ar(s.retard)}</span>` : `<span class="badge badge-paye">À jour</span>`;
   }
-  function suggestions() {
-    const vus = new Set(), liste = [];
-    [...PAIEMENTS].reverse().forEach((p) => { if (p.etudiant.statut === "ACTIF" && !vus.has(p.etudiant.id)) { vus.add(p.etudiant.id); liste.push(p.etudiant); } });
-    return liste.slice(0, 6);
+  function derniersServis() {
+    const vus = new Set(), r = [];
+    [...PAIEMENTS].reverse().forEach((p) => { if (p.etudiant.statut === "ACTIF" && !vus.has(p.etudiant.id)) { vus.add(p.etudiant.id); r.push(p.etudiant); } });
+    return r.slice(0, 5);
   }
   function chercher() {
     const q = $("#q").value.trim();
-    let liste;
-    if (!q) { liste = suggestions(); $("#resultats-titre").textContent = "Récemment servis au guichet"; }
+    if (!q) { liste = derniersServis(); $("#resultats-titre").textContent = "Derniers servis"; }
     else {
       const mots = norm(q).split(/\s+/);
       liste = actifs.filter((e) => { const t = norm(nomComplet(e) + " " + e.matricule); return mots.every((m) => t.includes(m)); });
       $("#resultats-titre").textContent = liste.length ? `${liste.length} étudiant${liste.length > 1 ? "s" : ""} trouvé${liste.length > 1 ? "s" : ""}` : "Aucun résultat";
     }
-    $("#resultats").innerHTML = liste.length ? liste.map(ligne).join("")
-      : `<li class="vide">Aucun étudiant actif ne correspond à « ${echapper(q)} ». Vérifiez l'orthographe ou cherchez par matricule.</li>`;
-    if (q) $("#resultats .resultat")?.classList.add("premier");
+    actif = q && liste.length ? 0 : -1;
+    $("#resultats").innerHTML = liste.length ? liste.map((e, i) => `
+      <li class="resultat" role="option" id="opt-${e.id}" data-id="${e.id}" aria-selected="${i === actif}">
+        <img src="${photo(e)}" alt="">
+        <span class="resultat-id"><b>${nomComplet(e)}</b><span><span class="matricule">${e.matricule}</span> · ${FILIERES[e.filiere].nom} · ${niveau(e.niveau)}</span></span>
+        ${badge(e)}
+      </li>`).join("")
+      : `<li class="vide">Aucun étudiant actif ne correspond à « ${echapper(q)} ». Vérifiez l'orthographe ou tapez le matricule.</li>`;
+    marquerActif();
+  }
+  function marquerActif() {
+    document.querySelectorAll(".resultat").forEach((li, i) => li.setAttribute("aria-selected", String(i === actif)));
+    const li = document.querySelectorAll(".resultat")[actif];
+    if (li) { $("#q").setAttribute("aria-activedescendant", li.id); li.scrollIntoView({ block: "nearest" }); }
+    else $("#q").removeAttribute("aria-activedescendant");
   }
   $("#q").addEventListener("input", chercher);
   $("#q").addEventListener("keydown", (ev) => {
-    if (ev.key === "Enter") { ev.preventDefault(); const b = $("#resultats .resultat"); if (b) choisir(IFSPA.etudiant(b.dataset.id)); }
-  });
-  $("#resultats").addEventListener("click", (ev) => { const b = ev.target.closest(".resultat"); if (b) choisir(IFSPA.etudiant(b.dataset.id)); });
-
-  /* ── Étape 2 : saisie ── */
-  function choisir(e) {
-    choisi = e;
-    history.replaceState(null, "", "?id=" + e.id);
-    const s = situation(e);
-    $("#carte").innerHTML = `
-      <img src="${photo(e)}" alt="">
-      <div>
-        <h2>${nomComplet(e)}</h2>
-        <div class="details"><span class="matricule">${e.matricule}</span><span class="badge badge-${e.filiere.toLowerCase()}">${FILIERES[e.filiere].nom}</span><span>${niveau(e.niveau)}${e.redoublant ? " · redoublante" : ""}</span></div>
-      </div>
-      <div class="carte-retard">
-        <small>${s.retard ? `En retard à date · ${s.moisRetard} mois` : "Situation à date"}</small>
-        <strong class="${s.retard ? "retard" : "succes"}">${s.retard ? ar(s.retard) : "À jour"}</strong>
-      </div>
-      <div class="carte-actions">
-        <button type="button" class="btn btn-fantome btn-petit" id="changer">Changer d'étudiant</button>
-        <a class="btn btn-fantome btn-petit" href="etudiant.html?id=${e.id}">Voir la fiche</a>
-        <a class="btn btn-fantome btn-petit" href="releve.html?id=${e.id}">Relevé</a>
-      </div>`;
-    $("#changer").addEventListener("click", () => {
-      history.replaceState(null, "", location.pathname);
-      $("#etape-saisie").hidden = true; $("#etape-recherche").hidden = false; $("#q").value = ""; chercher(); $("#q").focus();
-    });
-    const raccourcis = [];
-    raccourcis.push(`<button type="button" class="btn btn-secondaire btn-petit" data-montant="${s.retard}" ${s.retard ? "" : "disabled"}>Solder le retard <span>${s.retard ? ar(s.retard) : ""}</span></button>`);
-    raccourcis.push(`<button type="button" class="btn btn-secondaire btn-petit" data-montant="${TARIF.mensuel}">1 mois <span>${ar(TARIF.mensuel)}</span></button>`);
-    raccourcis.push(`<button type="button" class="btn btn-secondaire btn-petit" data-montant="${TARIF.mensuel * 2}">2 mois <span>${ar(TARIF.mensuel * 2)}</span></button>`);
-    $("#raccourcis").innerHTML = raccourcis.join("");
-    $("#montant").value = ""; $("#reference").value = ""; $("#observation").value = "";
-    effacerErreurs();
-    $("#etape-recherche").hidden = true; $("#etape-saisie").hidden = false;
-    majRepartition();
-    $("#montant").focus();
-  }
-  $("#raccourcis").addEventListener("click", (ev) => {
-    const b = ev.target.closest("[data-montant]"); if (!b) return;
-    $("#montant").value = Number(b.dataset.montant).toLocaleString("fr-FR"); effacerErreurs(); majRepartition();
-  });
-
-  const lireMontant = () => Number($("#montant").value.replace(/\D/g, "")) || 0;
-  $("#montant").addEventListener("input", (ev) => {
-    const n = ev.target.value.replace(/\D/g, "").slice(0, 9);
-    ev.target.value = n ? Number(n).toLocaleString("fr-FR") : "";
-    effacerErreurs(); majRepartition();
-  });
-
-  const PREFIXES = { MVOLA: "MP270312.1024.A15", ORANGE_MONEY: "CI270312.1024.B08", AIRTEL_MONEY: "AM270312.1024.C21" };
-  const mode = () => document.querySelector("input[name=mode]:checked").value;
-  document.querySelectorAll("input[name=mode]").forEach((r) => r.addEventListener("change", () => {
-    const m = mode(); const mm = m !== "ESPECES";
-    $("#champ-reference").hidden = !mm;
-    if (mm) $("#reference").placeholder = "Ex. " + PREFIXES[m];
-    effacerErreurs();
-  }));
-
-  function repartir(e, montant) {
-    let r = montant;
-    const lignes = echeancier(e).filter((l) => l.paye < l.du).map((l) => {
-      const reste = l.du - l.paye, impute = Math.min(r, reste); r -= impute;
-      return { ...l, reste, impute, apres: reste - impute };
-    });
-    return { lignes, excedent: r };
-  }
-
-  function etatApres(l) {
-    if (l.apres === 0) return `<span class="badge badge-paye">Soldée</span>`;
-    if (l.impute > 0) return `<span class="badge badge-partiel">Reste ${ar(l.apres)}</span>`;
-    return l.echue ? `<span class="badge badge-retard">En retard</span>` : `<span class="badge badge-avenir">À venir</span>`;
-  }
-
-  function majRepartition() {
-    const e = choisi; if (!e) return;
-    const montant = lireMontant();
-    const { lignes, excedent } = repartir(e, montant);
-    const s = situation(e);
-    if (!lignes.length) {
-      $("#repartition").innerHTML = `<div class="vide-repartition">Toutes les échéances de l'année 2026-2027 sont soldées. Aucun paiement n'est attendu.</div>`;
-      return;
+    if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+      ev.preventDefault(); if (!liste.length) return;
+      actif = ev.key === "ArrowDown" ? (actif + 1) % liste.length : (actif <= 0 ? liste.length - 1 : actif - 1);
+      marquerActif();
+    } else if (ev.key === "Enter") {
+      ev.preventDefault(); const e = liste[Math.max(actif, 0)]; if (e) choisir(e);
     }
-    const visibles = lignes.filter((l) => l.echue || l.impute > 0);
-    const caches = lignes.filter((l) => !(l.echue || l.impute > 0));
-    const retardApres = lignes.filter((l) => l.echue).reduce((t, l) => t + l.apres, 0);
-    const resteAnnee = lignes.reduce((t, l) => t + l.reste, 0);
-    const impute = montant - excedent;
-    $("#repartition").innerHTML = `
-      <div class="tableau-conteneur">
-        <table class="tableau repartition">
-          <thead><tr><th>Échéance</th><th class="a-droite col-reste">Reste dû</th><th class="a-droite">Imputé</th><th>Après paiement</th></tr></thead>
-          <tbody>${visibles.map((l) => `
-            <tr class="${l.impute ? "touchee" : ""}">
-              <td class="libelle">${l.libelle.replace("Mensualité ", "")}${l.court === "Droits" ? "<small>Année 2026-2027</small>" : l.echue ? "<small>Mensualité échue</small>" : "<small>Mensualité à venir</small>"}</td>
-              <td class="a-droite montant col-reste">${ar(l.reste)}</td>
-              <td class="a-droite montant ${l.impute ? "impute" : "muet"}">${l.impute ? ar(l.impute) : "—"}</td>
-              <td>${etatApres(l)}</td>
-            </tr>`).join("")}
-          </tbody>
-        </table>
-      </div>
-      ${caches.length ? `<p class="note-avenir">+ ${caches.length} mensualité${caches.length > 1 ? "s" : ""} à venir non concernée${caches.length > 1 ? "s" : ""} (${caches[0].court} → ${caches[caches.length - 1].court}), ${ar(caches.reduce((t, l) => t + l.reste, 0))}.</p>` : ""}
-      ${excedent > 0 ? `<div style="padding:0 1.25rem 1rem"><div class="alerte alerte-attention" role="alert"><div><b>Montant supérieur au reste dû de l'année</b>Le reste dû pour 2026-2027 est de ${ar(resteAnnee)}. Réduisez le montant de ${ar(excedent)}.</div></div></div>` : ""}
-      <dl class="bilan">
-        <dt>Montant saisi</dt><dd>${montant ? ar(montant) : "—"}</dd>
-        <dt>Retard actuel</dt><dd>${ar(s.retard)}</dd>
-        <dt class="final">Reste en retard après ce paiement</dt>
-        <dd class="final ${retardApres ? "retard" : "succes"}">${montant ? (retardApres ? ar(retardApres) : "À jour") : "—"}</dd>
-      </dl>`;
-    $("#valider").disabled = excedent > 0;
+  });
+  $("#resultats").addEventListener("click", (ev) => { const li = ev.target.closest(".resultat"); if (li) choisir(IFSPA.etudiant(li.dataset.id)); });
+
+  function choisir(e) {
+    etu = e;
+    history.replaceState(null, "", "?id=" + e.id);
+    $("#choisi").innerHTML = `<img src="${photo(e)}" alt="">
+      <div><b>${nomComplet(e)}</b><span><span class="matricule">${e.matricule}</span><span class="sep-point"> · </span><span class="fn">${FILIERES[e.filiere].nom} · ${niveau(e.niveau)}</span></span></div>
+      <button type="button" class="lien" id="changer">Changer<span class="sr-only"> d'étudiant</span></button>`;
+    $("#recherche").hidden = true; $("#choisi").hidden = false;
+
+    const ech = echeancier(e);
+    dues = ech.map((l, i) => ({ ...l, i, reste: l.du - l.paye })).filter((l) => l.reste > 0);
+    const exigibles = dues.filter((l) => l.mois <= MOIS_COURANT).length;
+    k = exigibles || (dues.length ? 1 : 0);
+
+    // Ligne « Déjà payé »
+    const soldees = ech.filter((l) => l.statut === "paye");
+    const mois = soldees.filter((l) => l.type === "MENSUALITE");
+    const droits = soldees.filter((l) => l.type === "DROITS");
+    const nDroits = e.droitsEn || 1;
+    const morceaux = [];
+    if (droits.length) morceaux.push(nDroits === 1 ? "droits" : droits.length === nDroits ? `droits (${nDroits} tranches)` : `droits ${droits.map((l) => l.court.split(" ")[1]).join(", ")}`);
+    if (mois.length === 1) morceaux.push(mois[0].court);
+    else if (mois.length > 1) morceaux.push(`${mois[0].court}–${mois[mois.length - 1].court}`);
+    $("#deja").textContent = morceaux.length ? `Déjà payé : ${morceaux.join(", ").replace(/\.$/, "")}.` : "Aucun paiement reçu cette année.";
+    rendre();
+  }
+  $("#choisi").addEventListener("click", (ev) => { if (ev.target.closest("#changer")) retourRecherche(); });
+
+  function retourRecherche() {
+    etu = null; dues = []; k = 0;
+    history.replaceState(null, "", location.pathname);
+    $("#choisi").hidden = true; $("#recherche").hidden = false;
+    $("#q").value = ""; chercher(); rendre(); $("#q").focus();
   }
 
-  /* ── Validation ── */
-  function erreur(id, champ, msg) { const p = $(id); p.textContent = msg; p.hidden = false; $(champ).setAttribute("aria-invalid", "true"); }
-  function effacerErreurs() {
-    ["#montant-erreur", "#reference-erreur"].forEach((id) => { $(id).hidden = true; });
-    ["#montant", "#reference"].forEach((id) => $(id).removeAttribute("aria-invalid"));
+  /* ══ 2. Que paie-t-il ? ══ */
+  // Les k premières échéances dues sont payées en entier (pas de paiement partiel).
+  const montant = () => dues.slice(0, k).reduce((t, l) => t + l.reste, 0);
+  const repartir = () => dues.map((l, n) => ({ ...l, impute: n < k ? l.reste : 0 }));
+  function etat(l) {
+    if (l.mois < MOIS_COURANT) return ["retard", "En retard"];
+    if (l.mois === MOIS_COURANT) return ["mois", "Ce mois-ci"];
+    return ["avenir", "À venir"];
   }
-  $("#reference").addEventListener("input", () => { $("#reference-erreur").hidden = true; $("#reference").removeAttribute("aria-invalid"); });
-
-  $("#formulaire").addEventListener("submit", (ev) => {
-    ev.preventDefault();
-    effacerErreurs();
-    const montant = lireMontant(), m = mode(), ref = $("#reference").value.trim();
-    let ok = true;
-    if (!montant) { erreur("#montant-erreur", "#montant", "Saisissez le montant reçu."); ok = false; }
-    if (m !== "ESPECES" && !ref) { erreur("#reference-erreur", "#reference", "La référence est obligatoire pour un paiement Mobile Money."); ok = false; }
-    if (!ok) { (montant ? $("#reference") : $("#montant")).focus(); return; }
-    const { lignes } = repartir(choisi, montant);
-    const touchees = lignes.filter((l) => l.impute);
-    const retardApres = lignes.filter((l) => l.echue).reduce((t, l) => t + l.apres, 0);
-    const obs = $("#observation").value.trim();
-    $("#confirmation-corps").innerHTML = `
-      <div class="personne" style="margin-bottom:1rem"><img src="${photo(choisi)}" alt=""><div><b>${nomComplet(choisi)}</b><span><span class="matricule">${choisi.matricule}</span> · ${FILIERES[choisi.filiere].nom} · ${niveau(choisi.niveau)}</span></div></div>
-      <dl class="recap">
-        <dt>Montant</dt><dd><span class="gros">${ar(montant)}</span><span class="lettres">${enLettres(montant)}</span></dd>
-        <dt>Mode</dt><dd>${modeLibelle(m)}${m !== "ESPECES" ? ` · réf. <span class="matricule">${echapper(ref)}</span>` : ""}</dd>
-        <dt>Imputation</dt><dd><ul>${touchees.map((l) => `<li>${l.libelle} : ${ar(l.impute)}${l.apres ? ` <span class="muet">(reste ${ar(l.apres)})</span>` : ""}</li>`).join("")}</ul></dd>
-        <dt>Retard après</dt><dd class="${retardApres ? "retard" : "succes"}">${retardApres ? ar(retardApres) : "À jour"}</dd>
-        ${obs ? `<dt>Observation</dt><dd style="font-weight:500">${echapper(obs)}</dd>` : ""}
-      </dl>`;
-    $("#confirmation").showModal();
+  function rendreCases(lignes) {
+    $("#cases").innerHTML = lignes.map((l) => {
+      const coche = l.impute > 0;
+      const [cls, txt] = etat(l);
+      const libelle = maj(l.court);
+      return `<button type="button" class="case" data-n="${lignes.indexOf(l)}" aria-pressed="${coche}" aria-label="${l.libelle}, ${ar(l.reste)}, ${txt.toLowerCase()}">
+        <span class="coche">${COCHE}</span><b>${libelle}</b><span class="reste">${ar(l.reste)}</span><span class="etat etat-${cls}">${txt}</span></button>`;
+    }).join("");
+  }
+  $("#cases").addEventListener("click", (ev) => {
+    const b = ev.target.closest(".case"); if (!b) return;
+    const i = Number(b.dataset.n);
+    k = i < k ? i : i + 1;
+    rendre();
+    document.querySelector(`.case[data-n="${i}"]`)?.focus();
   });
 
-  $("#confirmer").addEventListener("click", () => {
-    const montant = lireMontant(), m = mode(), ref = $("#reference").value.trim();
-    $("#confirmation").close();
-    const url = `recu.html?recu=${NOUVEAU_RECU}&nouveau=1&id=${choisi.id}&montant=${montant}&mode=${m}${ref ? "&ref=" + encodeURIComponent(ref) : ""}`;
-    $("#lien-recu").href = url;
-    $("#succes-titre").textContent = `Paiement enregistré — reçu ${NOUVEAU_RECU}`;
-    $("#succes-texte").textContent = ` ${ar(montant)} reçus en ${modeLibelle(m)}. Imprimez le reçu et remettez l'original au payeur.`;
-    $("#succes-personne").innerHTML = `<img src="${photo(choisi)}" alt=""><div><b>${nomComplet(choisi)}</b><span><span class="matricule">${choisi.matricule}</span> · ${niveau(choisi.niveau)}</span></div>`;
-    $("#etape-saisie").hidden = true; $("#succes").hidden = false;
-    toast(`Paiement enregistré — reçu ${NOUVEAU_RECU}. <a href="${url}">Imprimer le reçu</a>`);
-    $("#lien-recu").focus();
+  /* ══ 3. Comment ? ══ */
+  const mode = () => document.querySelector("input[name=mode]:checked").value;
+  const operateur = () => document.querySelector("input[name=op]:checked")?.value || null;
+  document.querySelectorAll("input[name=mode]").forEach((r) => r.addEventListener("change", () => {
+    $("#mm").hidden = mode() !== "MM"; rendre();
+  }));
+  const EXEMPLES = { MVOLA: "MP270312.1024.A15", ORANGE_MONEY: "CI270312.1024.B08", AIRTEL_MONEY: "AM270312.1024.C21" };
+  document.querySelectorAll("input[name=op]").forEach((r) => r.addEventListener("change", () => {
+    $("#reference").placeholder = "Ex. " + EXEMPLES[operateur()]; rendre(); $("#reference").focus();
+  }));
+  $("#reference").addEventListener("input", rendre);
+  $("#ajouter-note").addEventListener("click", () => { $("#ajouter-note").hidden = true; $("#champ-note").hidden = false; $("#note").focus(); });
+
+  /* ══ Rendu global ══ */
+  function activer(n, on, fait) {
+    const s = $("#etape-" + n);
+    s.classList.toggle("inactive", !on); s.classList.toggle("faite", !!fait);
+    s.querySelector(".etape-num").innerHTML = fait ? COCHE : String(n);
+    if (on) s.removeAttribute("inert"); else s.setAttribute("inert", "");
+  }
+  function rendre() {
+    const avecEtu = !!etu;
+    activer(1, true, avecEtu);
+    if (!avecEtu) { [2, 3, 4].forEach((n) => activer(n, false)); return; }
+
+    const aPayer = dues.length > 0;
+    const lignes = repartir();
+    const m = montant();
+    if (aPayer) rendreCases(lignes);
+    else $("#cases").innerHTML = `<p class="solde-annee" style="grid-column:1/-1;margin:0">Toute l'année 2026-2027 est payée. Rien à encaisser.</p>`;
+    $("#bloc-montant").hidden = !aPayer;
+    $("#total").textContent = ar(m);
+
+    const ok2 = aPayer && m > 0;
+    const mm = mode() === "MM", op = operateur(), ref = $("#reference").value.trim();
+    const ok3 = !mm || (op && ref);
+    activer(2, true, ok2);
+    activer(3, aPayer, ok2 && ok3);
+    activer(4, aPayer, false);
+
+    // Récapitulatif en une ligne
+    const touchees = lignes.filter((l) => l.impute > 0);
+    let recap = "";
+    if (touchees.length) {
+      const lib = (l) => l.court;
+      const premier = touchees[0], dernier = touchees[touchees.length - 1];
+      const plage = touchees.length === 1 ? maj(lib(premier)) : `${maj(lib(premier))} → ${lib(dernier)}`;
+      const nbMois = touchees.filter((l) => l.type === "MENSUALITE").length;
+      const nbDroits = touchees.filter((l) => l.type === "DROITS").length;
+      const quoi = [nbDroits ? ((etu.droitsEn || 1) > 1 ? `${nbDroits} tranche${nbDroits > 1 ? "s" : ""} de droits` : "droits") : "", nbMois ? `${nbMois} mensualité${nbMois > 1 ? "s" : ""}` : ""].filter(Boolean).join(" + ");
+      const modeTxt = mm ? (op ? modeLibelle(op) : "Mobile Money") : "Espèces";
+      recap = `${plage} · ${quoi} · ${modeTxt}`;
+    }
+    $("#recap").textContent = recap;
+
+    let raison = "";
+    if (!aPayer) raison = "";
+    else if (!m) raison = "Cochez au moins un mois.";
+    else if (mm && !op) raison = "Choisissez l'opérateur Mobile Money.";
+    else if (mm && !ref) raison = "Saisissez la référence de la transaction.";
+    $("#raison").textContent = raison;
+    const bouton = $("#encaisser");
+    if (bouton.getAttribute("aria-busy") !== "true") {
+      bouton.disabled = !!raison || !aPayer;
+      bouton.textContent = m ? `Encaisser ${ar(m)} et imprimer le reçu` : "Encaisser et imprimer le reçu";
+    }
+  }
+
+  /* ══ 4. Encaisser ══ */
+  let dernierUrl = "";
+  $("#encaisser").addEventListener("click", () => {
+    const b = $("#encaisser"); if (b.disabled) return;
+    const m = montant(), mm = mode() === "MM", code = mm ? operateur() : "ESPECES", ref = mm ? $("#reference").value.trim() : "";
+    const recu = `R-2027-${String(numeroRecu).padStart(5, "0")}`;
+    const base = `recu.html?recu=${recu}&nouveau=1&id=${etu.id}&montant=${m}&mode=${code}${ref ? "&ref=" + encodeURIComponent(ref) : ""}`;
+    dernierUrl = base + "&imprimer=1";
+    // L'onglet est ouvert pendant le clic (sinon le navigateur le bloque), puis chargé une fois le paiement enregistré.
+    const onglet = window.open("", "_blank");
+    b.setAttribute("aria-busy", "true"); b.disabled = true;
+    b.innerHTML = `<span class="rouage" aria-hidden="true"></span>Enregistrement…`;
+    setTimeout(() => {
+      if (onglet) onglet.location.href = dernierUrl;
+      if (!co.enLigne) { co.attente++; afficherConnexion(); }
+      afficherSucces(recu, m, code, !onglet);
+      numeroRecu++;
+      b.removeAttribute("aria-busy");
+    }, 900);
   });
 
-  /* ── Démarrage ── */
+  function afficherSucces(recu, m, code, bloque) {
+    $("#succes-titre").textContent = `Paiement enregistré — reçu ${recu}`;
+    $("#succes-texte").textContent = `${ar(m)} · ${modeLibelle(code)} · ${nomComplet(etu)}. ` +
+      (bloque ? "Le navigateur a bloqué l'ouverture du reçu : cliquez sur « Réimprimer le reçu »." : "Le reçu s'imprime dans un nouvel onglet.") +
+      (co.enLigne ? "" : " Hors ligne : le paiement est gardé sur ce poste et sera envoyé à la prochaine synchronisation.");
+    $("#reimprimer").href = dernierUrl;
+    $("#guichet").hidden = true; $("#succes").hidden = false; $("#succes").focus();
+  }
+
+  $("#autre").addEventListener("click", () => {
+    $("#succes").hidden = true; $("#guichet").hidden = false;
+    document.querySelector("input[name=mode][value=ESPECES]").checked = true;
+    document.querySelectorAll("input[name=op]").forEach((r) => (r.checked = false));
+    $("#reference").value = ""; $("#note").value = ""; $("#mm").hidden = true;
+    $("#champ-note").hidden = true; $("#ajouter-note").hidden = false;
+    retourRecherche();
+  });
+
+  /* ══ Connexion : l'encaissement fonctionne hors ligne ══
+     Les paiements saisis sans Internet sont gardés sur le poste, puis envoyés au serveur :
+     automatiquement dès le retour de la connexion (et toutes les 5 minutes), ou avec « Synchroniser ». */
+  const co = { enLigne: true, attente: 0, derniere: "10:24", sync: false };
+  const heureMaintenant = () => new Date().toTimeString().slice(0, 5);
+  function afficherConnexion() {
+    const el = $("#connexion"), b = $("#synchroniser");
+    el.dataset.etat = co.sync ? "sync" : co.enLigne ? "en-ligne" : "hors-ligne";
+    const attente = co.attente ? `${co.attente} paiement${co.attente > 1 ? "s" : ""} en attente d'envoi` : "aucun paiement en attente";
+    $("#co-texte").innerHTML = co.sync ? `<b>Synchronisation en cours…</b><small>Envoi de ${attente.replace(" en attente d'envoi", "")} au serveur</small>`
+      : co.enLigne ? `<b>En ligne · tout est synchronisé</b><small>Dernière synchronisation à ${co.derniere} · automatique toutes les 5 minutes</small>`
+      : `<b>Hors ligne · vous pouvez continuer à encaisser</b><small>${attente} · liste des étudiants du 12/03/2027 à ${co.derniere}</small>`;
+    b.disabled = co.sync || !co.enLigne;
+    b.title = co.enLigne ? "" : "Disponible dès le retour de la connexion";
+    b.querySelector("span").textContent = co.sync ? "Synchronisation…" : "Synchroniser";
+    $("#basculer").textContent = co.enLigne ? "simuler une coupure d'Internet" : "rétablir la connexion";
+  }
+  function synchroniser(auto) {
+    if (!co.enLigne || co.sync) return;
+    co.sync = true; afficherConnexion();
+    setTimeout(() => {
+      const n = co.attente;
+      co.sync = false; co.attente = 0; co.derniere = heureMaintenant(); afficherConnexion();
+      if (n || !auto) PROTO.toast(n ? `${n} paiement${n > 1 ? "s" : ""} envoyé${n > 1 ? "s" : ""} au serveur.` : "Tout est déjà synchronisé.");
+    }, 1400);
+  }
+  function passer(enLigne) { co.enLigne = enLigne; afficherConnexion(); if (enLigne) synchroniser(true); }
+  $("#synchroniser").addEventListener("click", () => synchroniser(false));
+  $("#basculer").addEventListener("click", () => passer(!co.enLigne));
+  window.addEventListener("online", () => passer(true));
+  window.addEventListener("offline", () => passer(false));
+  setInterval(() => synchroniser(true), 5 * 60 * 1000);
+  const demoCo = new URLSearchParams(location.search);
+  if (demoCo.get("hors-ligne") === "1") { co.enLigne = false; co.attente = Number(demoCo.get("attente")) || 0; co.derniere = "08:02"; }
+  afficherConnexion();
+
+  /* ══ Démarrage — démo : ?id=4 · ?id=4&etape=paiement · ?id=4&mois=3 · ?id=4&mode=mm ══ */
   const depart = new URLSearchParams(location.search);
   const initial = IFSPA.etudiant(depart.get("id"));
   if (initial && initial.statut === "ACTIF") {
     choisir(initial);
-    const pre = Number(depart.get("montant")); // démo : ?id=8&montant=200000
-    if (pre) { $("#montant").value = pre.toLocaleString("fr-FR"); majRepartition(); }
-  } else chercher();
+    const pre = Number(depart.get("mois"));
+    if (pre) k = Math.min(pre, dues.length);
+    if (depart.get("mode") === "mm") { document.querySelector("input[name=mode][value=MM]").checked = true; $("#mm").hidden = false; }
+    rendre();
+    if (depart.get("etape") === "paiement") {
+      $("#etape-3").scrollIntoView({ block: "start" });
+      document.querySelector("input[name=mode]:checked").focus({ preventScroll: true });
+    } else $("#encaisser").disabled || $("#encaisser").focus({ preventScroll: true });
+  } else {
+    chercher(); rendre(); $("#q").focus();
+  }
 </script>
 </body>
 </html>

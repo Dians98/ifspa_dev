@@ -10,6 +10,7 @@ import logo from "../../../public/brand/logo-ifspa.png";
 const LIENS = [
   { href: "#institut", label: "L'institut" },
   { href: "#filieres", label: "Filières" },
+  { href: "#galerie", label: "Galerie" },
   { href: "#agrements", label: "Agréments" },
   { href: "#contact", label: "Contact" },
 ];

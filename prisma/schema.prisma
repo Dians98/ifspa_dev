@@ -193,8 +193,6 @@ model Etudiant {
   telephone       String?
   email           String?
   adresse         String?
-  tuteurNom       String?
-  tuteurTelephone String?
   photo           String?
   filiereId       String
   filiere         Filiere        @relation(fields: [filiereId], references: [id])

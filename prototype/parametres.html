@@ -20,14 +20,14 @@
   .etablissement { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 1.25rem; align-items: start; }
   .logo-bloc { text-align: center; }
   .logo-bloc img { width: 140px; margin: .5rem auto 1rem; }
-  .saisie.a-completer::placeholder { color: var(--partiel); font-style: italic; }
+  .saisie.a-completer::placeholder { color: var(--attention); font-style: italic; }
   .pied-form { display: flex; justify-content: flex-end; align-items: center; gap: .75rem; padding: 1rem 1.25rem; border-top: 1px solid var(--bordure); background: var(--fond-2); border-radius: 0 0 12px 12px; }
   .pied-form .muet { margin-right: auto; font-size: .82rem; }
 
   .cellule-montant { width: 9.5rem; }
   .cellule-montant .saisie { text-align: right; font-variant-numeric: tabular-nums; height: 34px; }
   .cellule-mois .saisie { width: 4.5rem; text-align: right; height: 34px; }
-  .saisie.manquant { border-color: #f5d3a8; background: var(--partiel-pale); }
+  .saisie.manquant { border-color: #f5d3a8; background: var(--attention-pale); }
   .unite { font-size: .75rem; color: var(--texte-2); margin-left: .35rem; }
   .actions-ligne { display: flex; gap: .35rem; justify-content: flex-end; flex-wrap: wrap; }
   .courante { color: var(--rose-fonce); font-weight: 600; font-size: .78rem; display: block; }
@@ -282,7 +282,7 @@
       <tr>
         <td><b class="montant">${a.lib}</b>${a.etat === "courante" ? '<span class="courante">Année courante</span>' : ""}</td>
         <td class="col-mobile-masquee muet">${a.periode}</td>
-        <td>${{ cloturee: '<span class="badge badge-avenir">Clôturée</span>', courante: '<span class="badge badge-paye">En cours</span>', preparation: '<span class="badge badge-neutre">En préparation</span>', ouverte: '<span class="badge badge-partiel">Ouverte · à clôturer</span>' }[a.etat]}</td>
+        <td>${{ cloturee: '<span class="badge badge-avenir">Clôturée</span>', courante: '<span class="badge badge-paye">En cours</span>', preparation: '<span class="badge badge-neutre">En préparation</span>', ouverte: '<span class="badge badge-attention">Ouverte · à clôturer</span>' }[a.etat]}</td>
         <td class="pleine"><div class="actions-ligne">
           ${a.etat === "preparation" ? `<button class="btn btn-secondaire btn-petit" type="button" data-annee="${i}" data-action="courante">Définir comme année courante</button>` : ""}
           ${a.etat === "courante" || a.etat === "ouverte" ? `<button class="btn btn-secondaire btn-petit" type="button" data-annee="${i}" data-action="cloturer">Clôturer</button>` : ""}

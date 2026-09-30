@@ -76,18 +76,18 @@
   const ECRANS = [
     ["Page d'accueil publique", "Présentation de l'institut, filières, agréments et contact (site Next.js : voir la capture).", "captures/00-landing-desktop.png"],
     ["Connexion", "Espace du personnel avec les deux comptes de démonstration.", "connexion.html"],
-    ["Tableau de bord", "Effectifs, encaissements, taux de recouvrement, impayés et derniers paiements.", "dashboard.html"],
+    ["Tableau de bord", "Effectifs, encaissements, taux de recouvrement par classe et derniers paiements.", "dashboard.html"],
     ["Étudiants", "Liste avec recherche et filtres, photo, matricule et situation d'écolage.", "etudiants.html"],
     ["Fiche étudiant", "Écolage mois par mois, identité, parcours année par année, paiements.", "etudiant.html?id=5"],
     ["Nouvel étudiant", "Inscription avec attribution automatique du matricule et échéancier.", "etudiant-nouveau.html"],
-    ["Encaisser", "Écran du guichet : répartition automatique du paiement sur les échéances.", "encaissement.html?id=4"],
-    ["Reçu de paiement", "Ticket pour imprimante de reçus 80 mm : montant en lettres, QR code de vérification.", "recu.html"],
-    ["Vérification d'un reçu", "Page publique ouverte en scannant le QR code du reçu.", "verification.html"],
+    ["Encaisser", "Écran du guichet en 4 gestes : on coche les mois entiers (retards précochés, pas d'acompte), on choisit le mode ; fonctionne aussi sans Internet, un seul bouton encaisse et imprime.", "encaissement.html?id=4"],
+    ["Reçu de paiement", "Ticket pour imprimante de reçus 80 mm : montant en lettres, reste à payer.", "recu.html"],
     ["Paiements", "Historique des reçus ; annulation réservée à l'administrateur.", "paiements.html"],
     ["Impayés", "Étudiants en retard, avec relevé et encaissement en un clic.", "impayes.html"],
     ["Relevé d'écolage", "Document A4 pour les parents : situation complète de l'étudiant.", "releve.html?id=8"],
-    ["Admissions", "Passage d'année en lot en 3 étapes, avec vérification et historique annulable.", "admissions.html"],
+    ["Admissions", "Passage en année supérieure, classe par classe : tous les étudiants sont cochés, on décoche ceux qui ne passent pas (redouble ou abandon).", "admissions.html"],
     ["Paramètres", "Filières, années scolaires, tarifs et utilisateurs.", "parametres.html", true],
+    ["Workflows", "Schémas de chaque tâche, de la mise en service à l'utilisation quotidienne.", "workflows.html"],
   ];
   document.getElementById("liste").innerHTML = ECRANS.map(([nom, desc, href, admin], i) => `
     <li>

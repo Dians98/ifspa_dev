@@ -52,7 +52,7 @@
   .d-tab tr.annulee .m { text-decoration: line-through; }
   .st { display: inline-flex; align-items: center; gap: 1.2mm; font-weight: 600; font-size: 7.8pt; white-space: nowrap; }
   .st::before { content: ""; width: 1.8mm; height: 1.8mm; border-radius: 50%; background: currentColor; }
-  .st-paye { color: var(--paye); } .st-partiel { color: var(--partiel); } .st-retard { color: var(--retard); } .st-avenir { color: #566173; }
+  .st-paye { color: var(--paye); } .st-retard { color: var(--retard); } .st-avenir { color: #566173; }
   .st-avenir::before { background: transparent; border: .8pt solid currentColor; }
   .st-annule { color: #566173; }
 
@@ -100,7 +100,7 @@
   const e = IFSPA.etudiant(new URLSearchParams(location.search).get("id")) || IFSPA.etudiant(8);
   const F = e.sexe === "F";
   const DU_ANNUEL = TARIF.droits + TARIF.mensuel * TARIF.nombreMois;
-  const STATUTS = { paye: "Payé", partiel: "Partiel", retard: "En retard", avenir: "À venir" };
+  const STATUTS = { paye: "Payé", retard: "En retard", avenir: "À venir" };
   const st = (k, txt) => `<span class="st st-${k}">${txt || STATUTS[k]}</span>`;
 
   /* ── Parcours : années scolaires de l'entrée à l'année en cours (ou de sortie) ── */
@@ -119,7 +119,7 @@
     if (y === 2026 && e.statut === "ACTIF") {
       const lignes = echeancier(e);
       const du = lignes.reduce((s, l) => s + l.du, 0), paye = lignes.reduce((s, l) => s + l.paye, 0);
-      totalDu += du - (e.arrieres || 0); totalPayeTout += paye;
+      totalDu += du; totalPayeTout += paye;
       return `<section class="annee">${titre}
         <table class="d-tab">
           <thead><tr><th>Échéance</th><th class="m">Dû</th><th class="m">Payé</th><th class="m">Reste</th><th>Statut</th></tr></thead>
@@ -127,12 +127,11 @@
           <tfoot><tr><td>Sous-total ${lib}</td><td class="m">${ar(du)}</td><td class="m">${ar(paye)}</td><td class="m">${ar(du - paye)}</td><td></td></tr></tfoot>
         </table></section>`;
     }
-    const arr = y === 2025 && e.arrieres ? e.arrieres : 0;
-    totalDu += DU_ANNUEL; totalPayeTout += DU_ANNUEL - arr;
+    totalDu += DU_ANNUEL; totalPayeTout += DU_ANNUEL;
     return `<section class="annee">${titre}
       <table class="d-tab">
         <thead><tr><th>Échéance</th><th class="m">Dû</th><th class="m">Payé</th><th class="m">Reste</th><th>Statut</th></tr></thead>
-        <tbody><tr><td>Droits d'inscription + ${TARIF.nombreMois} mensualités (oct. ${y} → juil. ${y + 1})</td><td class="m">${ar(DU_ANNUEL)}</td><td class="m">${ar(DU_ANNUEL - arr)}</td><td class="m">${arr ? ar(arr) : "—"}</td><td>${arr ? st("partiel", "Reporté sur 2026-2027") : st("paye", "Soldée")}</td></tr></tbody>
+        <tbody><tr><td>Droits d'inscription + ${TARIF.nombreMois} mensualités (oct. ${y} → juil. ${y + 1})</td><td class="m">${ar(DU_ANNUEL)}</td><td class="m">${ar(DU_ANNUEL)}</td><td class="m">—</td><td>${st("paye", "Soldée")}</td></tr></tbody>
       </table></section>`;
   });
 
@@ -167,7 +166,7 @@
           <div><dt>Statut</dt><dd>${statut}</dd></div>
           <div><dt>Niveau ${e.statut === "ACTIF" ? "actuel" : "de sortie"}</dt><dd>${niveau(e.niveau)}${e.redoublant ? (F ? " (redoublante)" : " (redoublant)") : ""}</dd></div>
           <div><dt>Né${F ? "e" : ""} le</dt><dd>${e.naissance} à ${e.lieu}</dd></div>
-          <div><dt>Tuteur</dt><dd>${e.tuteur} · ${e.telTuteur}</dd></div>
+          <div><dt>Téléphone</dt><dd>${e.tel}</dd></div>
         </dl>
       </div>
     </section>

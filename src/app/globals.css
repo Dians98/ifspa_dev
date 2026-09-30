@@ -49,8 +49,8 @@
   /* Statuts d'écolage — volontairement distincts du rose d'accent */
   --color-paye: var(--paye);
   --color-paye-pale: var(--paye-pale);
-  --color-partiel: var(--partiel);
-  --color-partiel-pale: var(--partiel-pale);
+  --color-attention: var(--attention);
+  --color-attention-pale: var(--attention-pale);
   --color-retard: var(--retard);
   --color-retard-pale: var(--retard-pale);
   --radius-sm: calc(var(--radius) * 0.6);
@@ -92,8 +92,8 @@
 
   --paye: #1f7a4d;
   --paye-pale: #e7f4ec;
-  --partiel: #b45309;
-  --partiel-pale: #fdf1e3;
+  --attention: #b45309;
+  --attention-pale: #fdf1e3;
   --retard: #c62828;
   --retard-pale: #fdecec;
 

@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workflows · IFSPA</title>
+<link rel="icon" href="assets/img/logo-ifspa.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  body { background: var(--fond-2); }
+  .doc { max-width: 1120px; margin: 0 auto; padding: 2.5rem clamp(1rem, 4vw, 2rem) 4rem; }
+  .doc-tete { display: flex; align-items: center; gap: 1.1rem; margin-bottom: 1.75rem; }
+  .doc-tete img { width: 72px; height: auto; }
+  .doc-tete h1 { font: 700 clamp(1.7rem, 3vw, 2.3rem)/1.15 var(--police-titre); color: var(--primaire); }
+  .doc-tete h1::after { content: ""; display: block; width: 48px; height: 4px; border-radius: 999px; background: var(--rose); margin-top: .6rem; }
+  .doc-tete p { margin: .5rem 0 0; color: var(--texte-2); max-width: 46rem; }
+
+  /* Légende */
+  .legende { display: flex; flex-wrap: wrap; gap: .6rem 1.4rem; padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
+  .legende h2 { width: 100%; font: 600 .82rem var(--police-texte); color: var(--texte-2); }
+  .legende span { display: inline-flex; align-items: center; gap: .5rem; font-size: .88rem; }
+  .legende i { display: inline-block; width: 30px; height: 18px; border: 1.5px solid; border-radius: 6px; flex: none; }
+  .l-tous { background: #eef3f9; border-color: #4a7fb5 !important; }
+  .l-admin { background: #1e3a5f; border-color: #1e3a5f !important; }
+  .l-auto { background: #f4f6f9; border-color: #aab4c2 !important; border-style: dashed !important; border-radius: 2px !important; }
+  .l-choix { background: #fbf1f3; border-color: #d4798c !important; transform: rotate(45deg) scale(.62); width: 22px !important; height: 22px !important; border-radius: 3px !important; }
+  .l-fin { background: #e7f4ec; border-color: #1f7a4d !important; border-radius: 999px !important; }
+  .l-bloque { background: #fdecec; border-color: #c62828 !important; }
+  .l-public { background: #fff; border-color: #a84860 !important; }
+
+  /* Sommaire */
+  .sommaire { padding: 1.1rem 1.25rem 1.25rem; margin-bottom: 2rem; }
+  .sommaire h2 { font: 600 1rem var(--police-texte); margin-bottom: .75rem; }
+  .sommaire ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .25rem 2rem; }
+  .sommaire a { display: flex; align-items: baseline; gap: .6rem; padding: .35rem 0; text-decoration: none; color: var(--texte); }
+  .sommaire a:hover b { color: var(--primaire); text-decoration: underline; }
+  .sommaire .n { font: 700 .8rem var(--police-texte); color: var(--rose-fonce); min-width: 1.6rem; font-variant-numeric: tabular-nums; }
+  .sommaire b { font-weight: 600; }
+
+  /* Workflows */
+  .wf { margin-bottom: 1.75rem; scroll-margin-top: 1rem; overflow: hidden; }
+  .wf-tete { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: .75rem 1.5rem; padding: 1.2rem 1.4rem 1rem; border-bottom: 1px solid var(--bordure); }
+  .wf-tete h2 { font: 700 1.35rem/1.25 var(--police-titre); color: var(--primaire); display: flex; gap: .6rem; align-items: baseline; }
+  .wf-tete h2 .n { font: 700 .95rem var(--police-texte); color: #fff; background: var(--rose-fonce); border-radius: 6px; padding: .1rem .45rem; font-variant-numeric: tabular-nums; }
+  .wf-tete p { margin: .35rem 0 0; color: var(--texte-2); font-size: .92rem; max-width: 44rem; }
+  .qui { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .6rem; }
+  .role { display: inline-flex; align-items: center; padding: .15rem .55rem; border-radius: 999px; font-size: .75rem; font-weight: 600; }
+  .role-admin { background: var(--primaire); color: #fff; }
+  .role-tous { background: var(--primaire-pale); color: var(--primaire); }
+  .role-public { background: var(--rose-pale); color: var(--rose-fonce); }
+  .role-quand { background: var(--fond-2); color: var(--texte-2); }
+  .wf-schema { padding: 1.5rem 1rem; overflow-x: auto; background: #fff; text-align: center; }
+  .wf-schema .mermaid { display: inline-block; min-width: 0; }
+  .wf-schema svg { max-width: 100%; height: auto; }
+  .wf-pied { display: flex; flex-wrap: wrap; gap: 1rem 2rem; justify-content: space-between; align-items: flex-start; padding: 1rem 1.4rem 1.2rem; background: var(--fond-2); border-top: 1px solid var(--bordure); }
+  .wf-pied ul { margin: 0; padding-left: 1.1rem; font-size: .9rem; max-width: 46rem; }
+  .wf-pied li + li { margin-top: .25rem; }
+  .wf-pied h3 { font: 600 .8rem var(--police-texte); color: var(--texte-2); margin-bottom: .35rem; }
+  .wf-pied .ecrans { display: flex; flex-wrap: wrap; gap: .4rem; }
+  .mermaid:not([data-processed]) { color: transparent; min-height: 200px; }
+
+
+  /* Frise du cycle global */
+  .frise { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1.6rem; text-align: left; max-width: 1040px; margin: 0 auto; }
+  .phase { position: relative; background: #f8fafc; border: 1px solid var(--bordure); border-radius: 12px; padding: .9rem .8rem 1rem; }
+  .phase.cycle { background: var(--rose-pale); border-color: #f0d3da; }
+  .phase + .phase::before { content: ""; position: absolute; left: -1.35rem; top: 1.55rem; width: 1.1rem; height: 2px; background: #7a8494; }
+  .phase + .phase::after { content: ""; position: absolute; left: -.45rem; top: calc(1.55rem - 4px); border: 5px solid transparent; border-left: 7px solid #7a8494; border-right: 0; }
+  .phase-tete { display: flex; gap: .55rem; align-items: center; margin-bottom: .8rem; }
+  .phase-tete .phase-n { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--primaire); color: #fff; font-weight: 700; font-size: .9rem; }
+  .phase.cycle .phase-n { background: var(--rose-fonce); }
+  .phase-tete b { display: block; font: 700 1.02rem/1.2 var(--police-titre); color: var(--primaire); }
+  .phase-tete span { font-size: .78rem; color: var(--texte-2); }
+  .phase ul { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; }
+  .bloc { padding: .5rem .6rem; border-radius: 8px; border: 1.5px solid; font-size: .85rem; line-height: 1.35; }
+  .bloc-tous { background: #eef3f9; border-color: #4a7fb5; color: #1e3a5f; }
+  .bloc-admin { background: #1e3a5f; border-color: #1e3a5f; color: #fff; }
+  .bloc-auto { background: #fff; border-color: #aab4c2; border-style: dashed; color: #3d4757; border-radius: 3px; }
+  .retour { position: relative; max-width: 1040px; margin: .9rem auto 0; height: 34px; }
+  .retour::before { content: ""; position: absolute; left: calc(40% + .3rem); right: 10%; top: 0; height: 20px; border: 2px dashed var(--rose); border-top: 0; border-radius: 0 0 14px 14px; }
+  .retour::after { content: ""; position: absolute; left: calc(40% + .3rem - 5px); top: -6px; border: 6px solid transparent; border-bottom: 8px solid var(--rose); border-top: 0; }
+  .retour span { position: absolute; left: 50%; top: 20px; translate: -50% -50%; background: #fff; padding: 0 .6rem; font-size: .82rem; font-weight: 600; color: var(--rose-fonce); white-space: nowrap; }
+  @media (max-width: 900px) {
+    .frise { grid-template-columns: minmax(0, 1fr); gap: 1.4rem; }
+    .phase + .phase::before { left: 1.9rem; top: -1.3rem; width: 2px; height: 1.1rem; }
+    .phase + .phase::after { left: calc(1.9rem - 4px); top: -.4rem; border: 5px solid transparent; border-top: 7px solid #7a8494; border-bottom: 0; }
+    .retour { height: auto; } .retour::before, .retour::after { display: none; }
+    .retour span { position: static; translate: none; display: block; text-align: center; white-space: normal; }
+  }
+
+  .pied-doc { margin-top: 2.5rem; text-align: center; font-size: .8rem; color: var(--texte-2); }
+
+  @media (max-width: 720px) {
+    .sommaire ol { grid-template-columns: minmax(0, 1fr); }
+    .doc-tete img { width: 56px; }
+    .wf-tete, .wf-pied { padding-inline: 1rem; }
+  }
+  @media print {
+    body { background: #fff; }
+    .wf { break-inside: avoid; box-shadow: none; }
+    .sommaire, .ecrans { display: none; }
+  }
+</style>
+</head>
+<body>
+<main class="doc">
+  <header class="doc-tete">
+    <img src="assets/img/logo-ifspa.png" alt="Logo de l'IFSPA">
+    <div>
+      <h1>Comment fonctionne l'application</h1>
+      <p>Les étapes de chaque tâche, de la mise en service à l'utilisation quotidienne. Chaque schéma se lit de haut en bas.</p>
+    </div>
+  </header>
+
+  <section class="panneau legende" aria-labelledby="leg">
+    <h2 id="leg">Comment lire les schémas</h2>
+    <span><i class="l-tous"></i>Action faite par le secrétariat ou l'administrateur</span>
+    <span><i class="l-admin"></i>Action réservée à l'administrateur</span>
+    <span><i class="l-public"></i>Action d'une personne extérieure</span>
+    <span><i class="l-auto"></i>Fait automatiquement par l'application</span>
+    <span><i class="l-choix"></i>Question ou choix</span>
+    <span><i class="l-bloque"></i>Blocage ou refus</span>
+    <span><i class="l-fin"></i>Résultat</span>
+  </section>
+
+  <nav class="panneau sommaire" aria-labelledby="som">
+    <h2 id="som">Sommaire</h2>
+    <ol id="sommaire"></ol>
+  </nav>
+
+  <div id="workflows"></div>
+
+  <p class="pied-doc">© 2027 IFSPA — Conçu et réalisé par <a href="https://portfolio-blue-iota-21.vercel.app/" target="_blank" rel="noopener">Diano ANDRIANTSALAMA</a> · Document de présentation, données fictives</p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+  // Styles communs à tous les schémas (couleurs de la charte)
+  const STYLES = `
+    classDef default fill:#eef3f9,stroke:#4a7fb5,stroke-width:1.5px,color:#1e3a5f
+    classDef admin fill:#1e3a5f,stroke:#1e3a5f,color:#ffffff
+    classDef auto fill:#f4f6f9,stroke:#aab4c2,stroke-dasharray:5 4,color:#3d4757
+    classDef choix fill:#fbf1f3,stroke:#d4798c,stroke-width:1.5px,color:#7a2e44
+    classDef fin fill:#e7f4ec,stroke:#1f7a4d,stroke-width:1.5px,color:#17603c
+    classDef bloque fill:#fdecec,stroke:#c62828,stroke-width:1.5px,color:#9b1c1c
+    classDef public fill:#ffffff,stroke:#a84860,stroke-width:1.5px,color:#a84860
+    classDef phase fill:#ffffff,stroke:#cfd8e3,color:#1e3a5f`;
+
+  const WF = [
+    {
+      id: "global", titre: "Vue d'ensemble : de la mise en service à l'utilisation",
+      desc: "Le cycle d'une année à l'IFSPA. Les étapes 1 et 2 ne se font qu'une fois ; les étapes 3 à 5 se répètent chaque année.",
+      qui: [["tous", "Tout le personnel"], ["quand", "Toute l'année"]],
+      frise: [
+        { n: "1", titre: "Mise en service", quand: "Une seule fois", etapes: [
+          ["auto", "Installation de l'application sur l'hébergement de l'IFSPA"],
+          ["auto", "Préremplissage : filières IF et SF, année 2026-2027, tarifs, compte administrateur"] ] },
+        { n: "2", titre: "Paramétrage", quand: "Au démarrage", etapes: [
+          ["admin", "Vérifier les filières et leur durée"],
+          ["admin", "Saisir les vrais tarifs"],
+          ["admin", "Créer les comptes du secrétariat"] ] },
+        { n: "3", titre: "Rentrée", quand: "Octobre", cycle: true, etapes: [
+          ["tous", "Inscrire les nouveaux étudiants de 1re année"],
+          ["tous", "Encaisser les droits d'inscription (en 1, 2 ou 3 fois)"],
+          ["auto", "Matricule et échéancier créés automatiquement"] ] },
+        { n: "4", titre: "Toute l'année", quand: "Au quotidien", cycle: true, etapes: [
+          ["tous", "Encaisser et imprimer les reçus, même sans Internet"],
+          ["tous", "Suivre les impayés et relancer"],
+          ["tous", "Imprimer les relevés"],
+          ["tous", "Consulter le tableau de bord"],
+          ["admin", "Enregistrer une sortie"] ] },
+        { n: "5", titre: "Fin d'année", quand: "Juillet", cycle: true, etapes: [
+          ["admin", "Créer l'année suivante et ses tarifs"],
+          ["tous", "Passage en année supérieure, classe par classe"],
+          ["admin", "Définir la nouvelle année comme courante"] ] },
+      ],
+      retenir: ["Le prestataire installe et préremplit l'application : l'institut n'a rien à configurer techniquement.", "L'administrateur ajuste ensuite les tarifs et crée les comptes.", "Chaque année suit le même cycle : rentrée, encaissements, passage en année supérieure."],
+      ecrans: [["Paramètres", "parametres.html"], ["Tableau de bord", "dashboard.html"]],
+    },
+    {
+      id: "connexion", titre: "Se connecter",
+      desc: "Deux types de comptes : l'administrateur a tous les droits ; le secrétariat inscrit et encaisse, sans rien supprimer ni annuler.",
+      qui: [["tous", "Tout le personnel"]],
+      schema: `flowchart TD
+        A("Ouvrir le site de l'IFSPA") --> B("Cliquer sur « Se connecter »")
+        B --> C("Saisir son adresse e-mail<br/>et son mot de passe")
+        C --> D{"Identifiants<br/>corrects ?"}:::choix
+        D -- Non --> E["Message d'erreur"]:::bloque
+        E --> C
+        D -- Oui --> F{"Quel compte ?"}:::choix
+        F -- Administrateur --> G(["Tableau de bord<br/>avec tous les menus"]):::fin
+        F -- Secrétariat --> H(["Tableau de bord<br/>sans Paramètres ni annulations"]):::fin`,
+      retenir: ["Personne ne peut créer son propre compte : c'est l'administrateur qui les crée.", "La session se ferme d'elle-même après 12 heures."],
+      ecrans: [["Connexion", "connexion.html"]],
+    },
+    {
+      id: "parametres", titre: "Paramétrer l'application",
+      desc: "Filières, années scolaires, tarifs et comptes utilisateurs. Le paramétrage initial est déjà fait à l'installation ; l'administrateur l'ajuste ensuite.",
+      qui: [["admin", "Administrateur uniquement"], ["quand", "Au démarrage, puis chaque fin d'année"]],
+      schema: `flowchart TD
+        A("Menu « Paramètres »"):::admin --> B{"Que voulez-vous<br/>modifier ?"}:::choix
+        B -- Filières --> C("Ajouter ou modifier une filière :<br/>code, nom, durée des études"):::admin
+        B -- Années --> D("Créer une année scolaire"):::admin
+        D --> D2["Créée « en préparation »"]:::auto
+        D2 --> D3("La définir comme année courante<br/>le moment venu"):::admin
+        B -- Tarifs --> E("Pour chaque filière et chaque niveau :<br/>droits d'inscription + mensualité"):::admin
+        E --> E2["Appliqués aux nouvelles inscriptions ;<br/>les échéances déjà créées ne changent pas"]:::auto
+        B -- Utilisateurs --> F("Créer un compte :<br/>nom, e-mail, rôle"):::admin
+        F --> F2("Désactiver le compte<br/>quand la personne part"):::admin
+        C & D3 & E2 & F2 --> G(["Paramètres à jour"]):::fin
+        S("Un compte secrétariat<br/>ouvre « Paramètres »") --> T["Accès refusé"]:::bloque`,
+      retenir: ["Sans tarif, on ne peut ni inscrire ni faire passer une classe : l'application le signale clairement.", "Un changement de tarif ne réécrit jamais le passé."],
+      ecrans: [["Filières", "parametres.html#filieres"], ["Années", "parametres.html#annees"], ["Tarifs", "parametres.html#tarifs"], ["Utilisateurs", "parametres.html#utilisateurs"]],
+    },
+    {
+      id: "inscription", titre: "Inscrire un nouvel étudiant",
+      desc: "À la rentrée, pour chaque étudiant qui entre en 1re année. Le matricule est attribué automatiquement et ne changera plus jamais.",
+      qui: [["tous", "Secrétariat ou administrateur"], ["quand", "Rentrée d'octobre"]],
+      schema: `flowchart TD
+        A("« Étudiants » puis<br/>« Nouvel étudiant »") --> B("Saisir l'identité : nom, prénoms,<br/>date et lieu de naissance, téléphone, photo")
+        B --> C("Choisir la filière")
+        C --> C2{"Droits d'inscription<br/>payés en combien de fois ?"}:::choix
+        C2 -- "1, 2 ou 3 fois" --> D["Aperçu du matricule<br/>ex. IF-2026-0043"]:::auto
+        D --> E{"Tarif de l'année<br/>saisi ?"}:::choix
+        E -- Non --> X["Inscription impossible :<br/>l'administrateur doit saisir le tarif"]:::bloque
+        E -- Oui --> F("Vérifier le récapitulatif<br/>puis « Enregistrer »")
+        F --> G["Matricule définitif attribué.<br/>Droits (en 1, 2 ou 3 tranches)<br/>+ 10 mensualités créés"]:::auto
+        G --> H("Au guichet : encaisser les droits<br/>(ou leur 1re tranche)")
+        H --> I(["Étudiant inscrit<br/>et reçu remis"]):::fin`,
+      retenir: ["Le matricule suit le modèle FILIÈRE-ANNÉE-NUMÉRO (ex. IF-2026-0043).", "Droits en 2 ou 3 fois : tranches égales, la 1re à l'inscription, les suivantes en novembre puis en décembre.", "La filière ne peut plus être changée après l'enregistrement : on vérifie avant de valider."],
+      ecrans: [["Nouvel étudiant", "etudiant-nouveau.html"], ["Fiche étudiant", "etudiant.html?id=1"]],
+    },
+    {
+      id: "encaissement", titre: "Encaisser un paiement",
+      desc: "L'écran du guichet, en 4 gestes. On coche des mois entiers : il n'y a pas d'acompte ni de montant à taper.",
+      qui: [["tous", "Secrétariat ou administrateur"], ["quand", "Chaque jour, au guichet"]],
+      schema: `flowchart TD
+        A("« Encaisser »") --> A2{"Internet<br/>disponible ?"}:::choix
+        A2 -- Oui --> B
+        A2 -- Non --> A3["Bandeau « Hors ligne » :<br/>on continue à encaisser,<br/>les paiements sont gardés sur ce poste"]:::auto
+        A3 --> B("1 · Chercher l'étudiant<br/>par nom ou matricule")
+        B --> C{"Reste-t-il des mois<br/>à payer cette année ?"}:::choix
+        C -- Non --> Z(["« Toute l'année est payée » :<br/>rien à encaisser"]):::fin
+        C -- Oui --> D["Les mois en retard<br/>sont déjà cochés"]:::auto
+        D --> E("2 · Cocher ou décocher<br/>des mois entiers")
+        E --> F["Montant calculé<br/>automatiquement"]:::auto
+        F --> G{"3 · Comment<br/>paie-t-il ?"}:::choix
+        G -- Espèces --> I
+        G -- Mobile Money --> H("Choisir l'opérateur<br/>(MVola, Orange, Airtel)<br/>et recopier la référence du SMS")
+        H --> I("4 · « Encaisser … Ar<br/>et imprimer le reçu »")
+        I --> J["Reçu numéroté enregistré<br/>(ex. R-2027-00023),<br/>ticket imprimé"]:::auto
+        J --> K(["Écran remis à zéro<br/>pour la personne suivante"]):::fin
+        J -. "si hors ligne" .-> L["Paiement en attente d'envoi,<br/>envoyé à la prochaine synchronisation"]:::auto`,
+      retenir: ["Les échéances se paient toujours de la plus ancienne à la plus récente : droits (ou tranche de droits) puis mensualité de chaque mois.", "Pas de fenêtre de confirmation : le bouton dit exactement ce qu'il fait.", "Le reçu est un ticket de caisse 80 mm.", "Sans Internet, l'encaissement continue : c'est le seul écran qui fonctionne hors ligne."],
+      ecrans: [["Encaisser", "encaissement.html?id=8"], ["Hors ligne", "encaissement.html?id=8&hors-ligne=1&attente=2"], ["Reçu", "recu.html"]],
+    },
+    {
+      id: "droits", titre: "Droits d'inscription : quand et où les encaisser",
+      desc: "Les droits se paient au guichet, sur l'écran « Encaisser », comme les mensualités. Ils peuvent être payés en 1, 2 ou 3 fois.",
+      qui: [["tous", "Secrétariat ou administrateur"], ["quand", "À l'inscription, puis chaque rentrée"]],
+      schema: `flowchart TD
+        A{"Quel étudiant ?"}:::choix
+        A -- "Nouvel étudiant" --> B("Inscription : choisir<br/>droits en 1, 2 ou 3 fois")
+        A -- "Étudiant qui passe<br/>en année supérieure" --> C["Droits de la nouvelle année créés<br/>au passage (même choix que l'an passé,<br/>modifiable tant que rien n'est payé)"]:::auto
+        B --> D["Tranches créées :<br/>1re en octobre, 2e en novembre,<br/>3e en décembre"]:::auto
+        C --> D
+        D --> E("« Encaisser » : la tranche du mois<br/>apparaît en premier, avant la mensualité")
+        E --> F{"Tranche payée<br/>à temps ?"}:::choix
+        F -- Oui --> G(["Reçu remis"]):::fin
+        F -- Non --> H["Tranche « en retard » :<br/>l'étudiant apparaît dans les Impayés"]:::bloque`,
+      retenir: ["En 1 fois : les droits sont dus à l'inscription (octobre).", "En 2 fois : octobre et novembre. En 3 fois : octobre, novembre et décembre.", "Chaque tranche se paie en entier, comme une mensualité."],
+      ecrans: [["Nouvel étudiant", "etudiant-nouveau.html"], ["Fiche (droits en 3 fois)", "etudiant.html?id=10"], ["Encaisser", "encaissement.html?id=10"]],
+    },
+    {
+      id: "synchronisation", titre: "Encaisser sans Internet et synchroniser",
+      desc: "Si la connexion coupe, le guichet continue d'encaisser. Les paiements sont gardés sur le poste, puis envoyés au serveur.",
+      qui: [["tous", "Secrétariat ou administrateur"], ["quand", "En cas de coupure d'Internet"]],
+      schema: `flowchart TD
+        A["Coupure d'Internet"]:::bloque --> B["Bandeau orange « Hors ligne »<br/>sur l'écran Encaisser"]:::auto
+        B --> C("Encaisser normalement :<br/>le reçu s'imprime avec son numéro")
+        C --> D["Paiement gardé sur ce poste,<br/>« en attente d'envoi »"]:::auto
+        D --> E{"La connexion<br/>revient ?"}:::choix
+        E -- Non --> C
+        E -- Oui --> F{"Comment<br/>synchroniser ?"}:::choix
+        F -- Automatiquement --> G["Envoi dès le retour de la connexion,<br/>puis toutes les 5 minutes"]:::auto
+        F -- Manuellement --> H("Bouton « Synchroniser »")
+        G & H --> I["Le serveur vérifie chaque paiement"]:::auto
+        I --> J{"Mois déjà payé<br/>ailleurs entre-temps ?"}:::choix
+        J -- Non --> K(["Paiements enregistrés,<br/>bandeau vert « tout est synchronisé »"]):::fin
+        J -- Oui --> L["Paiement enregistré mais signalé<br/>« à vérifier » à l'administrateur"]:::bloque`,
+      retenir: ["Seul l'encaissement fonctionne hors ligne ; les autres écrans demandent Internet.", "Chaque poste garde une copie légère de la liste des étudiants et de leurs échéances, mise à jour à chaque synchronisation.", "Chaque poste réserve à l'avance une série de numéros de reçu : les tickets imprimés hors ligne portent donc leur numéro définitif.", "Ne pas vider le navigateur du poste tant que des paiements sont en attente."],
+      ecrans: [["Hors ligne", "encaissement.html?hors-ligne=1&attente=2"], ["En ligne", "encaissement.html"]],
+    },
+    {
+      id: "annulation-paiement", titre: "Annuler un paiement",
+      desc: "En cas d'erreur de saisie. Un paiement n'est jamais effacé : il est annulé avec un motif et reste visible dans l'historique.",
+      qui: [["admin", "Administrateur uniquement"]],
+      schema: `flowchart TD
+        A("« Paiements » : retrouver le reçu") --> B{"Qui est<br/>connecté ?"}:::choix
+        B -- Secrétariat --> C["Pas de bouton « Annuler » :<br/>prévenir l'administrateur"]:::bloque
+        B -- Administrateur --> D("« Annuler » puis<br/>saisir le motif"):::admin
+        D --> E["Reçu conservé,<br/>marqué ANNULÉ"]:::auto
+        E --> F["Les mois concernés<br/>redeviennent à payer"]:::auto
+        F --> G(["Encaisser à nouveau<br/>correctement si besoin"]):::fin`,
+      retenir: ["On sait toujours qui a annulé, quand et pourquoi.", "Un reçu annulé réimprimé porte la mention ANNULÉ."],
+      ecrans: [["Paiements", "paiements.html"], ["Reçu annulé", "recu.html?recu=R-2027-00015"]],
+    },
+    {
+      id: "impayes", titre: "Suivre les impayés",
+      desc: "Savoir qui relancer : la liste des étudiants qui ont au moins un mois échu non payé.",
+      qui: [["tous", "Secrétariat ou administrateur"], ["quand", "Chaque semaine ou chaque mois"]],
+      schema: `flowchart TD
+        A("Menu « Impayés »") --> B["Liste des étudiants en retard,<br/>avec le montant et les mois impayés"]:::auto
+        B --> C("Filtrer : filière, niveau,<br/>nombre de mois de retard")
+        C --> D{"Que faire ?"}:::choix
+        D -- Relancer --> E("Appeler l'étudiant<br/>(numéro affiché)")
+        D -- Informer --> F("Imprimer son relevé<br/>d'écolage")
+        D -- Il paie --> G("« Encaisser »")
+        G --> H(["Une fois à jour, l'étudiant<br/>sort de la liste"]):::fin
+        E & F --> I(["Relance faite"]):::fin`,
+      retenir: ["Un mois est en retard dès que son mois est passé sans paiement.", "Les impayés d'une année restent dus sur cette année : rien n'est reporté."],
+      ecrans: [["Impayés", "impayes.html"]],
+    },
+    {
+      id: "releve", titre: "Imprimer un relevé d'écolage",
+      desc: "Le document A4 remis à l'étudiant ou à sa famille : toute sa situation, année par année et mois par mois.",
+      qui: [["tous", "Secrétariat ou administrateur"], ["quand", "À la demande"]],
+      schema: `flowchart TD
+        A("Fiche de l'étudiant<br/>ou liste des impayés") --> B("« Relevé d'écolage »")
+        B --> C["Relevé A4 généré : chaque année,<br/>chaque mois payé, en retard ou à venir,<br/>et la liste des reçus"]:::auto
+        C --> D("Imprimer<br/>ou enregistrer en PDF")
+        D --> E(["Remis à l'étudiant<br/>ou à sa famille"]):::fin`,
+      retenir: ["Le relevé porte le logo et les références d'agrément de l'institut."],
+      ecrans: [["Relevé", "releve.html?id=8"]],
+    },
+    {
+      id: "passage", titre: "Passage en année supérieure",
+      desc: "En fin d'année, classe par classe. Tous les étudiants sont cochés : on décoche seulement ceux qui ne passent pas.",
+      qui: [["tous", "Secrétariat ou administrateur"], ["quand", "Fin juillet"]],
+      schema: `flowchart TD
+        P0{"Tarifs de l'année<br/>suivante saisis ?"}:::choix
+        P0 -- Non --> P1["Classe « Tarif manquant » :<br/>l'administrateur saisit le tarif"]:::bloque
+        P1 --> P0
+        P0 -- Oui --> A("« Admissions » :<br/>choisir une classe « À faire »")
+        A --> B["Tous les étudiants sont cochés :<br/>ils passent (ou sont diplômés<br/>en dernière année)"]:::auto
+        B --> C{"Quelqu'un<br/>ne passe pas ?"}:::choix
+        C -- Oui --> D("Le décocher")
+        D --> E{"Redouble<br/>ou abandon ?"}:::choix
+        E --> C
+        C -- Non --> F("« Valider la classe »")
+        F --> G("Relire la confirmation :<br/>nombre d'admis et liste nominative<br/>de ceux qui ne passent pas")
+        G --> H["Inscriptions de l'année suivante<br/>et mensualités créées.<br/>Diplômés et abandons sortent des effectifs"]:::auto
+        H --> I(["Classe « Validée » :<br/>on passe à la classe suivante"]):::fin`,
+      retenir: ["Les impayés de l'année écoulée restent dus : ils n'empêchent pas le passage.", "Le matricule ne change pas, même pour un redoublant.", "Tant qu'aucun paiement n'est saisi sur la nouvelle année, l'administrateur peut annuler (schéma suivant)."],
+      ecrans: [["Admissions", "admissions.html?classe=IF-1"], ["Classe validée", "admissions.html?classe=IF-3"]],
+    },
+    {
+      id: "annulation-passage", titre: "Annuler un passage",
+      desc: "Pour corriger une classe validée par erreur. Tout revient exactement à l'état d'avant.",
+      qui: [["admin", "Administrateur uniquement"]],
+      schema: `flowchart TD
+        A("Classe validée ou « Historique » :<br/>« Annuler ce passage »"):::admin --> B{"Des paiements ont-ils été saisis<br/>sur la nouvelle année ?"}:::choix
+        B -- Oui --> C["Annulation bloquée :<br/>la liste des reçus concernés s'affiche"]:::bloque
+        C --> D("Annuler d'abord ces paiements,<br/>avec un motif"):::admin
+        D --> B
+        B -- Non --> E("Confirmer l'annulation"):::admin
+        E --> F["Nouvelles inscriptions supprimées,<br/>statuts d'avant restaurés"]:::auto
+        F --> G(["Classe de nouveau « À faire »"]):::fin`,
+      retenir: ["Le blocage protège les paiements déjà encaissés."],
+      ecrans: [["Historique", "admissions.html#historique"]],
+    },
+    {
+      id: "sortie", titre: "Enregistrer une sortie",
+      desc: "Quand un étudiant abandonne ou est exclu en cours d'année. Les diplômés sortent, eux, par le passage en année supérieure.",
+      qui: [["admin", "Administrateur uniquement"], ["quand", "En cours d'année"]],
+      schema: `flowchart TD
+        A("Fiche de l'étudiant :<br/>« Enregistrer une sortie »"):::admin --> B("Choisir : abandon ou exclusion ;<br/>date ; motif obligatoire"):::admin
+        B --> C("Confirmer<br/>(action définitive)"):::admin
+        C --> D["L'étudiant ne compte plus dans les effectifs<br/>et ne peut plus être encaissé"]:::auto
+        D --> E(["Matricule, paiements et relevé restent consultables.<br/>Un retard éventuel reste dû"]):::fin`,
+      retenir: ["Le motif figure dans le dossier de l'étudiant."],
+      ecrans: [["Fiche étudiant", "etudiant.html?id=10"]],
+    },
+    {
+      id: "tableau-de-bord", titre: "Consulter le tableau de bord",
+      desc: "La situation de l'institut en un coup d'œil, sans graphique.",
+      qui: [["tous", "Secrétariat ou administrateur"], ["quand", "À tout moment"]],
+      schema: `flowchart TD
+        A("Se connecter") --> B["Tableau de bord : effectif actif,<br/>taux de recouvrement, étudiants en retard"]:::auto
+        B --> C("Filtrer par filière<br/>ou par année scolaire")
+        C --> D["Tableau par classe :<br/>recouvrement et nombre d'étudiants en retard"]:::auto
+        D --> E{"Besoin<br/>du détail ?"}:::choix
+        E -- Une classe en retard --> F(["Ouvrir la liste des impayés"]):::fin
+        E -- Un paiement récent --> G(["Ouvrir le reçu"]):::fin`,
+      retenir: ["Les chiffres sont calculés à la date du jour, sur les mois déjà échus."],
+      ecrans: [["Tableau de bord", "dashboard.html"]],
+    },
+  ];
+
+  const friseHTML = (phases) => `<div class="frise">${phases.map((ph) => `
+    <div class="phase${ph.cycle ? " cycle" : ""}">
+      <div class="phase-tete"><span class="phase-n">${ph.n}</span><div><b>${ph.titre}</b><span>${ph.quand}</span></div></div>
+      <ul>${ph.etapes.map(([c, t]) => `<li class="bloc bloc-${c}">${t}</li>`).join("")}</ul>
+    </div>`).join("")}</div>
+    <div class="retour" aria-hidden="true"><span>Chaque année, on recommence à l'étape 3</span></div>
+    <p class="sr-only">Chaque année, on recommence à l'étape 3.</p>`;
+
+  const ROLE = { tous: "role-tous", admin: "role-admin", public: "role-public", quand: "role-quand" };
+  document.getElementById("sommaire").innerHTML = WF.map((w, i) =>
+    `<li><a href="#${w.id}"><span class="n">${String(i).padStart(2, "0")}</span><b>${w.titre}</b></a></li>`).join("");
+  document.getElementById("workflows").innerHTML = WF.map((w, i) => `
+    <section class="panneau wf" id="${w.id}" aria-labelledby="t-${w.id}">
+      <div class="wf-tete">
+        <div>
+          <h2 id="t-${w.id}"><span class="n">${String(i).padStart(2, "0")}</span>${w.titre}</h2>
+          <p>${w.desc}</p>
+          <div class="qui">${w.qui.map(([r, t]) => `<span class="role ${ROLE[r]}">${r === "quand" ? "Quand : " : "Qui : "}${t}</span>`).join("")}</div>
+        </div>
+      </div>
+      <div class="wf-schema">${w.frise ? friseHTML(w.frise) : `<pre class="mermaid" data-wf="${i}"></pre>`}</div>
+      <div class="wf-pied">
+        <div><h3>À retenir</h3><ul>${w.retenir.map((r) => `<li>${r}</li>`).join("")}</ul></div>
+        <div><h3>Voir l'écran</h3><div class="ecrans">${w.ecrans.map(([t, h]) => `<a class="btn btn-secondaire btn-petit" href="${h}">${t}</a>`).join("")}</div></div>
+      </div>
+    </section>`).join("");
+
+  // Texte brut : les <br/> ne doivent pas être interprétés par le navigateur avant Mermaid
+  document.querySelectorAll("pre[data-wf]").forEach((pre) => {
+    const w = WF[pre.dataset.wf];
+    pre.textContent = `${w.schema}\n${STYLES}${w.id === "global" ? "\n        class P1,P2,P3,P4,P5 phase" : ""}`;
+  });
+
+  mermaid.initialize({
+    startOnLoad: false, theme: "base", securityLevel: "loose",
+    fontFamily: "Figtree, system-ui, sans-serif",
+    themeVariables: {
+      fontFamily: "Figtree, system-ui, sans-serif", fontSize: "16px",
+      lineColor: "#7a8494", primaryTextColor: "#1e3a5f", edgeLabelBackground: "#ffffff",
+      clusterBkg: "#f8fafc", clusterBorder: "#cfd8e3", titleColor: "#1e3a5f",
+    },
+    flowchart: { curve: "basis", htmlLabels: true, nodeSpacing: 36, rankSpacing: 46, padding: 14, useMaxWidth: true },
+  });
+  document.fonts.ready.then(() => mermaid.run({ querySelector: ".mermaid" })).then(() => document.body.dataset.pret = "1");
+</script>
+</body>
+</html>

@@ -12,6 +12,7 @@ type Coordonnees = {
 const NAVIGATION = [
   { href: "#institut", label: "L'institut" },
   { href: "#filieres", label: "Filières" },
+  { href: "#galerie", label: "Galerie" },
   { href: "#agrements", label: "Agréments" },
   { href: "#contact", label: "Contact" },
 ];

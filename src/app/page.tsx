@@ -10,6 +10,24 @@ import logo from "../../public/brand/logo-ifspa.png";
 import photoHero from "../../public/images/illustration/hero-etudiants-1920.webp";
 import photoInfirmier from "../../public/images/illustration/filiere-infirmier-1920.webp";
 import photoSageFemme from "../../public/images/illustration/filiere-sage-femme-1920.webp";
+import galEncadrement from "../../public/images/galerie/encadrement-clinique.webp";
+import galUrgence from "../../public/images/galerie/gestes-urgence.webp";
+import galPrelevement from "../../public/images/galerie/prelevement-sanguin.webp";
+import galSimulation from "../../public/images/galerie/simulation-mannequin.webp";
+import galTension from "../../public/images/galerie/tension-arterielle.webp";
+import { Galerie, type PhotoGalerie } from "@/components/landing/galerie";
+
+// Photos d'illustration (Pexels) à remplacer par les vraies photos de l'institut.
+const PHOTOS_GALERIE: PhotoGalerie[] = [
+  { src: galTension, legende: "Travaux pratiques : prise de la tension artérielle", alt: "Étudiantes s'exerçant à mesurer la tension artérielle" },
+  { src: galSimulation, legende: "Simulation sur mannequin", alt: "Étudiants pratiquant des soins sur un mannequin de simulation" },
+  { src: galPrelevement, legende: "Apprentissage du prélèvement sanguin", alt: "Étudiante préparant un prélèvement sanguin encadrée par une formatrice" },
+  { src: photoSageFemme, legende: "Soins au nouveau-né en maternité", alt: "Sage-femme s'occupant d'un nouveau-né" },
+  { src: galUrgence, legende: "Gestes d'urgence", alt: "Étudiants pratiquant des gestes d'urgence sur un mannequin" },
+  { src: galEncadrement, legende: "Encadrement en salle de pratique clinique", alt: "Formatrice encadrant des étudiants en salle de pratique" },
+  { src: photoInfirmier, legende: "Préparation d'une injection", alt: "Élève infirmière préparant une seringue" },
+  { src: photoHero, legende: "Une promotion d'étudiants en tenue", alt: "Groupe d'étudiants en tenue de soins" },
+];
 
 const FILIERES = [
   {
@@ -182,6 +200,21 @@ export default async function Accueil() {
               ))}
             </div>
           </div>
+        </section>
+
+        {/* ── Galerie ── */}
+        <section id="galerie" className="scroll-mt-20 border-t pb-20 lg:pb-28">
+          <div className="mx-auto max-w-7xl px-4 pt-20 sm:px-6 lg:px-8 lg:pt-28">
+            <div className="mb-10 max-w-2xl">
+              <h2 className="text-3xl font-bold tracking-tight text-primary after:mt-4 after:block after:h-1 after:w-12 after:rounded-full after:bg-rose after:content-[''] sm:text-4xl">
+                Galerie
+              </h2>
+              <p className="mt-4 text-lg text-muted-foreground">
+                Travaux pratiques, stages et vie de l&apos;institut en images.
+              </p>
+            </div>
+          </div>
+          <Galerie photos={PHOTOS_GALERIE} />
         </section>
 
         {/* ── Agréments ── */}

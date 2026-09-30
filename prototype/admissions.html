@@ -3,100 +3,158 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Admissions · IFSPA</title>
+<title>Passage en année supérieure · IFSPA</title>
 <link rel="icon" href="assets/img/logo-ifspa.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/app.css">
 <style>
-  /* Indicateur d'étapes */
-  .etapes { list-style: none; margin: 0 0 1.25rem; padding: 0; display: flex; align-items: center; gap: .5rem; counter-reset: etape; }
-  .etapes li { display: flex; align-items: center; gap: .6rem; font-size: .875rem; font-weight: 600; color: var(--texte-3); }
-  .etapes li + li::before { content: ""; width: clamp(1rem, 5vw, 3.5rem); height: 1px; background: var(--champ); margin-right: .1rem; }
-  .etapes .num { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: .8rem; border: 1px solid var(--champ); background: #fff; color: var(--texte-2); flex: none; font-variant-numeric: tabular-nums; }
-  .etapes .num svg { width: 16px; height: 16px; }
-  .etapes li[aria-current="step"] { color: var(--rose-fonce); }
-  .etapes li[aria-current="step"] .num { background: var(--rose-fonce); border-color: var(--rose-fonce); color: #fff; box-shadow: 0 0 0 4px var(--rose-pale); }
-  .etapes li.faite { color: var(--texte-2); }
-  .etapes li.faite .num { background: var(--primaire-pale); border-color: #cddbeb; color: var(--primaire); }
-  .etapes li.faite + li::before, .etapes li[aria-current="step"]::before { background: var(--rose); }
+  /* ── Avancement ── */
+  .avancement { min-width: 240px; font-size: .85rem; color: var(--texte-2); }
+  .avancement b { color: var(--texte); font-size: 1rem; font-variant-numeric: tabular-nums; }
+  .avancement .jauge { height: 8px; margin-top: .45rem; }
+  .avancement .jauge i { background: var(--paye); transition: width .4s cubic-bezier(.16, 1, .3, 1); }
 
-  .pied-assistant { display: flex; justify-content: space-between; align-items: center; gap: .75rem; padding: 1rem 1.25rem; border-top: 1px solid var(--bordure); background: var(--fond-2); border-radius: 0 0 12px 12px; }
-  .pied-assistant .muet { font-size: .82rem; }
+  /* ── Mise en page : classes à gauche, classe choisie à droite ── */
+  .admission { display: grid; grid-template-columns: 272px minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+  .classes { position: sticky; top: calc(64px + 1rem); padding: .5rem; }
+  .classes h2 { display: flex; align-items: center; gap: .45rem; margin: .65rem .6rem .35rem; font: 600 .78rem/1.3 var(--police-texte); color: var(--texte-2); }
+  .classes h2:first-child { margin-top: .35rem; }
+  .classes h2 i { width: 8px; height: 8px; border-radius: 50%; background: var(--bleu); }
+  .classes h2.sf i { background: var(--rose); }
+  .classes ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .classe {
+    width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .1rem .75rem;
+    padding: .6rem .65rem; border: 0; border-radius: 8px; background: none; font: inherit; color: var(--texte);
+    text-align: left; cursor: pointer; transition: background-color .12s;
+  }
+  .classe:hover { background: var(--fond-2); }
+  .classe b { font-weight: 600; font-size: .92rem; }
+  .classe .eff { grid-column: 1; font-size: .78rem; color: var(--texte-2); font-variant-numeric: tabular-nums; }
+  .classe .etat { grid-column: 2; grid-row: 1 / span 2; }
+  .classe[aria-current="true"] { background: var(--primaire-pale); box-shadow: inset 0 0 0 1px #cddbeb; }
+  .classe[aria-current="true"] b { color: var(--primaire); }
+  .etat { display: inline-flex; align-items: center; gap: .3rem; font-size: .74rem; font-weight: 600; color: var(--texte-2); white-space: nowrap; }
+  .etat svg { width: 15px; height: 15px; flex: none; }
+  .etat-validee { color: var(--paye); }
+  .etat-tarif { color: var(--attention); }
+  .etat-afaire::before { content: ""; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid currentColor; }
 
-  /* Étape 1 */
-  .fleche-annees { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: .75rem; }
-  .fleche-annees .fleche { height: 38px; display: grid; place-items: center; color: var(--texte-3); }
-  .fleche-annees .fleche svg { width: 18px; height: 18px; }
-  .resume-lot { margin-top: 1.25rem; display: flex; flex-wrap: wrap; gap: .35rem 1.5rem; font-size: .875rem; color: var(--texte-2); }
-  .resume-lot b { color: var(--texte); }
+  /* ── Classe choisie ── */
+  .classe-tete { padding: 1.1rem 1.25rem 1rem; border-bottom: 1px solid var(--bordure); }
+  .classe-tete h2 { font: 700 1.3rem/1.25 var(--police-titre); color: var(--primaire); }
+  .classe-tete .cible { margin: .2rem 0 0; color: var(--texte-2); font-size: .9rem; }
+  .consigne { display: flex; gap: .65rem; align-items: flex-start; margin: .9rem 0 0; padding: .7rem .85rem; border-radius: var(--rayon); background: var(--rose-pale); color: #6e2a3d; font-size: .9rem; }
+  .consigne svg { width: 18px; height: 18px; flex: none; margin-top: .1rem; color: var(--rose-fonce); }
 
-  /* Étape 2 */
-  .barre-groupee { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; padding: .75rem 1rem; border-bottom: 1px solid var(--bordure); background: #fcfdfe; }
-  .barre-groupee .tout { display: inline-flex; align-items: center; gap: .5rem; font-size: .875rem; font-weight: 600; cursor: pointer; }
-  .barre-groupee .compteur { font-size: .82rem; color: var(--texte-2); }
-  .barre-groupee .compteur b { color: var(--primaire); font-variant-numeric: tabular-nums; }
-  .barre-groupee .actions { margin-left: auto; }
-  .col-case { width: 44px; }
-  .tableau tr.non-coche td { background: #fcfdfe; }
-  .tableau tr.non-coche .personne, .tableau tr.non-coche .decision { opacity: .55; }
-  .decision { min-width: 200px; }
-  .note-ligne { display: block; margin-top: .25rem; }
+  .outils { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; padding: .8rem 1.25rem; border-bottom: 1px solid var(--bordure); }
+  .outils .recherche { position: relative; flex: 1 1 240px; }
+  .outils .recherche .saisie { padding-left: 2.2rem; }
+  .outils .recherche svg { position: absolute; left: .7rem; top: 50%; translate: 0 -50%; width: 16px; height: 16px; color: var(--texte-3); pointer-events: none; }
+  .vues { display: inline-flex; padding: 3px; gap: 2px; background: var(--fond-2); border: 1px solid var(--bordure); border-radius: var(--rayon); }
+  .vues button { height: 30px; padding: 0 .75rem; border: 0; border-radius: 6px; background: none; font: 600 .82rem var(--police-texte); color: var(--texte-2); cursor: pointer; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .vues button:hover { color: var(--texte); }
+  .vues button[aria-pressed="true"] { background: #fff; color: var(--primaire); box-shadow: var(--ombre-1); }
+  .vues button.exceptions[aria-pressed="true"] { color: var(--rose-fonce); }
 
-  /* Étape 3 */
-  .panneau-recap { background: var(--rose-pale); border-color: #f0d3da; }
-  .panneau-recap .panneau-tete { border-bottom-color: #f0d3da; }
-  .panneau-recap .panneau-tete p { color: #7d3a4c; }
-  .recap { display: flex; flex-wrap: wrap; margin: 0; }
-  .recap > div { flex: 1 1 140px; padding: 1rem 1.25rem; border-right: 1px solid #f0d3da; }
-  .recap dt { color: #7d3a4c !important; }
-  .recap dd small { color: #7d3a4c !important; }
-  .recap > div:last-child { border-right: 0; }
-  .recap dt { font-size: .8rem; font-weight: 600; color: var(--texte-2); }
-  .recap dd { margin: .3rem 0 0; font: 700 1.75rem/1.1 var(--police-texte); color: var(--texte); font-variant-numeric: tabular-nums; }
-  .recap dd small { font-size: .8rem; font-weight: 500; color: var(--texte-2); margin-left: .3rem; }
-  .liste-alertes { display: grid; gap: .75rem; }
-  .alerte ul { margin: .35rem 0 0; padding-left: 1.1rem; }
-  .alerte li + li { margin-top: .15rem; }
+  /* ── Liste des étudiants ── */
+  .eleves { list-style: none; margin: 0; padding: 0; }
+  .eleve { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .5rem 1rem; padding: .55rem 1.25rem; border-bottom: 1px solid var(--bordure); transition: background-color .15s; }
+  .eleve-id { display: flex; align-items: center; gap: .85rem; min-width: 0; min-height: 48px; cursor: pointer; }
+  .eleve-id input { width: 22px; height: 22px; flex: none; margin: 0; cursor: pointer; }
+  .eleve-id input:disabled { cursor: default; }
+  .eleve .personne b { white-space: normal; }
+  .impaye { font-size: .78rem; color: var(--texte-2); }
+  .passe { font-size: .85rem; font-weight: 600; color: var(--primaire); white-space: nowrap; }
+  .eleve.ne-passe-pas { background: var(--rose-pale); }
+  .eleve.ne-passe-pas .personne b { color: #6e2a3d; }
+  .decision-figee { font-size: .85rem; font-weight: 600; color: var(--rose-fonce); white-space: nowrap; }
 
-  /* Historique */
-  .op-lot b { display: block; font-weight: 600; }
-  .op-lot span { font-size: .78rem; color: var(--texte-2); }
-  .dialogue .liste-def { grid-template-columns: 10rem 1fr; }
+  .deux-choix { display: inline-grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 3px; background: #fff; border: 1px solid var(--rose-clair); border-radius: var(--rayon); }
+  .deux-choix label { position: relative; display: grid; place-items: center; min-width: 6.5rem; height: 34px; padding: 0 .75rem; border-radius: 6px; font-size: .85rem; font-weight: 600; color: var(--texte-2); cursor: pointer; transition: background-color .15s, color .15s; }
+  .deux-choix input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+  .deux-choix label:hover { color: var(--texte); }
+  .deux-choix label:has(input:checked) { background: var(--rose-fonce); color: #fff; }
+  .deux-choix label:has(input:focus-visible) { outline: 2px solid var(--bleu); outline-offset: 1px; }
+  .liste-vide { padding: 2.25rem 1.25rem; text-align: center; color: var(--texte-2); font-size: .9rem; border-bottom: 1px solid var(--bordure); }
+
+  /* ── Barre de validation collante ── */
+  .barre-valider {
+    position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 1.25rem;
+    padding: .9rem 1.25rem; background: #fff; border-radius: 0 0 12px 12px; box-shadow: 0 -10px 24px -16px rgb(18 36 60 / .35);
+  }
+  .totaux { margin: 0; font-size: .95rem; color: var(--texte-2); font-variant-numeric: tabular-nums; }
+  .totaux b { color: var(--texte); font-size: 1.05rem; }
+  .totaux .ex b { color: var(--rose-fonce); }
+  .sep { margin: 0 .4rem; color: var(--texte-3); }
+
+  /* ── Classe validée / bloquée ── */
+  .bandeau-validee { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem 1rem; padding: .85rem 1.25rem; background: var(--paye-pale); color: #17603c; border-bottom: 1px solid #bfe0cc; font-size: .9rem; }
+  .bandeau-validee > span { display: flex; gap: .6rem; align-items: flex-start; }
+  .bandeau-validee svg { width: 18px; height: 18px; flex: none; margin-top: .15rem; }
+  .bandeau-validee .ex b { color: inherit; }
+  .etat-bloque { padding: 2.75rem 1.25rem 3rem; text-align: center; }
+  .etat-bloque .pastille { width: 48px; height: 48px; margin: 0 auto 1rem; border-radius: 50%; display: grid; place-items: center; background: var(--attention-pale); color: var(--attention); }
+  .etat-bloque .pastille svg { width: 22px; height: 22px; }
+  .etat-bloque h3 { font: 700 1.2rem/1.3 var(--police-titre); color: var(--primaire); max-width: 32rem; margin: 0 auto; }
+  .etat-bloque p { margin: .5rem auto 1.25rem; max-width: 30rem; color: var(--texte-2); font-size: .9rem; }
+  .seulement-secretariat { display: none; }
+  body[data-role="secretariat"] .seulement-secretariat { display: block; }
+
+  /* ── Dialogue de confirmation ── */
+  .chiffres { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin: 0 0 1rem; }
+  .chiffres div { display: flex; flex-direction: column-reverse; justify-content: flex-end; padding: .7rem .85rem; background: var(--fond-2); border-radius: var(--rayon); }
+  .chiffres dd { margin: 0; font: 700 1.6rem/1.1 var(--police-texte); color: var(--texte); font-variant-numeric: tabular-nums; }
+  .chiffres dt { margin-top: .2rem; font-size: .78rem; color: var(--texte-2); }
+  .chiffres .ex dd { color: var(--rose-fonce); }
+  .qui { margin: 0 0 1rem; }
+  .qui h3 { font: 600 .85rem/1.3 var(--police-texte); color: var(--texte); margin-bottom: .4rem; }
+  .qui ul { list-style: none; margin: 0; padding: 0; border: 1px solid var(--bordure); border-radius: var(--rayon); max-height: 220px; overflow-y: auto; }
+  .qui li { display: flex; justify-content: space-between; gap: 1rem; padding: .5rem .75rem; font-size: .875rem; }
+  .qui li + li { border-top: 1px solid var(--bordure); }
+  .qui li span { color: var(--texte-2); min-width: 0; }
+  .qui li b.dec { color: var(--rose-fonce); white-space: nowrap; }
+  .notes { margin: 0; padding-left: 1.1rem; font-size: .85rem; color: var(--texte-2); }
+  .notes li + li { margin-top: .3rem; }
+
+  /* ── Historique ── */
+  .op-classe b { display: block; font-weight: 600; }
+  .op-classe span { font-size: .78rem; color: var(--texte-2); }
   .liste-defaire { margin: .5rem 0 0; padding-left: 1.1rem; font-size: .875rem; }
   .liste-defaire li + li { margin-top: .3rem; }
-  .sous-mobile-dipl { display: none; }
-  @media (max-width: 860px) { .sous-mobile-dipl { display: inline; } }
 
+  @media (max-width: 1100px) {
+    .admission { grid-template-columns: 236px minmax(0, 1fr); }
+  }
   @media (max-width: 860px) {
-    .etapes li:not([aria-current="step"]) .libelle { display: none; }
-    .fleche-annees { grid-template-columns: 1fr; }
-    .fleche-annees .fleche { display: none; }
-    .barre-groupee .actions { margin-left: 0; width: 100%; }
-    .barre-groupee .actions .btn { flex: 1 1 auto; }
-    .recap > div { flex-basis: 45%; border-right: 0; border-bottom: 1px solid var(--bordure); }
-    .tableau td, .tableau th { padding-left: .75rem; padding-right: .75rem; }
-    .col-mobile-masquee { display: none; }
-    .pied-assistant { flex-wrap: wrap; }
-    .pied-assistant .muet { order: -1; width: 100%; }
-    .pied-assistant .btn { flex: 1 1 auto; }
-    .dialogue .liste-def { grid-template-columns: 1fr; }
-    /* Tableaux en cartes */
+    .admission { grid-template-columns: minmax(0, 1fr); }
+    .classes { position: static; padding: .4rem .5rem .6rem; }
+    .classes ul { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .35rem; }
+    .classe { grid-template-columns: minmax(0, 1fr); padding: .5rem .55rem; border: 1px solid var(--bordure); }
+    .classe .etat { grid-column: 1; grid-row: auto; }
+    .classe b { font-size: .85rem; }
+    .avancement { width: 100%; }
+    .eleve { grid-template-columns: minmax(0, 1fr); padding: .6rem 1rem; }
+    .eleve .decision { padding-left: calc(22px + .85rem); }
+    .eleve .decision:has(> .passe) { display: none; } /* la case cochée suffit */
+    .deux-choix { display: grid; width: 100%; }
+    .deux-choix label { min-width: 0; height: 40px; }
+    .outils, .classe-tete, .bandeau-validee { padding-inline: 1rem; }
+    .barre-valider { flex-direction: column; align-items: stretch; padding: .8rem 1rem; }
+    .barre-valider .btn { white-space: normal; height: auto; min-height: 48px; padding: .6rem 1rem; line-height: 1.3; }
+    .totaux { text-align: center; }
     .cartes thead { display: none; }
-    .cartes tbody tr { display: grid; gap: .5rem .75rem; padding: .85rem .75rem; border-bottom: 1px solid var(--bordure); }
+    .cartes tbody tr { display: grid; grid-template-columns: 1fr; gap: .45rem; padding: .85rem 1rem; border-bottom: 1px solid var(--bordure); }
     .cartes tbody tr:last-child { border-bottom: 0; }
     .cartes tbody td { display: block; padding: 0; border: 0; background: none !important; }
-    .cartes td[data-label]::before { content: attr(data-label); display: block; font-size: .72rem; font-weight: 600; color: var(--texte-2); margin-bottom: .1rem; }
-    .cartes td.col-mobile-masquee { display: none !important; }
-    #lot tr { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; }
-    #lot .personne b { white-space: normal; }
-    #lot td:last-child { grid-column: 2 / -1; }
-    #lot .decision { min-width: 0; }
-    #liste-historique tr { grid-template-columns: 1fr 1fr; }
-    #liste-historique td.a-droite { text-align: left; }
-    #liste-historique td[data-admin] { grid-column: 1 / -1; }
-    #liste-historique td[data-admin]:empty { display: none; }
+    .cartes td.a-droite { text-align: left; }
+    .cartes td[data-admin]:empty { display: none; }
+  }
+  @media (max-width: 560px) {
+    .chiffres dd { font-size: 1.35rem; }
+    .classe .eff { display: none; }
+    .etat-tarif { white-space: normal; }
   }
 </style>
 </head>
@@ -108,100 +166,56 @@
     <main class="page">
       <div class="page-titre">
         <div>
-          <h1>Admissions</h1>
-          <p>Passage d'une année scolaire à la suivante, par lot : admis, redoublants et diplômés.</p>
+          <h1>Passage en année supérieure</h1>
+          <p>Fin de l'année 2026-2027 : décidez, classe par classe, qui passe en 2027-2028.</p>
         </div>
+        <div class="avancement" id="avancement" aria-live="polite"></div>
       </div>
 
       <div class="onglets" data-onglets role="tablist" aria-label="Admissions">
-        <button type="button" role="tab" aria-controls="nouvelle" id="onglet-nouvelle">Nouvelle admission</button>
+        <button type="button" role="tab" aria-controls="classes-onglet" id="onglet-classes">Classes</button>
         <button type="button" role="tab" aria-controls="historique" id="onglet-historique">Historique</button>
       </div>
 
-      <!-- ══════════ Nouvelle admission ══════════ -->
-      <section data-panneau="nouvelle" aria-labelledby="onglet-nouvelle">
-        <ol class="etapes" id="etapes" aria-label="Étapes de l'admission">
-          <li data-etape="1"><span class="num">1</span><span class="libelle">Choix du lot</span></li>
-          <li data-etape="2"><span class="num">2</span><span class="libelle">Décisions</span></li>
-          <li data-etape="3"><span class="num">3</span><span class="libelle">Vérification</span></li>
-        </ol>
+      <!-- ══════════ Classes ══════════ -->
+      <section data-panneau="classes-onglet" aria-labelledby="onglet-classes">
+        <div class="admission">
+          <nav class="panneau classes" id="classes" aria-label="Classes"></nav>
 
-        <!-- Étape 1 -->
-        <div class="panneau" data-etape-panneau="1">
-          <div class="panneau-tete"><div><h2>Choisir le lot d'étudiants</h2><p>Les étudiants actifs de la filière et du niveau choisis dans l'année source.</p></div></div>
-          <div class="panneau-corps">
-            <div class="formulaire-grille">
-              <div class="large fleche-annees">
-                <div class="champ">
-                  <label for="annee-source">Année source</label>
-                  <select class="saisie" id="annee-source"><option>2026-2027</option><option>2025-2026</option></select>
-                </div>
-                <span class="fleche" id="fleche-annees"></span>
-                <div class="champ">
-                  <label for="annee-cible">Année cible</label>
-                  <select class="saisie" id="annee-cible"><option>2027-2028</option></select>
-                </div>
-              </div>
-              <div class="champ">
-                <span class="etiquette" id="lbl-filiere">Filière</span>
-                <div class="choix" role="radiogroup" aria-labelledby="lbl-filiere">
-                  <label><input type="radio" name="filiere" value="IF" checked> Infirmier(e)s</label>
-                  <label><input type="radio" name="filiere" value="SF"> Sage-femmes</label>
-                </div>
-              </div>
-              <div class="champ">
-                <span class="etiquette" id="lbl-niveau">Niveau source</span>
-                <div class="choix" role="radiogroup" aria-labelledby="lbl-niveau">
-                  <label><input type="radio" name="niveau" value="1" checked> 1re année</label>
-                  <label><input type="radio" name="niveau" value="2"> 2e année</label>
-                  <label><input type="radio" name="niveau" value="3"> 3e année</label>
-                </div>
-              </div>
+          <section class="panneau" aria-labelledby="c-titre">
+            <div class="classe-tete">
+              <h2 id="c-titre"></h2>
+              <p class="cible" id="c-cible"></p>
+              <p class="consigne" id="c-consigne"></p>
             </div>
-            <div style="margin-top:1.25rem" id="alerte-tarifs"></div>
-            <div class="resume-lot" id="resume-lot"></div>
-          </div>
-          <div class="pied-assistant">
-            <span class="muet">Aucune donnée n'est modifiée avant la confirmation finale.</span>
-            <button class="btn btn-primaire" type="button" id="suivant-1">Suivant : décisions</button>
-          </div>
-        </div>
 
-        <!-- Étape 2 -->
-        <div class="panneau" data-etape-panneau="2" hidden>
-          <div class="panneau-tete"><div><h2 id="titre-lot">Infirmier(e)s · 1re année · 2026-2027</h2><p>Cochez les étudiants à traiter et fixez la décision de chacun. Les étudiants non cochés ne reçoivent pas d'inscription 2027-2028.</p></div></div>
-          <div class="barre-groupee">
-            <label class="tout"><input type="checkbox" id="tout-cocher"> Tout cocher</label>
-            <span class="compteur" id="compteur" aria-live="polite"></span>
-            <div class="actions">
-              <button class="btn btn-secondaire btn-petit" type="button" id="groupe-admis">Marquer la sélection comme admise</button>
-              <button class="btn btn-secondaire btn-petit" type="button" id="groupe-redouble">Marquer la sélection comme redoublante</button>
+            <div class="bandeau-validee" id="c-validee" hidden></div>
+
+            <div class="etat-bloque" id="c-bloque" hidden>
+              <div class="pastille" id="ic-tarif"></div>
+              <h3 id="bloque-titre"></h3>
+              <p data-admin>Sans tarif, l'application ne peut pas créer les mensualités 2027-2028 de cette classe.</p>
+              <a class="btn btn-primaire" href="parametres.html#tarifs" data-admin>Saisir le tarif 2027-2028</a>
+              <p class="seulement-secretariat">Demandez à l'administrateur de saisir le tarif. Vous pourrez ensuite valider cette classe.</p>
             </div>
-          </div>
-          <div class="tableau-conteneur">
-            <table class="tableau cartes">
-              <thead><tr><th class="col-case"><span class="sr-only">Sélection</span></th><th>Étudiant</th><th class="a-droite">Impayés 2026-2027</th><th>Décision</th></tr></thead>
-              <tbody id="lot"></tbody>
-            </table>
-          </div>
-          <div class="pied-assistant">
-            <button class="btn btn-secondaire" type="button" data-aller="1">Précédent</button>
-            <button class="btn btn-primaire" type="button" data-aller="3">Suivant : vérification</button>
-          </div>
-        </div>
 
-        <!-- Étape 3 -->
-        <div class="pile" data-etape-panneau="3" hidden>
-          <section class="panneau panneau-recap">
-            <div class="panneau-tete"><div><h2>Vérifier avant de procéder</h2><p id="recap-lot"></p></div></div>
-            <dl class="recap" id="recap"></dl>
-          </section>
-          <section class="panneau">
-            <div class="panneau-tete"><div><h2>Points à vérifier</h2><p>Rien ne bloque l'opération, mais lisez chaque point.</p></div></div>
-            <div class="panneau-corps liste-alertes" id="alertes"></div>
-            <div class="pied-assistant">
-              <button class="btn btn-secondaire" type="button" data-aller="2">Précédent : modifier les décisions</button>
-              <button class="btn btn-accent" type="button" data-ouvrir="dlg-confirmer" id="procéder">Procéder à l'admission</button>
+            <div id="c-liste">
+              <div class="outils">
+                <div class="recherche">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+                  <input class="saisie" type="search" id="q" placeholder="Chercher un étudiant de la classe" aria-label="Chercher un étudiant de la classe" autocomplete="off">
+                </div>
+                <div class="vues" role="group" aria-label="Afficher">
+                  <button type="button" id="vue-tous" aria-pressed="true"></button>
+                  <button type="button" id="vue-exceptions" class="exceptions" aria-pressed="false"></button>
+                </div>
+              </div>
+              <ul class="eleves" id="eleves"></ul>
+            </div>
+
+            <div class="barre-valider" id="barre">
+              <p class="totaux" id="totaux" aria-live="polite"></p>
+              <button class="btn btn-accent btn-grand" type="button" data-ouvrir="dlg-confirmer" id="valider"></button>
             </div>
           </section>
         </div>
@@ -210,10 +224,10 @@
       <!-- ══════════ Historique ══════════ -->
       <section data-panneau="historique" aria-labelledby="onglet-historique" hidden>
         <div class="panneau">
-          <div class="panneau-tete"><div><h2>Opérations d'admission</h2><p>Une opération peut être annulée par l'administrateur tant qu'aucun paiement n'a été saisi sur les inscriptions qu'elle a créées.</p></div></div>
+          <div class="panneau-tete"><div><h2>Passages validés</h2><p>L'administrateur peut annuler un passage tant qu'aucun paiement n'a été saisi sur les inscriptions qu'il a créées.</p></div></div>
           <div class="tableau-conteneur">
             <table class="tableau cartes">
-              <thead><tr><th>Date</th><th>Lot</th><th class="col-mobile-masquee">Années</th><th class="a-droite">Admis</th><th class="a-droite">Redoublants</th><th class="a-droite col-mobile-masquee">Diplômés</th><th>État</th><th data-admin><span class="sr-only">Actions</span></th></tr></thead>
+              <thead><tr><th>Date</th><th>Classe</th><th>Décisions</th><th>État</th><th data-admin><span class="sr-only">Actions</span></th></tr></thead>
               <tbody id="liste-historique"></tbody>
             </table>
           </div>
@@ -223,27 +237,31 @@
   </div>
 </div>
 
-<!-- Confirmation finale -->
+<!-- Confirmation -->
 <dialog class="dialogue" id="dlg-confirmer" aria-labelledby="dlg-confirmer-titre">
-  <div class="dialogue-tete"><h2 id="dlg-confirmer-titre">Confirmer l'admission</h2><p id="dlg-confirmer-texte"></p></div>
-  <div class="dialogue-corps"><dl class="liste-def" id="dlg-confirmer-recap"></dl></div>
+  <div class="dialogue-tete"><h2 id="dlg-confirmer-titre"></h2><p id="dlg-confirmer-texte"></p></div>
+  <div class="dialogue-corps">
+    <dl class="chiffres" id="dlg-chiffres"></dl>
+    <div class="qui" id="dlg-qui"></div>
+    <ul class="notes" id="dlg-notes"></ul>
+  </div>
   <div class="dialogue-pied">
-    <button class="btn btn-secondaire" type="button" data-fermer>Revenir à la vérification</button>
-    <button class="btn btn-accent" type="button" id="confirmer">Confirmer l'admission</button>
+    <button class="btn btn-secondaire" type="button" data-fermer>Revenir à la liste</button>
+    <button class="btn btn-accent" type="button" id="confirmer">Confirmer le passage</button>
   </div>
 </dialog>
 
 <!-- Annulation possible -->
 <dialog class="dialogue" id="dlg-annuler" aria-labelledby="dlg-annuler-titre">
-  <div class="dialogue-tete"><h2 id="dlg-annuler-titre">Annuler l'opération d'admission ?</h2><p id="dlg-annuler-lot"></p></div>
+  <div class="dialogue-tete"><h2 id="dlg-annuler-titre">Annuler ce passage ?</h2><p id="dlg-annuler-lot"></p></div>
   <div class="dialogue-corps">
-    <p style="margin:0;font-size:.875rem">L'annulation remet les étudiants dans l'état d'avant l'opération :</p>
+    <p style="margin:0;font-size:.875rem">Les étudiants reviennent à leur état d'avant le passage :</p>
     <ul class="liste-defaire" id="dlg-annuler-effets"></ul>
     <div class="alerte alerte-info" style="margin-top:1rem"><span id="ic-info"></span><div>Aucun paiement n'a été saisi sur ces inscriptions.</div></div>
   </div>
   <div class="dialogue-pied">
-    <button class="btn btn-secondaire" type="button" data-fermer>Garder l'opération</button>
-    <button class="btn btn-danger" type="button" id="confirmer-annulation">Annuler l'opération</button>
+    <button class="btn btn-secondaire" type="button" data-fermer>Garder le passage</button>
+    <button class="btn btn-danger" type="button" id="confirmer-annulation">Annuler le passage</button>
   </div>
 </dialog>
 
@@ -251,216 +269,256 @@
 <dialog class="dialogue" id="dlg-annuler-bloque" aria-labelledby="dlg-bloque-titre">
   <div class="dialogue-tete"><h2 id="dlg-bloque-titre">Annulation impossible pour l'instant</h2><p id="dlg-bloque-lot"></p></div>
   <div class="dialogue-corps">
-    <div class="alerte alerte-erreur"><span id="ic-erreur"></span><div><b id="dlg-bloque-message"></b>Annulez d'abord ces paiements (avec un motif), puis revenez annuler l'opération.<ul id="dlg-bloque-liste"></ul></div></div>
+    <div class="alerte alerte-erreur"><span id="ic-erreur"></span><div><b id="dlg-bloque-message"></b>Annulez d'abord ces paiements (avec un motif), puis revenez annuler le passage.<ul id="dlg-bloque-liste" style="margin:.35rem 0 0;padding-left:1.1rem"></ul></div></div>
   </div>
   <div class="dialogue-pied">
     <button class="btn btn-secondaire" type="button" data-fermer>Fermer</button>
-    <button class="btn btn-danger" type="button" disabled>Annuler l'opération</button>
+    <button class="btn btn-danger" type="button" disabled>Annuler le passage</button>
   </div>
 </dialog>
 
 <script src="assets/data.js"></script>
 <script src="assets/app.js"></script>
 <script>
-  const { ar, ETUDIANTS, FILIERES, situation, photo, nomComplet, niveau } = IFSPA;
+  const { ar, ETUDIANTS, FILIERES, GLOBAL, situation, photo, nomComplet, niveau } = IFSPA;
   const { svg, toast, role, UTIL } = PROTO;
   const params = new URLSearchParams(location.search);
   const $ = (id) => document.getElementById(id);
-  const icAlerte = svg("impayes"), icOk = svg("ok");
-  const icInfo = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>';
-  $("ic-info").outerHTML = icInfo;
-  $("ic-erreur").outerHTML = icAlerte;
-  $("fleche-annees").innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
   const accord = (e, m, f) => (e.sexe === "F" ? f : m);
-  const niveauCourt = (n) => (n === 1 ? "1re" : n + "e");
+  const pluriel = (n, s, p) => (n > 1 ? p : s);
+  const norm = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const SOURCE = "2026-2027", CIBLE = "2027-2028";
+  const ICONE_INFO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>';
 
-  // Tarifs 2027-2028 : saisis pour les Infirmier(e)s uniquement (cohérent avec parametres.html#tarifs)
-  const TARIFS_CIBLE = { IF: { droits: 100000, mensuel: 85000, mois: 10 }, SF: null };
-  const EFFECTIFS = { IF: [42, 38, 32], SF: [27, 24, 21] };
+  $("ic-info").outerHTML = ICONE_INFO;
+  $("ic-erreur").outerHTML = svg("impayes");
+  $("ic-tarif").innerHTML = svg("parametres");
 
-  // Lignes fictives complémentaires (sans photo)
-  const COMPLEMENT = [
-    { nom: "RAZAFIMAHATRATRA", prenoms: "Andry", sexe: "M", retard: 0 },
-    { nom: "RAHARIMALALA", prenoms: "Nomena", sexe: "F", retard: 320000, mois: 4, redouble: true },
-    { nom: "RABENANDRASANA", prenoms: "Toky", sexe: "M", retard: 240000, mois: 3 },
-    { nom: "RAKOTOARISOA", prenoms: "Mahery", sexe: "M", retard: 0, deja: true },
-    { nom: "RAVAOARISOA", prenoms: "Fanja", sexe: "F", retard: 80000, mois: 1, nonCoche: true },
-    { nom: "RANDRIANARIVELO", prenoms: "Soa", sexe: "F", retard: 0, nonCoche: true },
-    { nom: "RAHARINIRINA", prenoms: "Tsiry", sexe: "M", retard: 0 },
+  // ── Historique (op8 et op9 concernent le passage en cours) ──
+  const HISTORIQUE = [
+    { id: "op9", date: "10/03/2027 10:05", auteur: "Administrateur IFSPA", f: "SF", n: 3, source: SOURCE, cible: CIBLE, admis: 0, red: 1, dipl: 20, aband: 0, active: true, inscriptions: 1 },
+    { id: "op8", date: "09/03/2027 16:10", auteur: "Hanitra RAKOTO", f: "IF", n: 3, source: SOURCE, cible: CIBLE, admis: 0, red: 2, dipl: 29, aband: 1, active: true, inscriptions: 2 },
+    { id: "op7", date: "31/07/2026 14:05", auteur: "Administrateur IFSPA", f: "SF", n: 3, source: "2025-2026", cible: "2026-2027", admis: 0, red: 0, dipl: 20, aband: 0, active: true, inscriptions: 0 },
+    { id: "op6", date: "31/07/2026 10:20", auteur: "Hanitra RAKOTO", f: "IF", n: 3, source: "2025-2026", cible: "2026-2027", admis: 0, red: 2, dipl: 30, aband: 0, active: true, inscriptions: 2,
+      paiements: ["R-2026-00031 · 01/10/2026 · 180 000 Ar", "R-2026-00037 · 05/10/2026 · 100 000 Ar"] },
+    { id: "op5", date: "30/07/2026 16:40", auteur: "Hanitra RAKOTO", f: "IF", n: 2, source: "2025-2026", cible: "2026-2027", admis: 30, red: 2, dipl: 0, aband: 1, active: true, inscriptions: 32, nbPaiements: 87 },
+    { id: "op4", date: "30/07/2026 11:15", auteur: "Hanitra RAKOTO", f: "IF", n: 1, source: "2025-2026", cible: "2026-2027", admis: 36, red: 3, dipl: 0, aband: 0, active: true, inscriptions: 39, nbPaiements: 104 },
+    { id: "op3", date: "29/07/2026 15:30", auteur: "Hanitra RAKOTO", f: "SF", n: 2, source: "2025-2026", cible: "2026-2027", admis: 21, red: 1, dipl: 0, aband: 0, active: true, inscriptions: 22, nbPaiements: 58 },
+    { id: "op2", date: "29/07/2026 09:10", auteur: "Hanitra RAKOTO", f: "SF", n: 1, source: "2025-2026", cible: "2026-2027", admis: 23, red: 2, dipl: 0, aband: 0, active: true, inscriptions: 25, nbPaiements: 66 },
+    { id: "op1", date: "28/07/2026 16:50", auteur: "Hanitra RAKOTO", f: "SF", n: 1, source: "2025-2026", cible: "2026-2027", admis: 25, red: 0, dipl: 0, aband: 0, active: false, annulation: "Annulé le 29/07/2026 par Administrateur IFSPA" },
   ];
 
-  const etat = { etape: 1, filiere: "IF", niveau: 1, lignes: [] };
+  // ── Classes (filière × niveau), effectifs de GLOBAL.parNiveau. Sage-femmes 2e année : tarif 2027-2028 pas encore saisi.
+  // preset : exemples de décisions sur les étudiants fictifs (rang → R redouble, X abandon)
+  const CLASSES = [
+    { id: "IF-1", f: "IF", n: 1, preset: { 2: "R", 6: "X" } },
+    { id: "IF-2", f: "IF", n: 2 },
+    { id: "IF-3", f: "IF", n: 3, op: "op8", preset: { 0: "R", 3: "R", 5: "X" } },
+    { id: "SF-1", f: "SF", n: 1, preset: { 4: "R" } },
+    { id: "SF-2", f: "SF", n: 2, tarifManquant: true },
+    { id: "SF-3", f: "SF", n: 3, op: "op9", preset: { 1: "R" } },
+  ].map((c, i) => { const p = GLOBAL.parNiveau.find((r) => r.f === c.f && r.n === c.n); return { ...c, rang: i, eff: p.eff, nbRetard: p.retard }; });
+  const derniere = (c) => c.n === FILIERES[c.f].duree;
+  const nomClasse = (c) => `${FILIERES[c.f].nom} ${niveau(c.n)}`;
 
-  function construireLot() {
-    const f = etat.filiere, n = etat.niveau;
-    const reels = ETUDIANTS.filter((e) => e.statut === "ACTIF" && e.filiere === f && e.niveau === n)
-      .map((e) => { const s = situation(e); return { e, id: "e" + e.id, retard: s.retard, mois: s.moisRetard, reel: true }; });
-    const entree = 2026 - (n - 1);
-    let seq = reels.reduce((m, l) => Math.max(m, Number(l.e.matricule.slice(-4))), 0);
-    const complement = COMPLEMENT.slice(0, Math.max(0, 8 - reels.length)).map((c, i) => ({
-      e: { ...c, matricule: `${f}-${entree}-${String(++seq).padStart(4, "0")}` }, id: "c" + i, retard: c.retard, mois: c.mois || 0, deja: c.deja, nonCoche: c.nonCoche, redouble: c.redouble,
-    }));
-    etat.lignes = [...reels, ...complement].map((l) => ({ ...l, coche: !l.nonCoche, decision: l.redouble ? "R" : n === FILIERES[f].duree ? "D" : "A" }));
-  }
+  // ── Étudiants de chaque classe : réels (data.js) puis fictifs pour atteindre l'effectif ──
+  const NOMS = ["RAZAFIMAHATRATRA", "RAHARIMALALA", "RABENANDRASANA", "RAKOTOARISOA", "RAVAOARISOA", "RANDRIANARIVELO", "RAHARINIRINA", "ANDRIAMANANTENA", "RAFALIMANANA", "RASOLOFONIRINA", "RAMAROSON", "RAKOTONIAINA", "RANAIVOSON", "RAJAONAH", "RATSIMBAZAFY", "RAZANAKOLONA", "RANDRIAMIHAJA", "RAVELOSON", "RAKOTOVAO", "RASOAMANARIVO", "ANDRIANJAFY", "RAMANANJANAHARY", "RATOVONDRAHONA"];
+  const PRENOMS = [["Andry", "M"], ["Nomena", "F"], ["Toky", "M"], ["Fanja", "F"], ["Mahery", "M"], ["Soa", "F"], ["Tsiry", "M"], ["Onja", "F"], ["Fitahiana", "M"], ["Ravo", "F"], ["Hasina", "F"], ["Lova", "F"], ["Rija", "M"], ["Tahiry", "F"], ["Manitra", "M"], ["Vola", "F"], ["Heritiana", "M"], ["Aina", "F"], ["Njiva", "M"], ["Zo", "F"]];
+  const POS_IMPAYES = [1, 7, 11, 15, 20, 26, 31, 36, 40], MOIS_IMPAYES = [3, 1, 2, 4];
 
-  // ── Étape 1 ──
-  function majEtape1() {
-    etat.filiere = document.querySelector('[name="filiere"]:checked').value;
-    etat.niveau = Number(document.querySelector('[name="niveau"]:checked').value);
-    const f = FILIERES[etat.filiere], t = TARIFS_CIBLE[etat.filiere];
-    const dernier = etat.niveau === f.duree;
-    const alerte = $("alerte-tarifs");
-    if (t) {
-      alerte.innerHTML = `<div class="alerte alerte-succes">${icOk}<div><b>Tarifs 2027-2028 saisis pour les ${f.nom}</b>Droits d'inscription ${ar(t.droits)} + ${t.mois} mensualités de ${ar(t.mensuel)}, soit ${ar(t.droits + t.mois * t.mensuel)} par an. Les échéances seront créées à partir de ces montants.</div></div>`;
-    } else {
-      alerte.innerHTML = `<div class="alerte alerte-attention">${icAlerte}<div><b>Tarifs 2027-2028 non saisis pour les ${f.nom}</b>Sans tarif, les échéances des nouvelles inscriptions ne peuvent pas être créées. <a href="parametres.html#tarifs" style="color:inherit;font-weight:600">Saisir les tarifs 2027-2028</a></div></div>`;
-    }
-    $("suivant-1").disabled = !t;
-    $("resume-lot").innerHTML = `<span>Lot : <b>${EFFECTIFS[etat.filiere][etat.niveau - 1]} étudiants actifs</b> en ${f.nom} ${niveau(etat.niveau)} (2026-2027)</span>
-      <span>Décisions possibles : <b>${dernier ? "Diplômé(e) ou Redoublant(e)" : `Admis(e) en ${niveau(etat.niveau + 1)} ou Redoublant(e)`}</b></span>
-      <span class="petit">Prototype : 8 étudiants sont affichés à l'étape suivante.</span>`;
-  }
-  document.querySelectorAll('[name="filiere"],[name="niveau"]').forEach((r) => r.addEventListener("change", majEtape1));
-
-  // ── Étape 2 ──
-  function optionsDecision(l) {
-    const e = l.e, n = etat.niveau, dernier = n === FILIERES[etat.filiere].duree;
-    const opts = dernier
-      ? [["D", accord(e, "Diplômé", "Diplômée")], ["R", accord(e, "Redoublant", "Redoublante") + ` (reste en ${niveau(n)})`]]
-      : [["A", accord(e, "Admis", "Admise") + ` en ${niveau(n + 1)}`], ["R", accord(e, "Redoublant", "Redoublante") + ` (reste en ${niveau(n)})`]];
-    return opts.map(([v, t]) => `<option value="${v}" ${l.decision === v ? "selected" : ""}>${t}</option>`).join("");
-  }
-  function avatar(l) {
-    return l.reel ? `<img src="${photo(l.e)}" alt="">` : `<span class="avatar-initiales" aria-hidden="true">${l.e.nom[0]}${l.e.prenoms[0]}</span>`;
-  }
-  function badgeImpayes(l) {
-    if (!l.retard) return `<span class="badge badge-paye">À jour</span>`;
-    const cls = l.mois >= 2 ? "badge-retard" : "badge-partiel";
-    return `<span class="badge ${cls}">${ar(l.retard)}</span><div class="petit muet" style="margin-top:.2rem">${l.mois} mois</div>`;
-  }
-  function afficherLot() {
-    const f = FILIERES[etat.filiere];
-    $("titre-lot").textContent = `${f.nom} · ${niveau(etat.niveau)} · 2026-2027 → 2027-2028`;
-    $("lot").innerHTML = etat.lignes.map((l) => `
-      <tr class="${l.coche ? "" : "non-coche"}" data-id="${l.id}">
-        <td class="col-case"><input type="checkbox" data-coche="${l.id}" ${l.coche ? "checked" : ""} aria-label="Sélectionner ${nomComplet(l.e)}"></td>
-        <td><div class="personne">${avatar(l)}<div>
-          <b>${l.reel ? `<a href="etudiant.html?id=${l.e.id}" style="color:inherit;text-decoration:none">${nomComplet(l.e)}</a>` : nomComplet(l.e)}</b>
-          <span class="matricule">${l.e.matricule}</span>${l.e.redoublant ? ` · <span>${accord(l.e, "redoublant", "redoublante")}</span>` : ""}
-          ${l.deja ? `<span class="note-ligne"><span class="badge badge-partiel badge-sans-point">Déjà ${accord(l.e, "inscrit", "inscrite")} en 2027-2028 · sera ${accord(l.e, "ignoré", "ignorée")}</span></span>` : ""}
-        </div></div></td>
-        <td class="a-droite">${badgeImpayes(l)}</td>
-        <td><select class="saisie decision" data-decision="${l.id}" aria-label="Décision pour ${nomComplet(l.e)}">${optionsDecision(l)}</select></td>
-      </tr>`).join("");
-    const dernier = etat.niveau === f.duree;
-    $("groupe-admis").textContent = dernier ? "Marquer la sélection comme diplômée" : "Marquer la sélection comme admise";
-    majCompteur();
-  }
-  function majCompteur() {
-    const n = etat.lignes.filter((l) => l.coche).length;
-    $("compteur").innerHTML = `<b>${n}</b> sélectionné${n > 1 ? "s" : ""} sur ${etat.lignes.length}`;
-    const tout = $("tout-cocher");
-    tout.checked = n === etat.lignes.length; tout.indeterminate = n > 0 && n < etat.lignes.length;
-    $("groupe-admis").disabled = $("groupe-redouble").disabled = n === 0;
-  }
-  $("lot").addEventListener("change", (ev) => {
-    const c = ev.target.dataset.coche, d = ev.target.dataset.decision;
-    if (c) { const l = etat.lignes.find((x) => x.id === c); l.coche = ev.target.checked; ev.target.closest("tr").classList.toggle("non-coche", !l.coche); majCompteur(); }
-    if (d) { etat.lignes.find((x) => x.id === d).decision = ev.target.value; }
-  });
-  $("tout-cocher").addEventListener("change", (ev) => { etat.lignes.forEach((l) => (l.coche = ev.target.checked)); afficherLot(); });
-  function decisionGroupee(v) {
-    const sel = etat.lignes.filter((l) => l.coche);
-    sel.forEach((l) => (l.decision = v === "A" && etat.niveau === FILIERES[etat.filiere].duree ? "D" : v));
-    afficherLot();
-    toast(`${sel.length} étudiant${sel.length > 1 ? "s" : ""} ${v === "R" ? "marqué(s) redoublant(s)" : etat.niveau === FILIERES[etat.filiere].duree ? "marqué(s) diplômé(s)" : "marqué(s) admis"}.`);
-  }
-  $("groupe-admis").addEventListener("click", () => decisionGroupee("A"));
-  $("groupe-redouble").addEventListener("click", () => decisionGroupee("R"));
-
-  // ── Étape 3 ──
-  function bilan() {
-    const traites = etat.lignes.filter((l) => l.coche && !l.deja);
-    return {
-      traites,
-      admis: traites.filter((l) => l.decision === "A"),
-      redoublants: traites.filter((l) => l.decision === "R"),
-      diplomes: traites.filter((l) => l.decision === "D"),
-      ignores: etat.lignes.filter((l) => l.coche && l.deja),
-      nonCoches: etat.lignes.filter((l) => !l.coche),
-      impayes: traites.filter((l) => l.retard > 0),
-    };
-  }
-  function afficherVerification() {
-    const b = bilan(), f = FILIERES[etat.filiere], t = TARIFS_CIBLE[etat.filiere];
-    const suivant = etat.niveau < f.duree ? niveau(etat.niveau + 1) : null;
-    $("recap-lot").textContent = `${f.nom} ${niveau(etat.niveau)} · 2026-2027 → 2027-2028 · ${b.traites.length} étudiants traités`;
-    $("recap").innerHTML = `
-      ${suivant ? `<div><dt>Admis en ${suivant}</dt><dd>${b.admis.length}</dd></div>` : ""}
-      <div><dt>Redoublants</dt><dd>${b.redoublants.length}<small>restent en ${niveau(etat.niveau)}</small></dd></div>
-      ${suivant ? "" : `<div><dt>Diplômés</dt><dd>${b.diplomes.length}</dd></div>`}
-      <div><dt>Ignorés</dt><dd>${b.ignores.length}<small>déjà inscrits</small></dd></div>
-      <div><dt>Non cochés</dt><dd>${b.nonCoches.length}<small>non traités</small></dd></div>`;
-    const alertes = [];
-    if (b.impayes.length) alertes.push(`<div class="alerte alerte-attention">${icAlerte}<div><b>${b.impayes.length} étudiant${b.impayes.length > 1 ? "s ont" : " a"} des impayés en 2026-2027</b>Leurs impayés restent dus sur l'année 2026-2027 et restent encaissables depuis leur fiche.
-      <ul>${b.impayes.map((l) => `<li>${nomComplet(l.e)} (<span class="matricule" style="color:inherit">${l.e.matricule}</span>) : <b style="display:inline">${ar(l.retard)}</b></li>`).join("")}</ul></div></div>`);
-    if (b.ignores.length) alertes.push(`<div class="alerte alerte-info">${icInfo}<div><b>${b.ignores.length} étudiant déjà inscrit en 2027-2028 sera ignoré</b>${b.ignores.map((l) => `${nomComplet(l.e)} (${l.e.matricule})`).join(", ")} : son inscription existante n'est pas modifiée.</div></div>`);
-    if (b.nonCoches.length) alertes.push(`<div class="alerte alerte-info">${icInfo}<div><b>${b.nonCoches.length} étudiants non cochés ne seront pas traités</b>${b.nonCoches.map((l) => nomComplet(l.e)).join(", ")} : ${b.nonCoches.length > 1 ? "ils restent" : "reste"} en ${niveau(etat.niveau)} 2026-2027, sans inscription 2027-2028. Vous pourrez les inclure dans une prochaine opération.</div></div>`);
-    alertes.push(`<div class="alerte alerte-info">${icInfo}<div><b>Ce qui va être créé</b>Les inscriptions 2027-2028 et leurs échéances seront créées${t ? ` (droits ${ar(t.droits)} + ${t.mois} × ${ar(t.mensuel)})` : ""}. Opération annulable par l'administrateur tant qu'aucun paiement n'a été saisi.</div></div>`);
-    $("alertes").innerHTML = alertes.join("");
-    $("procéder").disabled = b.traites.length === 0;
-
-    $("dlg-confirmer-texte").textContent = `${b.traites.length} étudiants de ${f.nom} ${niveau(etat.niveau)} passent en 2027-2028. L'opération s'exécute en une seule fois.`;
-    $("dlg-confirmer-recap").innerHTML = `
-      ${suivant ? `<dt>Admis en ${suivant}</dt><dd>${b.admis.length}</dd>` : ""}
-      <dt>Redoublants</dt><dd>${b.redoublants.length}</dd>
-      ${b.diplomes.length ? `<dt>Diplômés</dt><dd>${b.diplomes.length}</dd>` : ""}
-      <dt>Inscriptions créées</dt><dd>${b.admis.length + b.redoublants.length}, avec leurs échéances</dd>
-      <dt>Impayés 2026-2027 restant dus</dt><dd>${ar(b.impayes.reduce((s, l) => s + l.retard, 0))} (${b.impayes.length} étudiants)</dd>`;
-  }
-
-  // ── Navigation entre étapes ──
-  function allerA(n) {
-    if (n === 2 && etat.etape === 1) { construireLot(); afficherLot(); }
-    if (n === 3) afficherVerification();
-    etat.etape = n;
-    document.querySelectorAll("[data-etape-panneau]").forEach((p) => (p.hidden = Number(p.dataset.etapePanneau) !== n));
-    document.querySelectorAll("#etapes li").forEach((li) => {
-      const i = Number(li.dataset.etape);
-      li.classList.toggle("faite", i < n);
-      if (i === n) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current");
-      li.querySelector(".num").innerHTML = i < n ? svg("ok") : i;
+  function eleves(c) {
+    if (c.lignes) return c.lignes;
+    const reels = ETUDIANTS.filter((e) => e.statut === "ACTIF" && e.filiere === c.f && e.niveau === c.n)
+      .map((e) => ({ id: "e" + e.id, e, reel: true, retard: situation(e).retard, d: "A" }));
+    const entree = 2026 - (c.n - 1);
+    const pris = new Set(reels.map((l) => Number(l.e.matricule.slice(-4))));
+    let seq = 0, aPlacer = Math.max(0, c.nbRetard - reels.filter((l) => l.retard).length);
+    const fictifs = Array.from({ length: c.eff - reels.length }, (_, i) => {
+      do seq++; while (pris.has(seq));
+      const [prenom, sexe] = PRENOMS[(i * 3 + c.rang * 7) % PRENOMS.length];
+      const retard = POS_IMPAYES.includes(i) && aPlacer-- > 0 ? MOIS_IMPAYES[i % MOIS_IMPAYES.length] * 80000 : 0;
+      return { id: `${c.id}-${i}`, e: { nom: NOMS[(i * 5 + c.rang * 3) % NOMS.length], prenoms: prenom, sexe, matricule: `${c.f}-${entree}-${String(seq).padStart(4, "0")}` }, retard, d: (c.preset || {})[i] || "A" };
     });
+    // Ordre alphabétique : c'est ainsi que le secrétariat retrouve un nom.
+    c.lignes = [...reels, ...fictifs].sort((a, b) => nomComplet(a.e).localeCompare(nomComplet(b.e), "fr"));
+    return c.lignes;
   }
-  $("suivant-1").addEventListener("click", () => { etat.etape = 1; allerA(2); window.scrollTo({ top: 0 }); });
-  document.querySelectorAll("[data-aller]").forEach((b) => b.addEventListener("click", () => { allerA(Number(b.dataset.aller)); window.scrollTo({ top: 0 }); }));
+  function bilan(c) {
+    const L = eleves(c);
+    return { A: L.filter((l) => l.d === "A").length, R: L.filter((l) => l.d === "R").length, X: L.filter((l) => l.d === "X").length, total: L.length, impayes: L.filter((l) => l.retard > 0).length };
+  }
+  const bilanOp = (o) => ({ A: o.dipl || o.admis, R: o.red, X: o.aband });
+  function libelle(d, e, c) {
+    if (d === "R") return "Redouble";
+    if (d === "X") return "Abandon";
+    return derniere(c) ? accord(e, "Diplômé", "Diplômée") : `Passe en ${niveau(c.n + 1)}`;
+  }
+  function totauxTexte(b, c, balise = "b") {
+    return [
+      `<span><${balise}>${b.A}</${balise}> ${derniere(c) ? pluriel(b.A, "diplômé", "diplômés") : pluriel(b.A, "passe", "passent") + " en " + niveau(c.n + 1)}</span>`,
+      `<span class="ex"><${balise}>${b.R}</${balise}> ${pluriel(b.R, "redouble", "redoublent")}</span>`,
+      `<span class="ex"><${balise}>${b.X}</${balise}> ${pluriel(b.X, "abandon", "abandons")}</span>`,
+    ].join('<span class="sep" aria-hidden="true">·</span>');
+  }
+
+  // ── État de l'écran ──
+  const vue = { cid: "IF-1", exceptions: false, q: "" };
+  const classe = () => CLASSES.find((c) => c.id === vue.cid);
+  const opDe = (c) => HISTORIQUE.find((o) => o.id === c.op);
+
+  function afficherAvancement() {
+    const faites = CLASSES.filter((c) => c.op).length;
+    $("avancement").innerHTML = `<b>${faites}</b> ${pluriel(faites, "classe validée", "classes validées")} sur ${CLASSES.length}
+      <div class="jauge" aria-hidden="true"><i style="width:${Math.round((faites / CLASSES.length) * 100)}%"></i></div>`;
+  }
+
+  function afficherClasses() {
+    $("classes").innerHTML = ["IF", "SF"].map((f) => `
+      <h2 class="${f.toLowerCase()}"><i aria-hidden="true"></i>${FILIERES[f].nom}</h2>
+      <ul>${CLASSES.filter((c) => c.f === f).map((c) => {
+        const etat = c.op ? `<span class="etat etat-validee">${svg("ok")}Validée</span>`
+          : c.tarifManquant ? `<span class="etat etat-tarif">${svg("impayes")}Tarif manquant</span>`
+          : `<span class="etat etat-afaire">À faire</span>`;
+        return `<li><button type="button" class="classe" data-classe="${c.id}" ${c.id === vue.cid ? 'aria-current="true"' : ""}>
+          <b>${niveau(c.n)}</b><span class="eff">${c.eff} étudiants</span>${etat}</button></li>`;
+      }).join("")}</ul>`).join("");
+  }
+
+  function afficherClasse() {
+    const c = classe(), op = opDe(c);
+    const validee = !!op, bloquee = !validee && c.tarifManquant;
+    afficherAvancement();
+    afficherClasses();
+    $("c-titre").textContent = nomClasse(c);
+    $("c-cible").textContent = `${c.eff} étudiants · ${derniere(c) ? `dernière année, diplôme en fin d'année ${SOURCE}` : `passage en ${niveau(c.n + 1)} pour ${CIBLE}`}`;
+    $("c-consigne").hidden = validee || bloquee;
+    $("c-consigne").innerHTML = `${ICONE_INFO}<span>Tous les étudiants sont cochés : ils sont ${derniere(c) ? "diplômés" : `admis en ${niveau(c.n + 1)}`}. <b>Décochez seulement ceux qui ne passent pas</b>, puis indiquez s'ils redoublent ou abandonnent.</span>`;
+
+    $("c-bloque").hidden = !bloquee;
+    $("c-liste").hidden = bloquee;
+    $("barre").hidden = bloquee || validee;
+    $("c-validee").hidden = !validee;
+
+    if (bloquee) {
+      $("bloque-titre").textContent = role === "admin"
+        ? `Saisissez d'abord le tarif ${CIBLE} des ${nomClasse(c)}`
+        : `Le tarif ${CIBLE} des ${nomClasse(c)} n'est pas encore saisi`;
+      return;
+    }
+    if (validee) {
+      $("c-validee").innerHTML = `<span>${svg("ok")}<span>Classe validée le ${op.date.replace(" ", " à ")} par ${op.auteur} : ${totauxTexte(bilanOp(op), c)}.</span></span>
+        <button class="btn btn-danger-contour btn-petit" type="button" id="annuler-classe" data-admin>Annuler ce passage</button>`;
+      $("annuler-classe").addEventListener("click", () => ouvrirAnnulation(op));
+    }
+    afficherListe();
+    majTotaux();
+  }
+
+  function afficherListe() {
+    const c = classe(), L = eleves(c), fige = !!c.op, b = bilan(c);
+    const q = norm(vue.q.trim());
+    const visibles = L.filter((l) => (!vue.exceptions || l.d !== "A") && (!q || norm(nomComplet(l.e) + " " + l.e.matricule).includes(q)));
+    $("eleves").innerHTML = visibles.map((l) => ligne(l, c, fige)).join("")
+      || `<li class="liste-vide">${q ? `Aucun étudiant de la classe ne correspond à « ${vue.q.replace(/[<>&"]/g, "")} ».` : `Personne n'est décoché : tous les étudiants sont ${derniere(c) ? "diplômés" : "admis en " + niveau(c.n + 1)}.`}</li>`;
+    compteurs(b);
+    $("vue-tous").setAttribute("aria-pressed", String(!vue.exceptions));
+    $("vue-exceptions").setAttribute("aria-pressed", String(vue.exceptions));
+  }
+  function compteurs(b) {
+    $("vue-tous").textContent = `Tous (${b.total})`;
+    $("vue-exceptions").textContent = `Ne passent pas (${b.R + b.X})`;
+  }
+
+  function ligne(l, c, fige) {
+    const e = l.e, passe = l.d === "A";
+    const avatar = l.reel ? `<img src="${photo(e)}" alt="">` : `<span class="avatar-initiales" aria-hidden="true">${e.nom[0]}${e.prenoms[0]}</span>`;
+    const info = l.retard ? `<span class="impaye"> · ${ar(l.retard)} impayés en ${SOURCE}</span>` : "";
+    let decision;
+    if (passe) decision = `<span class="passe">${libelle("A", e, c)}</span>`;
+    else if (fige) decision = `<span class="decision-figee">${libelle(l.d, e, c)}</span>`;
+    else decision = `<div class="deux-choix" role="radiogroup" aria-label="${nomComplet(e)} ne passe pas :">${["R", "X"].map((v) => `
+        <label><input type="radio" name="d-${l.id}" value="${v}" ${l.d === v ? "checked" : ""}>${libelle(v, e, c)}</label>`).join("")}</div>`;
+    return `<li class="eleve ${passe ? "" : "ne-passe-pas"}" data-id="${l.id}">
+      <label class="eleve-id">
+        <input type="checkbox" ${passe ? "checked" : ""} ${fige ? "disabled" : ""} aria-label="${nomComplet(e)} : ${derniere(c) ? "diplômé(e)" : "passe en " + niveau(c.n + 1)}">
+        <span class="personne">${avatar}<span><b>${nomComplet(e)}</b><span class="matricule">${e.matricule}</span>${info}</span></span>
+      </label>
+      <div class="decision">${decision}</div></li>`;
+  }
+
+  function majTotaux() {
+    const c = classe(), b = bilan(c);
+    $("totaux").innerHTML = totauxTexte(b, c);
+    $("valider").textContent = `Valider les ${nomClasse(c)}`;
+    // Dialogue de confirmation, toujours prêt (y compris pour ?dialogue=dlg-confirmer)
+    $("dlg-confirmer-titre").textContent = `Valider le passage des ${nomClasse(c)} ?`;
+    $("dlg-confirmer-texte").textContent = `${b.total} étudiants · de ${SOURCE} vers ${CIBLE}`;
+    $("dlg-chiffres").innerHTML = `
+      <div><dt>${derniere(c) ? pluriel(b.A, "diplômé", "diplômés") : `${pluriel(b.A, "passe", "passent")} en ${niveau(c.n + 1)}`}</dt><dd>${b.A}</dd></div>
+      <div class="ex"><dt>${pluriel(b.R, "redouble", "redoublent")} la ${niveau(c.n)}</dt><dd>${b.R}</dd></div>
+      <div class="ex"><dt>${pluriel(b.X, "abandon", "abandons")}</dt><dd>${b.X}</dd></div>`;
+    const exceptions = eleves(c).filter((l) => l.d !== "A");
+    $("dlg-qui").innerHTML = exceptions.length
+      ? `<h3>Ne passent pas (${exceptions.length})</h3><ul>${exceptions.map((l) => `<li><span><b style="color:var(--texte)">${nomComplet(l.e)}</b> · ${l.e.matricule}</span><b class="dec">${libelle(l.d, l.e, c)}</b></li>`).join("")}</ul>`
+      : `<p class="alerte alerte-succes" style="margin:0">Tous les étudiants ${derniere(c) ? "sont diplômés" : "passent en " + niveau(c.n + 1)}.</p>`;
+    const inscr = (derniere(c) ? 0 : b.A) + b.R;
+    $("dlg-notes").innerHTML = `
+      <li>${inscr} ${pluriel(inscr, "inscription", "inscriptions")} ${CIBLE} ${pluriel(inscr, "sera créée", "seront créées")}, avec leurs mensualités.</li>
+      ${b.impayes ? `<li>${b.impayes} ${pluriel(b.impayes, "étudiant a", "étudiants ont")} des impayés ${SOURCE} : ils restent dus.</li>` : ""}
+      <li>L'administrateur peut annuler ce passage tant qu'aucun paiement ${CIBLE} n'est saisi.</li>`;
+  }
+
+  // ── Interactions ──
+  $("classes").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-classe]"); if (!b) return;
+    choisirClasse(b.dataset.classe);
+  });
+  function choisirClasse(id) {
+    vue.cid = id; vue.exceptions = false; vue.q = ""; $("q").value = "";
+    history.replaceState(null, "", `?classe=${id}${location.hash}`);
+    afficherClasse();
+  }
+  $("eleves").addEventListener("change", (ev) => {
+    const t = ev.target, li = t.closest(".eleve"); if (!li) return;
+    const c = classe(), l = eleves(c).find((x) => x.id === li.dataset.id);
+    if (t.type === "checkbox") l.d = t.checked ? "A" : "R"; // décoché → « Redouble » par défaut
+    else l.d = t.value;
+    li.outerHTML = ligne(l, c, false);
+    majTotaux(); compteurs(bilan(c));
+    const cible = t.type === "checkbox" ? "input[type=checkbox]" : `input[value="${l.d}"]`;
+    document.querySelector(`.eleve[data-id="${l.id}"] ${cible}`)?.focus();
+  });
+  $("q").addEventListener("input", (ev) => { vue.q = ev.target.value; afficherListe(); });
+  $("vue-tous").addEventListener("click", () => { vue.exceptions = false; afficherListe(); });
+  $("vue-exceptions").addEventListener("click", () => { vue.exceptions = true; afficherListe(); });
+
+  $("confirmer").addEventListener("click", () => {
+    const c = classe(); if (c.op || c.tarifManquant) return;
+    const b = bilan(c);
+    const op = { id: "op-" + c.id, date: "12/03/2027 " + new Date().toTimeString().slice(0, 5), auteur: UTIL.nom, f: c.f, n: c.n, source: SOURCE, cible: CIBLE,
+      admis: derniere(c) ? 0 : b.A, dipl: derniere(c) ? b.A : 0, red: b.R, aband: b.X, active: true, inscriptions: (derniere(c) ? 0 : b.A) + b.R };
+    HISTORIQUE.unshift(op);
+    c.op = op.id;
+    $("dlg-confirmer").close();
+    toast(`${nomClasse(c)} validés : ${op.inscriptions} inscriptions ${CIBLE} créées.`);
+    afficherHistorique();
+    const suivante = [...CLASSES.slice(c.rang + 1), ...CLASSES.slice(0, c.rang)].find((x) => !x.op && !x.tarifManquant);
+    choisirClasse(suivante ? suivante.id : c.id);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
 
   // ── Historique ──
-  const HISTORIQUE = [
-    { id: "op7", date: "31/07/2026 14:05", auteur: "Administrateur IFSPA", f: "SF", n: 3, source: "2025-2026", cible: "2026-2027", admis: 0, red: 0, dipl: 20, active: true, inscriptions: 0 },
-    { id: "op6", date: "31/07/2026 10:20", auteur: "Hanitra RAKOTO", f: "IF", n: 3, source: "2025-2026", cible: "2026-2027", admis: 0, red: 2, dipl: 30, active: true, inscriptions: 2,
-      paiements: ["R-2026-00031 · 01/10/2026 · 180 000 Ar", "R-2026-00037 · 05/10/2026 · 100 000 Ar"] },
-    { id: "op5", date: "30/07/2026 16:40", auteur: "Hanitra RAKOTO", f: "IF", n: 2, source: "2025-2026", cible: "2026-2027", admis: 30, red: 2, dipl: 0, active: true, inscriptions: 32, nbPaiements: 87 },
-    { id: "op4", date: "30/07/2026 11:15", auteur: "Hanitra RAKOTO", f: "IF", n: 1, source: "2025-2026", cible: "2026-2027", admis: 36, red: 3, dipl: 0, active: true, inscriptions: 39, nbPaiements: 104 },
-    { id: "op3", date: "29/07/2026 15:30", auteur: "Hanitra RAKOTO", f: "SF", n: 2, source: "2025-2026", cible: "2026-2027", admis: 21, red: 1, dipl: 0, active: true, inscriptions: 22, nbPaiements: 58 },
-    { id: "op2", date: "29/07/2026 09:10", auteur: "Hanitra RAKOTO", f: "SF", n: 1, source: "2025-2026", cible: "2026-2027", admis: 23, red: 2, dipl: 0, active: true, inscriptions: 25, nbPaiements: 66 },
-    { id: "op1", date: "28/07/2026 16:50", auteur: "Hanitra RAKOTO", f: "SF", n: 1, source: "2025-2026", cible: "2026-2027", admis: 25, red: 0, dipl: 0, active: false, annulation: "Annulée le 29/07/2026 à 08:30 par Administrateur IFSPA" },
-  ];
-  function libelleLot(o) {
-    return `${o.f} ${niveauCourt(o.n)} année → ${o.n === FILIERES[o.f].duree ? "sortie" : niveauCourt(o.n + 1) + " année"}`;
-  }
   function afficherHistorique() {
-    $("liste-historique").innerHTML = HISTORIQUE.map((o) => `
-      <tr class="${o.active ? "" : "ligne-annulee"}">
+    $("liste-historique").innerHTML = HISTORIQUE.map((o) => {
+      const c = { f: o.f, n: o.n };
+      return `<tr class="${o.active ? "" : "ligne-annulee"}">
         <td><span class="montant">${o.date.split(" ")[0]}</span><div class="petit muet">${o.date.split(" ")[1]} · ${o.auteur}</div></td>
-        <td class="op-lot"><b>${libelleLot(o)}</b><span><span class="badge badge-${o.f.toLowerCase()}" style="font-size:.7rem">${FILIERES[o.f].nom}</span></span></td>
-        <td class="col-mobile-masquee"><span class="montant">${o.source} → ${o.cible}</span></td>
-        <td class="a-droite montant" data-label="Admis">${o.admis}</td>
-        <td class="a-droite montant" data-label="Redoublants · diplômés">${o.red}<span class="sous-mobile-dipl"> · ${o.dipl}</span></td>
-        <td class="a-droite montant col-mobile-masquee">${o.dipl}</td>
-        <td>${o.active ? `<span class="badge badge-paye">Active</span>` : `<span class="badge badge-avenir">Annulée</span><div class="petit muet" style="margin-top:.2rem">${o.annulation}</div>`}</td>
-        <td data-admin class="a-droite">${o.active ? `<button class="btn btn-danger-contour btn-petit" type="button" data-annuler="${o.id}">Annuler l'opération</button>` : ""}</td>
-      </tr>`).join("");
+        <td class="op-classe"><b>${nomClasse(c)}</b><span>${o.source} vers ${o.cible}</span></td>
+        <td class="montant">${totauxTexte(bilanOp(o), c, "span")}</td>
+        <td>${o.active ? `<span class="badge badge-paye">Actif</span>` : `<span class="badge badge-avenir">Annulé</span><div class="petit muet" style="margin-top:.2rem">${o.annulation}</div>`}</td>
+        <td data-admin class="a-droite">${o.active ? `<button class="btn btn-danger-contour btn-petit" type="button" data-annuler="${o.id}">Annuler</button>` : ""}</td>
+      </tr>`;
+    }).join("");
   }
   let opCourante = null;
   $("liste-historique").addEventListener("click", (ev) => {
@@ -468,12 +526,13 @@
     ouvrirAnnulation(HISTORIQUE.find((o) => o.id === b.dataset.annuler));
   });
   function ouvrirAnnulation(o) {
+    if (role !== "admin") return;
     opCourante = o;
-    const lot = `${FILIERES[o.f].nom} · ${libelleLot(o)} · ${o.source} → ${o.cible} · opération du ${o.date}`;
+    const lot = `${nomClasse(o)} · ${o.source} vers ${o.cible} · validé le ${o.date.replace(" ", " à ")}`;
     const nbPaiements = o.paiements ? o.paiements.length : o.nbPaiements || 0;
     if (nbPaiements) {
       $("dlg-bloque-lot").textContent = lot;
-      $("dlg-bloque-message").textContent = `${nbPaiements} paiements ont déjà été saisis sur ces inscriptions : annulez-les d'abord.`;
+      $("dlg-bloque-message").textContent = `${nbPaiements} paiements ont déjà été saisis sur ces inscriptions ${o.cible}.`;
       $("dlg-bloque-liste").innerHTML = o.paiements
         ? o.paiements.map((p) => `<li><a href="recu.html?recu=${p.split(" ")[0]}" style="color:inherit;font-weight:600">${p.split(" · ")[0]}</a> · ${p.split(" · ").slice(1).join(" · ")}</li>`).join("")
         : `<li>Liste complète dans <a href="paiements.html" style="color:inherit;font-weight:600">Paiements</a> (filtre : ${FILIERES[o.f].nom}, ${o.cible}).</li>`;
@@ -482,42 +541,38 @@
     }
     $("dlg-annuler-lot").textContent = lot;
     const effets = [];
-    if (o.inscriptions) effets.push(`les <b>${o.inscriptions} inscriptions ${o.cible}</b> créées et leurs échéances sont supprimées ;`);
+    if (o.inscriptions) effets.push(`les <b>${o.inscriptions} inscriptions ${o.cible}</b> créées et leurs mensualités sont supprimées ;`);
     if (o.admis) effets.push(`les ${o.admis} admis reviennent en ${niveau(o.n)} ${o.source} ;`);
-    if (o.red) effets.push(`les ${o.red} redoublants perdent leur inscription ${o.cible} ;`);
-    if (o.dipl) effets.push(`les ${o.dipl} diplômés reprennent le statut « Actif » (date de sortie effacée) ;`);
-    effets.push("les inscriptions " + o.source + " retrouvent le statut « En cours ».");
+    if (o.red) effets.push(`${o.red > 1 ? `les ${o.red} redoublants perdent leur` : "le redoublant perd son"} inscription ${o.cible} ;`);
+    if (o.dipl) effets.push(`les ${o.dipl} diplômés reprennent le statut « Actif » ;`);
+    if (o.aband) effets.push(`${o.aband > 1 ? `les ${o.aband} abandons reprennent` : "l'abandon reprend"} le statut « Actif » ;`);
+    effets.push(`la classe redevient « À faire ».`);
     $("dlg-annuler-effets").innerHTML = effets.map((x) => `<li>${x}</li>`).join("");
     $("dlg-annuler").showModal();
   }
   $("confirmer-annulation").addEventListener("click", () => {
-    if (role !== "admin") return;
+    if (role !== "admin" || !opCourante) return;
     opCourante.active = false;
-    opCourante.annulation = `Annulée le 12/03/2027 par ${UTIL.nom}`;
+    opCourante.annulation = `Annulé le 12/03/2027 par ${UTIL.nom}`;
+    const c = CLASSES.find((x) => x.op === opCourante.id);
+    if (c) c.op = null;
     $("dlg-annuler").close();
     afficherHistorique();
-    toast("Opération annulée : inscriptions supprimées et statuts restaurés.");
+    afficherClasse();
+    toast(c ? `Passage annulé : les ${nomClasse(c)} sont de nouveau à faire.` : "Passage annulé : inscriptions supprimées et statuts restaurés.");
   });
 
-  // ── Confirmation finale ──
-  $("confirmer").addEventListener("click", () => {
-    const b = bilan();
-    HISTORIQUE.unshift({ id: "op-nouvelle", date: "12/03/2027 " + new Date().toTimeString().slice(0, 5), auteur: UTIL.nom, f: etat.filiere, n: etat.niveau, source: "2026-2027", cible: "2027-2028",
-      admis: b.admis.length, red: b.redoublants.length, dipl: b.diplomes.length, active: true, inscriptions: b.admis.length + b.redoublants.length });
-    afficherHistorique();
-    $("dlg-confirmer").close();
-    toast(`Admission enregistrée : ${b.admis.length + b.redoublants.length} inscriptions 2027-2028 créées.`);
-    $("onglet-historique").click();
-    allerA(1);
-  });
-
-  // ── Initialisation ──
-  majEtape1();
+  // ── Démarrage — démo : ?classe=IF-1 · &vue=exceptions · &dialogue=dlg-confirmer · ?annuler=op6#historique ──
+  const cUrl = params.get("classe");
+  if (CLASSES.some((c) => c.id === cUrl)) vue.cid = cUrl;
+  vue.exceptions = params.get("vue") === "exceptions";
   afficherHistorique();
-  const etapeUrl = Number(params.get("etape"));
-  if (etapeUrl === 2 || etapeUrl === 3) { allerA(2); if (etapeUrl === 3) allerA(3); } else allerA(1);
+  afficherClasse();
   const annulerUrl = params.get("annuler");
-  if (annulerUrl) window.addEventListener("load", () => { const o = HISTORIQUE.find((x) => x.id === annulerUrl); if (o) { $("onglet-historique").click(); ouvrirAnnulation(o); } });
+  if (annulerUrl) window.addEventListener("load", () => {
+    const o = HISTORIQUE.find((x) => x.id === annulerUrl);
+    if (o) ouvrirAnnulation(o);
+  });
 </script>
 </body>
 </html>

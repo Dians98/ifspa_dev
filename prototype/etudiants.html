@@ -128,7 +128,6 @@
     if (e.statut !== "ACTIF") return `<span class="petit muet">Sorti${e.sexe === "F" ? "e" : ""} · aucune échéance</span>`;
     if (s.statut === "ajour") return `<span class="badge badge-paye">À jour</span>`;
     const detail = `<div class="petit muet" style="margin-top:.2rem">${s.moisRetard} mois</div>`;
-    if (s.statut === "partiel") return `<span class="badge badge-partiel"><span class="masquer-mobile">Partiel · </span>${ar(s.retard)}</span>${detail}`;
     return `<span class="badge badge-retard"><span class="masquer-mobile">En retard · </span>${ar(s.retard)}</span>${detail}`;
   }
 
