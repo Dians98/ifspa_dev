@@ -34,6 +34,7 @@ model User {
   etudiantsCrees     Etudiant[]           @relation("EtudiantCreePar")
   paiementsSaisis    Paiement[]           @relation("PaiementSaisiPar")
   paiementsAnnules   Paiement[]           @relation("PaiementAnnulePar")
+  blocsRecusReserves BlocRecus[]          @relation("BlocRecusReservePar")
   admissionsCreees   OperationAdmission[] @relation("AdmissionCreePar")
   admissionsAnnulees OperationAdmission[] @relation("AdmissionAnnuleePar")
 
@@ -232,6 +233,8 @@ model Inscription {
   anneeScolaire        AnneeScolaire       @relation(fields: [anneeScolaireId], references: [id])
   niveau               Int
   redoublement         Boolean             @default(false)
+  // Droits d'inscription payés en 1, 2 ou 3 tranches (octobre, novembre, décembre)
+  droitsEnTranches     Int                 @default(1)
   statut               StatutInscription   @default(EN_COURS)
   // Renseigné quand l'inscription a été créée par une admission en lot
   operationAdmissionId String?
@@ -256,9 +259,10 @@ model Echeance {
   inscriptionId String
   inscription   Inscription  @relation(fields: [inscriptionId], references: [id], onDelete: Cascade)
   type          TypeEcheance
+  tranche       Int? // 1 à 3 pour les droits, null pour une mensualité
   mois          DateTime     @db.Date // 1er du mois concerné (date d'exigibilité)
-  ordre         Int // 0 = droits, puis 1..N pour les mensualités
-  montantDu     Int // copié depuis le tarif à la génération
+  ordre         Int // ordre de solde : pour chaque mois, la tranche de droits éventuelle puis la mensualité
+  montantDu     Int // copié depuis le tarif à la génération ; payé = somme des lignes de paiements non annulés (paiement partiel possible)
 
   lignesPaiement PaiementLigne[]
 
@@ -301,13 +305,35 @@ model Paiement {
   annulePar       User?            @relation("PaiementAnnulePar", fields: [annuleParId], references: [id])
   dateAnnulation  DateTime?
   motifAnnulation String?
+  // Encaissement hors ligne : identifiant généré sur le poste, un double envoi est sans effet
+  idClient        String?          @unique
+  // Échéance soldée ailleurs avant la synchronisation : l'admin annule ou régularise
+  aVerifier       Boolean          @default(false)
   createdAt       DateTime         @default(now())
 
   lignes PaiementLigne[]
 
   @@index([etudiantId])
   @@index([date])
+  @@index([aVerifier])
   @@map("paiement")
+}
+
+// Bloc de numéros de reçu réservé à l'avance par un poste (encaissement hors ligne).
+// Les numéros d'un bloc sans paiement sont listés « non utilisés » dans Paiements.
+model BlocRecus {
+  id           String   @id @default(cuid())
+  poste        String // identifiant du poste, généré par le navigateur
+  annee        Int // année du compteur "RECU:{annee}"
+  premier      Int
+  dernier      Int
+  reserveParId String
+  reservePar   User     @relation("BlocRecusReservePar", fields: [reserveParId], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@unique([annee, premier])
+  @@index([poste, annee])
+  @@map("bloc_recus")
 }
 
 model PaiementLigne {

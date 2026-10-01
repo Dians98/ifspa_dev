@@ -51,15 +51,16 @@ Source officielle : `LOGO ET ARRËTEE IFSPA.pdf` (logo et arrêtés : ouverture 
 - **Echeance** : générée à l'inscription à partir du Tarif. Le montant est copié au moment de la génération, pour qu'un changement de tarif ne modifie pas le passé. Champs : `inscriptionId`, `type` (`DROITS` | `MENSUALITE`), `tranche?` (1 à 3 pour les droits), `mois` (date du 1er du mois d'exigibilité), `montantDu`.
   - **Droits d'inscription en 1, 2 ou 3 fois** (demande du client) : choix fait à l'inscription (`Inscription.droitsEnTranches`, 1 par défaut). Tranches égales arrondies au millier, le reste sur la 1re (ex. 100 000 en 3 fois = 34 000 + 33 000 + 33 000). Exigibles : 1re tranche en octobre (à l'inscription), 2e en novembre, 3e en décembre. Au passage en année supérieure, le choix de l'année précédente est repris ; il reste modifiable sur la fiche tant qu'aucune tranche n'est payée.
   - **Où et quand encaisser les droits** : au guichet, sur l'écran Encaisser, comme les mensualités. Ordre de solde : pour chaque mois, la tranche de droits éventuelle puis la mensualité. Un nouvel étudiant paie ses droits (ou la 1re tranche) juste après son inscription ; un étudiant qui passe en année supérieure paie ceux de la nouvelle année à la rentrée d'octobre.
-- **Paiement** : `numeroRecu` (unique), `etudiantId`, `date`, `montant`, `mode` (`ESPECES` | `MOBILE_MONEY`), `operateur?` (`MVOLA` | `ORANGE` | `AIRTEL`), `reference?`, `observation?`, `saisiParId`, `annule`, `annuleParId?`, `motifAnnulation?`
-- **PaiementLigne** : `paiementId`, `echeanceId`, `montant`. Répartit un paiement sur les échéances, de la plus ancienne à la plus récente. **Pas de paiement partiel** (retiré à la demande du client) : un paiement solde toujours des échéances entières, donc `PaiementLigne.montant` = `Echeance.montantDu` et le montant du paiement est la somme des mois cochés. Pas d'acompte, pas de montant libre. **Pas de notion d'« arriérés »** (retirée à la demande du client) : les impayés d'une année restent dus sur cette année, rien n'est reporté sur l'année suivante.
+- **Paiement** : `numeroRecu` (unique), `etudiantId`, `date`, `montant`, `mode` (`ESPECES` | `MOBILE_MONEY`), `operateur?` (`MVOLA` | `ORANGE` | `AIRTEL`), `reference?`, `observation?`, `saisiParId`, `annule`, `annuleParId?`, `motifAnnulation?`, `idClient?` (unique : identifiant généré sur le poste pour l'encaissement hors ligne, rend un double envoi sans effet), `aVerifier` (paiement synchronisé alors que l'échéance avait été soldée ailleurs)
+- **BlocRecus** : bloc de numéros de reçu réservé à l'avance par un poste pour l'encaissement hors ligne. Champs : `poste`, `annee`, `premier`, `dernier`, `reserveParId`.
+- **PaiementLigne** : `paiementId`, `echeanceId`, `montant`. Répartit un paiement sur les échéances, de la plus ancienne à la plus récente. **Paiement partiel autorisé** (rétabli à la demande du client le 01/10/2026), sur les droits comme sur les mensualités : le montant reçu est libre. Ce qui dépasse les échéances soldées va en acompte sur l'échéance suivante (l'étudiant apporte 100 000 Ar pour un mois à 80 000 Ar : le mois est soldé, 20 000 Ar d'acompte sur le mois suivant) ; un montant inférieur à une échéance la paie en partie. `PaiementLigne.montant` peut donc être inférieur à `Echeance.montantDu` ; le payé d'une échéance est la somme de ses lignes de paiements non annulés. Un montant qui dépasse le reste dû de l'année est refusé (pas de trop-perçu). **Pas de notion d'« arriérés »** (retirée à la demande du client) : les impayés d'une année restent dus sur cette année, rien n'est reporté sur l'année suivante.
 - **Compteur** : `cle` (ex. `MATRICULE:IF:2026`, `RECU:2026`), `valeur`. Incrémenté de façon atomique dans une transaction (`UPDATE … RETURNING`).
 - **OperationAdmission** : `anneeSourceId`, `anneeCibleId`, `filiereId`, `niveauSource`, `creeParId`, `date`, `annulee`, `annuleeParId?`, `dateAnnulation?`, avec des lignes (`etudiantId`, `decision`, `inscriptionSourceId`, `inscriptionCibleId?`, `ancienStatutEtudiant`)
 - ~~JournalAudit~~ : **retiré à la demande du client.** Pas de journal d'audit. Les annulations restent tracées sur l'objet lui-même : `annulePar`, `dateAnnulation`, motif.
 
 **Règles clés**
 - Le matricule est généré à la création : `{Filiere.code}-{AnneeEntree.anneeDebut}-{séquence sur 4 chiffres}`.
-- Une échéance est soit **payée**, soit **en retard** (mois passé, non payée), soit **à venir**. Il n'existe pas d'état « partiel ». Les droits (ou leur 1re tranche) sont dus à l'inscription.
+- Une échéance est soit **payée**, soit **partielle** (acompte versé, reste dû, mois pas encore passé), soit **en retard** (mois passé, pas entièrement payée ; on affiche le reste dû), soit **à venir**. Les droits (ou leur 1re tranche) sont dus à l'inscription.
 - Aucune suppression physique de paiement. L'admin **annule** le paiement avec un motif : le reçu reste dans l'historique, marqué ANNULÉ.
 
 ## Rôles et permissions
@@ -91,20 +92,22 @@ Les permissions sont vérifiées **côté serveur** dans chaque Server Action (`
   - identité et contact de l'étudiant (pas de tuteur) ;
   - filière et matricule ;
   - **parcours** : une ligne par année scolaire (niveau, admis ou redoublant) ;
-  - **situation de l'écolage** : grille mois par mois pour chaque année (payé, en retard, à venir), total dû, total payé, reste ;
+  - **situation de l'écolage** : grille mois par mois pour chaque année (payé, partiel, en retard, à venir), total dû, total payé, reste ;
   - historique des paiements avec les reçus ;
   - boutons **Encaisser**, **Imprimer la fiche**, et **Sortie** (admin).
-- **Encaisser** (UX simplifiée à la demande du client ; maquette `prototype/encaissement.html`). On choisit des mois, pas un montant. Une seule colonne en 4 gestes, **sans fenêtre de confirmation** :
+- **Encaisser** (UX simplifiée à la demande du client ; maquette `prototype/encaissement.html`). On coche des mois, et le montant reçu reste modifiable (paiement partiel). Une seule colonne en 4 gestes, **sans fenêtre de confirmation** :
   1. **Quel étudiant ?** Grande recherche (nom, prénoms, matricule, accents ignorés) avec la liste « Derniers servis ».
-  2. **Que paie-t-il ?** Les échéances non soldées s'affichent en cases. Celles **en retard sont cochées par défaut**. Le cochage se fait dans l'ordre, puisque les plus anciennes sont soldées d'abord. Le montant se calcule seul et **ne se modifie pas** : chaque mois se paie en entier, pas d'acompte.
+  2. **Que paie-t-il ?** Les échéances non soldées s'affichent en cases. Celles **en retard sont cochées par défaut**. Le cochage se fait dans l'ordre, puisque les plus anciennes sont soldées d'abord. Le champ **« Montant reçu »** est prérempli avec la somme des cases cochées et **reste modifiable** (paiement partiel) : s'il dépasse les cases cochées, le surplus va en acompte sur l'échéance suivante et l'écran le dit (« 20 000 Ar d'acompte sur avril, il restera 60 000 Ar ») ; s'il est inférieur, la dernière échéance n'est payée qu'en partie. Refusé s'il dépasse le reste dû de l'année.
   3. **Comment ?** Espèces ou Mobile Money. L'opérateur et la référence ne sont demandés que pour le Mobile Money.
   4. **Un seul bouton**, qui dit ce qu'il fait : « Encaisser 160 000 Ar et imprimer le reçu ». Le ticket s'imprime et l'écran se remet à zéro pour le parent suivant.
 - **Encaissement hors ligne** (demande du client, **uniquement l'écran Encaisser**) : maquette `prototype/encaissement.html?hors-ligne=1`, captures `06d` et `m06d`.
-  - Application installable (PWA, service worker) : l'écran Encaisser et ses ressources restent disponibles sans Internet. Les autres écrans affichent « Connexion nécessaire ».
+  - **Rien à installer sur le poste** (pas d'application installable, pas de manifeste PWA), précision du 01/10/2026. Le seul besoin est que l'écran Encaisser fonctionne sans Internet ; les autres écrans demandent Internet et on ne fait rien pour eux. Moyen technique : un service worker minimal, invisible pour l'utilisateur, qui met en cache **uniquement** la page Encaisser et ses ressources, pour qu'elle s'ouvre et se recharge même sans connexion (cas d'une coupure de courant : le poste redémarre sans Internet).
+  - **Cadre de l'application hors ligne** : le menu latéral, l'en-tête et le nom de l'utilisateur s'affichent comme en ligne (ils sont en cache avec la page). Les autres entrées du menu sont grisées avec la mention « Connexion nécessaire », et la déconnexion est désactivée tant que le poste est hors ligne ou que des paiements sont en attente.
   - **Pas de copie complète de la base sur le poste** : le navigateur garde (IndexedDB) une copie légère de ce dont le guichet a besoin, à savoir les étudiants actifs, leurs échéances non soldées et les tarifs, rafraîchie à chaque synchronisation. S'y ajoute une **file des paiements en attente**.
   - **Numéros de reçu** : chaque poste réserve à l'avance un bloc de numéros (ex. 20) dans le `Compteur`, en transaction. Un ticket imprimé hors ligne porte donc son numéro définitif. Un bloc non utilisé en fin d'année laisse des numéros « non utilisés », listés dans Paiements.
   - **Synchronisation** : bandeau d'état (vert « En ligne · tout est synchronisé », orange « Hors ligne · n paiements en attente », bleu « Synchronisation… »). Elle est automatique au retour de la connexion (événement `online`) puis toutes les 5 minutes, et manuelle avec le bouton « Synchroniser ». Chaque paiement porte un identifiant unique généré sur le poste, ce qui rend un double envoi sans effet (idempotence).
   - **Au serveur** : chaque paiement envoyé est revalidé. Si une échéance a été soldée ailleurs entre-temps, le paiement est enregistré mais signalé « à vérifier » à l'administrateur, qui l'annule ou le régularise. L'argent reçu n'est jamais perdu.
+  - **Accès concurrents** : une seule synchronisation à la fois par poste, même avec deux onglets ouverts (Web Locks API) ; le prochain numéro du bloc est pris dans une transaction IndexedDB ; au serveur, l'enregistrement d'un paiement verrouille les échéances de l'inscription (`SELECT … FOR UPDATE`) avant de recalculer le reste dû. Deux postes en ligne sur la même échéance : le second est refusé avec un message clair. Un poste hors ligne : son paiement est enregistré « à vérifier ».
   - La session doit rester valide hors ligne : un poste déconnecté ne redemande pas le mot de passe avant la synchronisation.
 - **Paiements** : historique des paiements du jour et de la période ; annulation réservée à l'admin.
 - **Impayés** : liste des étudiants en retard avec le montant et le nombre de mois de retard, export Excel.
@@ -123,7 +126,7 @@ Le point de départ est le **rose et le bleu du paramédical**, en variantes ado
 
 **Répartition** : 60 % de blanc et de neutres clairs, 30 % de bleu (sidebar, header, boutons principaux), 10 % de rose en accent (badges, survols, éléments décoratifs de la landing).
 
-**Couleurs de statut distinctes du rose** : vert = payé, rouge franc = en retard, gris = à venir. L'orange (`--attention`) sert uniquement aux avertissements (tarif manquant, taux de recouvrement bas), jamais à un statut de paiement. Un accent rose ne doit jamais pouvoir être confondu avec une alerte de retard.
+**Couleurs de statut distinctes du rose** : vert = payé, orange = partiel (`--partiel`), rouge franc = en retard, gris = à venir. Le même orange (`--attention`) sert aussi aux avertissements (tarif manquant, taux de recouvrement bas, hors ligne). Un accent rose ne doit jamais pouvoir être confondu avec une alerte de retard.
 
 **Tokens** : toutes les couleurs sont des variables CSS (tokens shadcn : `--primary`, `--accent`, etc.) dans `src/app/globals.css`, avec 3 thèmes candidats sous `[data-theme="..."]` :
 | Thème | Principal | Secondaire | Accent | Fond |
@@ -149,7 +152,7 @@ Les PDF sont générés côté serveur avec `@react-pdf/renderer`. Le bouton **I
 **1. Reçu de paiement** (`/api/pdf/recu/[id]`)
 - n° de reçu, date et heure ;
 - étudiant : matricule, nom et prénoms, filière, niveau, année scolaire ;
-- détail des lignes payées (droits d'inscription, octobre 2026, novembre 2026, etc.) avec les montants ;
+- détail des lignes payées (droits d'inscription, octobre 2026, novembre 2026, etc.) avec les montants ; une échéance payée en partie porte la mention « acompte » et son reste dû ;
 - **total en chiffres et en lettres** (« cent cinquante mille ariary ») ;
 - mode de paiement, opérateur et référence Mobile Money ;
 - **reste à payer après ce paiement** ;
@@ -165,7 +168,7 @@ Les PDF sont générés côté serveur avec `@react-pdf/renderer`. Le bouton **I
 
 **2. Relevé d'écolage** (`/api/pdf/releve/[etudiantId]`, format A4)
 - identité de l'étudiant, matricule, filière, statut ;
-- **pour chaque année scolaire** du parcours : le niveau (avec la mention « redoublant » s'il y a lieu), puis un tableau mois par mois (dû, payé, reste, statut : payé, **en retard**, à venir) et un sous-total ;
+- **pour chaque année scolaire** du parcours : le niveau (avec la mention « redoublant » s'il y a lieu), puis un tableau mois par mois (dû, payé, reste, statut : payé, partiel, **en retard**, à venir) et un sous-total ;
 - **récapitulatif général** : total dû, total payé, **reste à payer**, nombre de mois en retard ;
 - la liste des paiements avec les n° de reçu ;
 - ce document sert aussi pour les parents et les relances individuelles.
@@ -279,18 +282,19 @@ L'administrateur de l'institut ajuste ensuite lui-même dans Paramètres. Les é
 - [ ] Encaissement (saisie rapide et depuis la fiche), numérotation des reçus
 - [ ] Reçu au format ticket thermique 80 mm (58 mm en option), sans QR code
 - [ ] Droits d'inscription en 1, 2 ou 3 tranches
-- [ ] Encaissement hors ligne : PWA, copie locale légère (IndexedDB), file d'attente, blocs de numéros de reçu, synchronisation automatique et manuelle
+- [ ] Paiement partiel : montant reçu libre, acompte sur l'échéance suivante, statut « partiel »
+- [ ] Encaissement hors ligne (écran Encaisser seul, rien à installer) : page en cache, copie locale légère (IndexedDB), file d'attente, blocs de numéros de reçu, synchronisation automatique et manuelle
 - [ ] Relevé d'écolage PDF A4, impression directe
 - [ ] Annulation d'un paiement par l'admin, filigrane ANNULÉ
 - [ ] Page Impayés et export Excel
 
 ### Phase 5 — Admissions et sorties
-- [ ] Assistant en 3 étapes (lot, liste à cocher, vérification) et exécution en transaction
+- [ ] Écran par classe (tous cochés, on décoche ceux qui ne passent pas), une seule confirmation, exécution en transaction
 - [ ] Historique des opérations et annulation par l'admin (bloquée s'il existe des paiements), avec les tests
 - [ ] Sorties : abandon et exclusion (admin)
 
 ### Phase 6 — Dashboard
-- [ ] Cartes d'indicateurs, tableau par filière et par niveau, top des impayés, derniers paiements (sans graphiques)
+- [ ] Trois cartes d'indicateurs, tableau par filière et par niveau, 10 derniers paiements (sans graphiques, sans « plus gros impayés »)
 
 ### Phase 7 — Reprise des données Excel
 Script `scripts/import-excel.ts`, lancé par `npm run import -- fichier.xlsx`, avec la librairie `exceljs`.
@@ -327,14 +331,14 @@ Script `scripts/import-excel.ts`, lancé par `npm run import -- fichier.xlsx`, a
 - **Tests unitaires (Vitest)** :
   - matricule : format, séquence, unicité quand plusieurs créations arrivent en même temps ;
   - échéances : génération à partir du tarif ;
-  - répartition d'un paiement : plusieurs mois d'un coup, toujours des échéances entières ; refus d'un montant qui ne correspond pas à des mois entiers ;
+  - répartition d'un paiement : plusieurs mois d'un coup, paiement partiel (acompte sur l'échéance suivante, échéance payée en partie, tranche de droits payée en partie), refus du trop-perçu au-delà du reste de l'année ;
   - calcul des retards à une date donnée ;
   - montant en lettres ;
   - admission puis annulation, qui doit restaurer exactement l'état d'avant.
 - **Parcours manuel** :
   1. Se connecter en admin et créer une année et des tarifs.
   2. Créer 3 étudiants et vérifier les matricules `IF-2026-0001`, `IF-2026-0002` et `SF-2026-0001` (la séquence est propre à chaque filière).
-  3. Encaisser deux mois et vérifier la grille. Imprimer le reçu : vérifier le logo, le montant en lettres et le reste à payer. Couper Internet, encaisser, rétablir, puis vérifier la synchronisation. Imprimer le relevé d'écolage.
+  3. Encaisser deux mois et vérifier la grille. Encaisser un mois avec un surplus (100 000 Ar pour 80 000 Ar) et vérifier l'acompte sur le mois suivant. Imprimer le reçu : vérifier le logo, le montant en lettres et le reste à payer. Couper Internet, encaisser, rétablir, puis vérifier la synchronisation. Imprimer le relevé d'écolage.
   4. Lancer une admission avec 2 admis et 1 redoublant, puis l'annuler et vérifier que l'état est restauré.
   5. Se connecter en USER et vérifier qu'aucun bouton de suppression ou d'annulation n'apparaît, et que l'appel direct à la Server Action est refusé.
 - `npm run build` et `npm run lint` sans erreur avant chaque fin de phase.

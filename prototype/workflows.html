@@ -235,7 +235,7 @@
     },
     {
       id: "encaissement", titre: "Encaisser un paiement",
-      desc: "L'écran du guichet, en 4 gestes. On coche des mois entiers : il n'y a pas d'acompte ni de montant à taper.",
+      desc: "L'écran du guichet, en 4 gestes. On coche les mois à payer ; le montant reçu se règle si le payeur apporte plus ou moins (acompte).",
       qui: [["tous", "Secrétariat ou administrateur"], ["quand", "Chaque jour, au guichet"]],
       schema: `flowchart TD
         A("« Encaisser »") --> A2{"Internet<br/>disponible ?"}:::choix
@@ -245,16 +245,19 @@
         B --> C{"Reste-t-il des mois<br/>à payer cette année ?"}:::choix
         C -- Non --> Z(["« Toute l'année est payée » :<br/>rien à encaisser"]):::fin
         C -- Oui --> D["Les mois en retard<br/>sont déjà cochés"]:::auto
-        D --> E("2 · Cocher ou décocher<br/>des mois entiers")
-        E --> F["Montant calculé<br/>automatiquement"]:::auto
-        F --> G{"3 · Comment<br/>paie-t-il ?"}:::choix
+        D --> E("2 · Cocher ou décocher les mois")
+        E --> F["« Montant reçu » = somme des mois cochés"]:::auto
+        F --> F2{"Le payeur apporte<br/>un autre montant ?"}:::choix
+        F2 -- Non --> G
+        F2 -- Oui --> F3["On corrige le montant :<br/>le surplus fait un acompte sur le mois suivant,<br/>un manque laisse le dernier mois payé en partie"]:::auto
+        F3 --> G{"3 · Comment<br/>paie-t-il ?"}:::choix
         G -- Espèces --> I
         G -- Mobile Money --> H("Choisir l'opérateur<br/>(MVola, Orange, Airtel)<br/>et recopier la référence du SMS")
         H --> I("4 · « Encaisser … Ar<br/>et imprimer le reçu »")
         I --> J["Reçu numéroté enregistré<br/>(ex. R-2027-00023),<br/>ticket imprimé"]:::auto
         J --> K(["Écran remis à zéro<br/>pour la personne suivante"]):::fin
         J -. "si hors ligne" .-> L["Paiement en attente d'envoi,<br/>envoyé à la prochaine synchronisation"]:::auto`,
-      retenir: ["Les échéances se paient toujours de la plus ancienne à la plus récente : droits (ou tranche de droits) puis mensualité de chaque mois.", "Pas de fenêtre de confirmation : le bouton dit exactement ce qu'il fait.", "Le reçu est un ticket de caisse 80 mm.", "Sans Internet, l'encaissement continue : c'est le seul écran qui fonctionne hors ligne."],
+      retenir: ["Les échéances se paient toujours de la plus ancienne à la plus récente : droits (ou tranche de droits) puis mensualité de chaque mois.", "Montant libre : un acompte est permis, sur les droits comme sur les mensualités. Le montant ne peut pas dépasser ce qui reste dû sur l'année : pas de trop-perçu.", "Pas de fenêtre de confirmation : le bouton dit exactement ce qu'il fait.", "Le reçu est un ticket de caisse 80 mm.", "Sans Internet, l'encaissement continue : c'est le seul écran qui fonctionne hors ligne."],
       ecrans: [["Encaisser", "encaissement.html?id=8"], ["Hors ligne", "encaissement.html?id=8&hors-ligne=1&attente=2"], ["Reçu", "recu.html"]],
     },
     {
@@ -271,7 +274,7 @@
         E --> F{"Tranche payée<br/>à temps ?"}:::choix
         F -- Oui --> G(["Reçu remis"]):::fin
         F -- Non --> H["Tranche « en retard » :<br/>l'étudiant apparaît dans les Impayés"]:::bloque`,
-      retenir: ["En 1 fois : les droits sont dus à l'inscription (octobre).", "En 2 fois : octobre et novembre. En 3 fois : octobre, novembre et décembre.", "Chaque tranche se paie en entier, comme une mensualité."],
+      retenir: ["En 1 fois : les droits sont dus à l'inscription (octobre).", "En 2 fois : octobre et novembre. En 3 fois : octobre, novembre et décembre.", "Une tranche se paie comme une mensualité, en entier ou par acompte."],
       ecrans: [["Nouvel étudiant", "etudiant-nouveau.html"], ["Fiche (droits en 3 fois)", "etudiant.html?id=10"], ["Encaisser", "encaissement.html?id=10"]],
     },
     {

@@ -52,7 +52,7 @@
   .d-tab tr.annulee .m { text-decoration: line-through; }
   .st { display: inline-flex; align-items: center; gap: 1.2mm; font-weight: 600; font-size: 7.8pt; white-space: nowrap; }
   .st::before { content: ""; width: 1.8mm; height: 1.8mm; border-radius: 50%; background: currentColor; }
-  .st-paye { color: var(--paye); } .st-retard { color: var(--retard); } .st-avenir { color: #566173; }
+  .st-paye { color: var(--paye); } .st-partiel { color: var(--partiel); } .st-retard { color: var(--retard); } .st-avenir { color: #566173; }
   .st-avenir::before { background: transparent; border: .8pt solid currentColor; }
   .st-annule { color: #566173; }
 
@@ -100,7 +100,7 @@
   const e = IFSPA.etudiant(new URLSearchParams(location.search).get("id")) || IFSPA.etudiant(8);
   const F = e.sexe === "F";
   const DU_ANNUEL = TARIF.droits + TARIF.mensuel * TARIF.nombreMois;
-  const STATUTS = { paye: "Payé", retard: "En retard", avenir: "À venir" };
+  const STATUTS = { paye: "Payé", partiel: "Partiel", retard: "En retard", avenir: "À venir" };
   const st = (k, txt) => `<span class="st st-${k}">${txt || STATUTS[k]}</span>`;
 
   /* ── Parcours : années scolaires de l'entrée à l'année en cours (ou de sortie) ── */
@@ -123,7 +123,7 @@
       return `<section class="annee">${titre}
         <table class="d-tab">
           <thead><tr><th>Échéance</th><th class="m">Dû</th><th class="m">Payé</th><th class="m">Reste</th><th>Statut</th></tr></thead>
-          <tbody>${lignes.map((l) => `<tr><td>${l.libelle}</td><td class="m">${ar(l.du)}</td><td class="m">${l.paye ? ar(l.paye) : "—"}</td><td class="m">${l.du - l.paye ? ar(l.du - l.paye) : "—"}</td><td>${st(l.statut)}</td></tr>`).join("")}</tbody>
+          <tbody>${lignes.map((l) => `<tr><td>${l.libelle}</td><td class="m">${ar(l.du)}</td><td class="m">${l.paye ? ar(l.paye) : "—"}</td><td class="m">${l.reste ? ar(l.reste) : "—"}</td><td>${st(l.statut)}</td></tr>`).join("")}</tbody>
           <tfoot><tr><td>Sous-total ${lib}</td><td class="m">${ar(du)}</td><td class="m">${ar(paye)}</td><td class="m">${ar(du - paye)}</td><td></td></tr></tfoot>
         </table></section>`;
     }

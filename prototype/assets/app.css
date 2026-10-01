@@ -23,6 +23,8 @@
   --paye-pale: #e7f4ec;
   --attention: #b45309;
   --attention-pale: #fdf1e3;
+  --partiel: var(--attention);        /* acompte versé, reste dû : alias de l'orange d'avertissement */
+  --partiel-pale: var(--attention-pale);
   --retard: #c62828;
   --retard-pale: #fdecec;
 
@@ -211,6 +213,7 @@ table.tableau { width: 100%; border-collapse: collapse; font-size: .875rem; }
 .badge-sans-point::before { display: none; }
 .badge-paye { background: var(--paye-pale); color: var(--paye); }
 .badge-attention { background: var(--attention-pale); color: var(--attention); }
+.badge-partiel { background: var(--partiel-pale); color: var(--partiel); }
 .badge-retard { background: var(--retard-pale); color: var(--retard); }
 .badge-avenir { background: var(--fond-2); color: var(--texte-2); }
 .badge-neutre { background: var(--primaire-pale); color: var(--primaire); }

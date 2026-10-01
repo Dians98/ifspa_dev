@@ -94,7 +94,7 @@
 
   const base = ETUDIANTS.filter((e) => e.statut === "ACTIF").map((e) => {
     const s = situation(e);
-    const impayes = echeancier(e).filter((l) => l.echue && l.statut !== "paye").map((l) => l.type === "DROITS" ? l.court.toLowerCase() : l.court);
+    const impayes = echeancier(e).filter((l) => l.echue && l.statut !== "paye").map((l) => (l.type === "DROITS" ? l.court.toLowerCase() : l.court) + (l.paye > 0 ? ` (reste ${ar(l.reste)})` : ""));
     const dernier = PAIEMENTS.filter((p) => p.etudiant === e && !p.annule).pop();
     return { e, s, impayes, dernier };
   }).filter((x) => x.s.retard > 0).sort((a, b) => b.s.retard - a.s.retard);

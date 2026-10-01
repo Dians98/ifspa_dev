@@ -56,3 +56,8 @@ next-env.d.ts
 /.windsurf/
 /.claude/settings.local.json
 
+
+# Playwright (tests de bout en bout)
+/test-results/
+/playwright-report/
+/playwright/.auth/

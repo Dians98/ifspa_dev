@@ -51,6 +51,8 @@
   --color-paye-pale: var(--paye-pale);
   --color-attention: var(--attention);
   --color-attention-pale: var(--attention-pale);
+  --color-partiel: var(--partiel);
+  --color-partiel-pale: var(--partiel-pale);
   --color-retard: var(--retard);
   --color-retard-pale: var(--retard-pale);
   --radius-sm: calc(var(--radius) * 0.6);
@@ -94,6 +96,8 @@
   --paye-pale: #e7f4ec;
   --attention: #b45309;
   --attention-pale: #fdf1e3;
+  --partiel: var(--attention);
+  --partiel-pale: var(--attention-pale);
   --retard: #c62828;
   --retard-pale: #fdecec;
 

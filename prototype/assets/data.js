@@ -21,7 +21,7 @@
   // p = paiements : [date, montant, mode, référence Mobile Money, caissier, annulé ?]
   const ETUDIANTS = [
     { id: 1, matricule: "IF-2026-0001", nom: "RAKOTOMALALA", prenoms: "Hanta Fitiavana", sexe: "F", photo: 9, filiere: "IF", niveau: 1, entree: 2026, statut: "ACTIF", naissance: "14/05/2006", lieu: "Toamasina", tel: "034 12 345 67", adresse: "Lot II A 45, Ambodimanga, Toamasina",
-      p: [["2026-10-04", 180000, "ESPECES"], ["2026-12-02", 160000, "MVOLA", "MP261202.1532.A41"], ["2027-02-03", 160000, "ESPECES"], ["2027-03-05", 80000, "ESPECES"]] },
+      p: [["2026-10-04", 180000, "ESPECES"], ["2026-12-02", 160000, "MVOLA", "MP261202.1532.A41"], ["2027-02-03", 160000, "ESPECES"], ["2027-03-05", 100000, "ESPECES"]] }, // mars soldé + 20 000 Ar d'acompte sur avril (reste 60 000 Ar)
     { id: 2, matricule: "IF-2026-0002", nom: "RANDRIAMAMPIONONA", prenoms: "Tojo", sexe: "M", photo: 2, filiere: "IF", niveau: 1, entree: 2026, statut: "ACTIF", naissance: "02/09/2005", lieu: "Brickaville", tel: "033 21 456 78", adresse: "Bazar Be, Toamasina",
       p: [["2026-10-06", 180000, "ESPECES"], ["2026-12-10", 160000, "ORANGE_MONEY", "CI261210.0845.B12"], ["2027-01-14", 80000, "ESPECES", null, "Hanitra RAKOTO", "Doublon de saisie"], ["2027-01-15", 80000, "ESPECES"]] },
     { id: 3, matricule: "SF-2026-0001", nom: "RAZAFINDRAKOTO", prenoms: "Miora", sexe: "F", photo: 3, filiere: "SF", niveau: 1, entree: 2026, statut: "ACTIF", naissance: "21/01/2006", lieu: "Fénérive-Est", tel: "034 55 102 33", adresse: "Tanambao V, Toamasina",
@@ -37,7 +37,7 @@
     { id: 8, matricule: "SF-2025-0005", nom: "RAJAONARISON", prenoms: "Voahangy", sexe: "F", photo: 7, filiere: "SF", niveau: 1, redoublant: true, entree: 2025, statut: "ACTIF", naissance: "08/08/2004", lieu: "Foulpointe", tel: "033 12 131 41", adresse: "Mangarivotra, Toamasina",
       p: [["2026-10-12", 180000, "ESPECES"], ["2027-01-20", 320000, "MVOLA", "MP270120.1348.H90"]] },
     { id: 9, matricule: "IF-2024-0004", nom: "RANDRIANASOLO", prenoms: "Haja", sexe: "M", photo: 10, filiere: "IF", niveau: 3, entree: 2024, statut: "ACTIF", naissance: "25/06/2003", lieu: "Toamasina", tel: "034 99 887 76", adresse: "Ampasimazava, Toamasina",
-      p: [["2026-10-01", 180000, "ESPECES"], ["2026-12-18", 240000, "MVOLA", "MP261218.1015.J33"], ["2027-03-02", 160000, "ESPECES"]] },
+      p: [["2026-10-01", 180000, "ESPECES"], ["2026-12-18", 240000, "MVOLA", "MP261218.1015.J33"], ["2027-03-02", 120000, "ESPECES"]] }, // mars échu, payé en partie : 40 000 Ar d'acompte, reste 40 000 Ar
     { id: 10, matricule: "IF-2024-0009", nom: "RAKOTONDRABE", prenoms: "Faniry", sexe: "F", photo: 12, filiere: "IF", niveau: 3, entree: 2024, statut: "ACTIF", droitsEn: 3, naissance: "13/02/2004", lieu: "Ambatondrazaka", tel: "032 40 506 07", adresse: "Tanambao II, Toamasina",
       p: [["2026-10-15", 114000, "ESPECES"]] },
     { id: 11, matricule: "SF-2024-0001", nom: "RAMANANTSOA", prenoms: "Tiana", sexe: "F", photo: 1, filiere: "SF", niveau: 3, entree: 2024, statut: "ACTIF", naissance: "19/10/2003", lieu: "Toamasina", tel: "034 18 273 64", adresse: "Ampasimbe, Toamasina",
@@ -81,14 +81,19 @@
     MOIS.forEach((m, i) => lignes.push({ type: "MENSUALITE", mois: i, du: TARIF.mensuel, libelle: "Mensualité " + MOIS_LONGS[i], court: m }));
     return lignes.sort((a, b) => a.mois - b.mois || (a.type === "DROITS" ? -1 : 1));
   }
-  /** Échéancier avec ce qui est payé. Pas de paiement partiel : chaque paiement solde des échéances entières,
-      de la plus ancienne à la plus récente. Statut : payé, en retard ou à venir. */
+  /** Échéancier avec ce qui est payé. Le montant reçu est libre (acompte permis, sur les droits comme sur les
+      mensualités) : il est réparti de l'échéance la plus ancienne à la plus récente, et la dernière échéance
+      touchée peut n'être payée qu'en partie. `reste` = ce qu'il reste dû sur la ligne.
+      Statut : payé · partiel (acompte versé, mois pas encore échu) · en retard (mois échu, pas entièrement payé,
+      même si un acompte a été versé) · à venir (rien versé, pas encore échu). */
   function echeancier(e) {
-    let reste = totalPaye(e);
+    let disponible = totalPaye(e);
     return echeances(e).map((l) => {
-      const paye = Math.min(reste, l.du); reste -= paye;
+      const paye = Math.min(disponible, l.du); disponible -= paye;
       const echue = l.mois < moisEchus();
-      return { ...l, paye, echue, statut: paye >= l.du ? "paye" : echue ? "retard" : "avenir" };
+      const reste = l.du - paye;
+      const statut = reste === 0 ? "paye" : echue ? "retard" : paye > 0 ? "partiel" : "avenir";
+      return { ...l, paye, reste, echue, statut };
     });
   }
   function situation(e) {

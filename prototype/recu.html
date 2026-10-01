@@ -237,7 +237,8 @@
       const debut = pos, fin = pos + l.du; pos = fin;
       if (moisDebut + l.mois <= moisPaiement) duEchu += l.du;
       const impute = Math.max(0, Math.min(fin, apres) - Math.max(debut, avant));
-      if (impute > 0) lignes.push({ libelle: l.type === "DROITS" ? l.libelle : "Mens. " + MOIS_LONGS[l.mois], impute });
+      // reste : ce qu'il reste dû sur cette échéance après ce paiement (acompte si > 0) ; suite : un acompte antérieur est complété
+      if (impute > 0) lignes.push({ libelle: l.type === "DROITS" ? l.libelle : "Mens. " + MOIS_LONGS[l.mois], impute, reste: Math.max(0, fin - apres), suite: debut < avant });
     });
     const excedent = Math.max(0, apres - pos);
     if (excedent) lignes.push({ libelle: "Avance", impute: excedent });
@@ -271,7 +272,7 @@
       </div>
       <hr class="sep">
       <div class="lignes">
-        ${r.lignes.map((l) => `<div class="ligne"><span>${l.libelle}</span><span class="m">${ar(l.impute)}</span></div>`).join("")}
+        ${r.lignes.map((l) => `<div class="ligne"><span>${l.libelle}${l.reste ? `<small>${l.suite ? "Nouvel acompte" : "Acompte"} · reste dû ${ar(l.reste)}</small>` : l.suite ? `<small>Solde de l'acompte versé</small>` : ""}</span><span class="m">${ar(l.impute)}</span></div>`).join("")}
       </div>
       <div class="ligne t-total"><span>TOTAL</span><span>${ar(p.montant)}</span></div>
       <p class="lettres">Arrêté à : <b>${enLettres(p.montant)}</b></p>

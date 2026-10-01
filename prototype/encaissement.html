@@ -80,6 +80,7 @@
   .case .etat { display: inline-flex; align-items: center; gap: .3rem; margin-top: .15rem; font-size: .74rem; font-weight: 600; }
   .case .etat::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
   .etat-retard { color: var(--retard); }
+  .etat-partiel { color: var(--partiel); }
   .etat-mois { color: var(--primaire); }
   .etat-avenir { color: var(--texte-2); }
   .coche {
@@ -90,11 +91,21 @@
   .case[aria-pressed="true"] { border-color: var(--primaire); background: var(--primaire-pale); box-shadow: inset 0 0 0 1px var(--primaire); }
   .case[aria-pressed="true"] .coche { background: var(--primaire); border-color: var(--primaire); }
   .case[aria-pressed="true"] .coche svg { opacity: 1; }
+  /* Case payée en partie (acompte) : même geste, couleur « partiel » */
+  .case[aria-pressed="mixed"] { border-color: var(--partiel); background: var(--partiel-pale); box-shadow: inset 0 0 0 1px var(--partiel); }
+  .case[aria-pressed="mixed"] .coche { background: var(--partiel); border-color: var(--partiel); }
+  .case[aria-pressed="mixed"] .coche svg { opacity: 1; }
 
-  .total { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: .25rem 1rem; margin-top: 1.1rem; padding-top: 1rem; border-top: 1px dashed var(--bordure); }
-  .total small { display: block; font-size: .8rem; font-weight: 600; color: var(--texte-2); }
-  .total strong { display: block; font: 700 2.25rem/1.1 var(--police-texte); letter-spacing: -.015em; color: var(--texte); font-variant-numeric: tabular-nums; }
-  .total .aide { margin: 0; max-width: 16rem; text-align: right; }
+  /* Montant reçu : libre, prérempli avec les cases cochées */
+  .total { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: .75rem 1.25rem; margin-top: 1.1rem; padding-top: 1rem; border-top: 1px dashed var(--bordure); }
+  .montant-champ { flex: 0 1 19rem; min-width: 0; }
+  .montant-champ label { display: block; margin-bottom: .3rem; font-size: .8rem; font-weight: 600; color: var(--texte-2); }
+  .montant-saisie { position: relative; }
+  .montant-saisie .saisie { height: 64px; padding: 0 3.4rem 0 1rem; font: 700 1.9rem/1 var(--police-texte); letter-spacing: -.015em; font-variant-numeric: tabular-nums; }
+  .montant-saisie .unite { position: absolute; right: 1rem; top: 50%; translate: 0 -50%; font-weight: 600; color: var(--texte-2); pointer-events: none; }
+  .total .aide { flex: 1 1 14rem; margin: 0; max-width: 18rem; text-align: right; }
+  .erreur-montant { margin: .6rem 0 0; font-size: .875rem; font-weight: 600; color: var(--retard); }
+  .repartition { margin: .85rem 0 0; padding: .7rem .9rem; border: 1px solid #f5d3a8; border-radius: var(--rayon); background: var(--partiel-pale); color: #8a4108; font-size: .9rem; font-weight: 600; }
   .solde-annee { padding: .9rem 1rem; border-radius: var(--rayon); background: var(--paye-pale); color: #17603c; font-weight: 600; }
 
   /* ── 3. Mode ── */
@@ -162,7 +173,8 @@
     .case b { font-size: .9rem; }
     .case .reste { font-size: .8rem; }
     .coche { top: .5rem; right: .45rem; width: 18px; height: 18px; }
-    .total strong { font-size: 1.9rem; }
+    .montant-champ { flex-basis: 100%; }
+    .montant-saisie .saisie { font-size: 1.7rem; }
     .operateurs .mode span { font-size: .82rem; padding-inline: .3rem; }
     .modes .mode span { flex-direction: column; gap: .2rem; min-height: 72px; }
     .choisi .sep-point { display: none; }
@@ -215,9 +227,17 @@
               <div class="cases" id="cases" role="group" aria-labelledby="t2"></div>
               <div id="bloc-montant">
                 <div class="total">
-                  <div><small>Montant à encaisser</small><strong id="total" aria-live="polite">0 Ar</strong></div>
-                  <p class="aide">Chaque échéance se paie en entier. Pas d'acompte.</p>
+                  <div class="montant-champ">
+                    <label for="montant">Montant reçu</label>
+                    <div class="montant-saisie">
+                      <input id="montant" class="saisie" inputmode="numeric" autocomplete="off" spellcheck="false" aria-describedby="montant-aide montant-erreur">
+                      <span class="unite" aria-hidden="true">Ar</span>
+                    </div>
+                  </div>
+                  <p class="aide" id="montant-aide">Prérempli avec les mois cochés. Si le payeur apporte plus ou moins, corrigez le montant : le surplus part en acompte sur le mois suivant.</p>
                 </div>
+                <p class="erreur-montant" id="montant-erreur" role="alert" hidden></p>
+                <p class="repartition" id="repartition" aria-live="polite" hidden></p>
               </div>
             </div>
           </section>
@@ -290,7 +310,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/app.js"></script>
 <script>
-  const { ETUDIANTS, PAIEMENTS, echeancier, situation, ar, photo, nomComplet, niveau, FILIERES, modeLibelle } = IFSPA;
+  const { ETUDIANTS, PAIEMENTS, echeancier, situation, ar, photo, nomComplet, niveau, FILIERES, modeLibelle, MOIS_LONGS, ANNEE } = IFSPA;
   const { svg } = PROTO;
   const $ = (s) => document.querySelector(s);
   const MOIS_COURANT = 5; // 0 = octobre … 5 = mars (date simulée : 12/03/2027)
@@ -300,9 +320,10 @@
   const echapper = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const maj = (s) => s.charAt(0).toUpperCase() + s.slice(1);
   const COCHE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>';
+  const TIRET = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 12h12"/></svg>';
 
-  /* État de l'écran */
-  let etu = null, dues = [], k = 0, actif = -1, liste = [];
+  /* État de l'écran : m = montant reçu (entier, ariary). Les cases et la répartition en découlent. */
+  let etu = null, dues = [], m = 0, erreurSaisie = "", actif = -1, liste = [];
 
   /* ══ 1. Quel étudiant ? ══ */
   function badge(e) {
@@ -357,11 +378,12 @@
       <div><b>${nomComplet(e)}</b><span><span class="matricule">${e.matricule}</span><span class="sep-point"> · </span><span class="fn">${FILIERES[e.filiere].nom} · ${niveau(e.niveau)}</span></span></div>
       <button type="button" class="lien" id="changer">Changer<span class="sr-only"> d'étudiant</span></button>`;
     $("#recherche").hidden = true; $("#choisi").hidden = false;
+    $("#montant-erreur").hidden = true; $("#repartition").hidden = true;
 
     const ech = echeancier(e);
     dues = ech.map((l, i) => ({ ...l, i, reste: l.du - l.paye })).filter((l) => l.reste > 0);
     const exigibles = dues.filter((l) => l.mois <= MOIS_COURANT).length;
-    k = exigibles || (dues.length ? 1 : 0);
+    m = somme(exigibles || (dues.length ? 1 : 0)); erreurSaisie = "";
 
     // Ligne « Déjà payé »
     const soldees = ech.filter((l) => l.statut === "paye");
@@ -372,43 +394,78 @@
     if (droits.length) morceaux.push(nDroits === 1 ? "droits" : droits.length === nDroits ? `droits (${nDroits} tranches)` : `droits ${droits.map((l) => l.court.split(" ")[1]).join(", ")}`);
     if (mois.length === 1) morceaux.push(mois[0].court);
     else if (mois.length > 1) morceaux.push(`${mois[0].court}–${mois[mois.length - 1].court}`);
+    ech.filter((l) => l.paye > 0 && l.reste > 0).forEach((l) => morceaux.push(`acompte de ${ar(l.paye)} sur ${l.type === "DROITS" ? l.court.toLowerCase() : l.court}`));
     $("#deja").textContent = morceaux.length ? `Déjà payé : ${morceaux.join(", ").replace(/\.$/, "")}.` : "Aucun paiement reçu cette année.";
-    rendre();
+    rendre("champ");
   }
   $("#choisi").addEventListener("click", (ev) => { if (ev.target.closest("#changer")) retourRecherche(); });
 
   function retourRecherche() {
-    etu = null; dues = []; k = 0;
+    etu = null; dues = []; m = 0; erreurSaisie = "";
     history.replaceState(null, "", location.pathname);
     $("#choisi").hidden = true; $("#recherche").hidden = false;
-    $("#q").value = ""; chercher(); rendre(); $("#q").focus();
+    $("#q").value = ""; champ.value = ""; chercher(); rendre(); $("#q").focus();
   }
 
   /* ══ 2. Que paie-t-il ? ══ */
-  // Les k premières échéances dues sont payées en entier (pas de paiement partiel).
-  const montant = () => dues.slice(0, k).reduce((t, l) => t + l.reste, 0);
-  const repartir = () => dues.map((l, n) => ({ ...l, impute: n < k ? l.reste : 0 }));
+  // Le montant reçu (m) est réparti de l'échéance la plus ancienne à la plus récente : les premières sont soldées,
+  // la dernière touchée peut ne l'être qu'en partie (acompte). Un seul acompte possible par encaissement.
+  function somme(n) { return dues.slice(0, n).reduce((t, l) => t + l.reste, 0); }
+  const resteAnnee = () => dues.reduce((t, l) => t + l.reste, 0);
+  function repartir(recu) {
+    let dispo = recu;
+    return dues.map((l) => {
+      const impute = Math.min(dispo, l.reste); dispo -= impute;
+      return { ...l, impute, entiere: impute === l.reste, partielle: impute > 0 && impute < l.reste };
+    });
+  }
+  const nomLong = (l) => l.type === "DROITS" ? `les ${l.libelle.charAt(0).toLowerCase() + l.libelle.slice(1)}` : MOIS_LONGS[l.mois];
+  function phraseAcompte(lignes) {
+    const p = lignes.find((l) => l.partielle);
+    return p ? `${ar(p.impute)} d'acompte sur ${nomLong(p)}, il restera ${ar(p.reste - p.impute)}.` : "";
+  }
   function etat(l) {
     if (l.mois < MOIS_COURANT) return ["retard", "En retard"];
     if (l.mois === MOIS_COURANT) return ["mois", "Ce mois-ci"];
+    if (l.paye > 0) return ["partiel", "Partiel"];
     return ["avenir", "À venir"];
   }
   function rendreCases(lignes) {
-    $("#cases").innerHTML = lignes.map((l) => {
-      const coche = l.impute > 0;
+    $("#cases").innerHTML = lignes.map((l, n) => {
       const [cls, txt] = etat(l);
-      const libelle = maj(l.court);
-      return `<button type="button" class="case" data-n="${lignes.indexOf(l)}" aria-pressed="${coche}" aria-label="${l.libelle}, ${ar(l.reste)}, ${txt.toLowerCase()}">
-        <span class="coche">${COCHE}</span><b>${libelle}</b><span class="reste">${ar(l.reste)}</span><span class="etat etat-${cls}">${txt}</span></button>`;
+      const pression = l.entiere ? "true" : l.partielle ? "mixed" : "false";
+      const montantCase = l.partielle
+        ? `${ar(l.impute)}<small>reste ${ar(l.reste - l.impute)}</small>`
+        : `${ar(l.reste)}${l.paye > 0 ? `<small>déjà ${ar(l.paye)}</small>` : ""}`;
+      const vocal = `${l.libelle}, ${ar(l.reste)} à payer${l.paye > 0 ? ` (acompte déjà versé : ${ar(l.paye)})` : ""}, ${txt.toLowerCase()}` +
+        (l.partielle ? `, payée en partie : ${ar(l.impute)}, il restera ${ar(l.reste - l.impute)}` : "");
+      return `<button type="button" class="case" data-n="${n}" aria-pressed="${pression}" aria-label="${vocal}">
+        <span class="coche">${l.partielle ? TIRET : COCHE}</span><b>${maj(l.court)}</b><span class="reste">${montantCase}</span><span class="etat etat-${cls}">${txt}</span></button>`;
     }).join("");
   }
+  // Cocher / décocher une case remet le montant à la somme des cases cochées (la case partielle devient entière).
   $("#cases").addEventListener("click", (ev) => {
     const b = ev.target.closest(".case"); if (!b) return;
     const i = Number(b.dataset.n);
-    k = i < k ? i : i + 1;
-    rendre();
+    const cochees = repartir(m).filter((l) => l.entiere).length;
+    m = somme(i < cochees ? i : i + 1); erreurSaisie = "";
+    rendre("champ");
     document.querySelector(`.case[data-n="${i}"]`)?.focus();
   });
+
+  /* Montant reçu : saisie libre, entiers seulement */
+  const champ = $("#montant");
+  const fmt = (n) => n ? n.toLocaleString("fr-FR") : "";
+  champ.addEventListener("input", () => {
+    const brut = champ.value.replace(/\s/g, "");
+    if (!brut) { m = 0; erreurSaisie = "vide"; }
+    else if (!/^\d+$/.test(brut)) { m = 0; erreurSaisie = "format"; }
+    else if (/^0+$/.test(brut)) { m = 0; erreurSaisie = "zero"; }
+    else { m = Number(brut.slice(0, 9)); erreurSaisie = ""; }
+    rendre();
+  });
+  champ.addEventListener("blur", () => { if (!erreurSaisie) champ.value = fmt(m); });
+  champ.addEventListener("focus", () => champ.select());
 
   /* ══ 3. Comment ? ══ */
   const mode = () => document.querySelector("input[name=mode]:checked").value;
@@ -430,20 +487,33 @@
     s.querySelector(".etape-num").innerHTML = fait ? COCHE : String(n);
     if (on) s.removeAttribute("inert"); else s.setAttribute("inert", "");
   }
-  function rendre() {
+  // rendre("champ") réécrit aussi le champ « Montant reçu » (clic sur une case, changement d'étudiant) ;
+  // pendant la frappe on n'y touche pas.
+  function rendre(source) {
     const avecEtu = !!etu;
     activer(1, true, avecEtu);
     if (!avecEtu) { [2, 3, 4].forEach((n) => activer(n, false)); return; }
 
     const aPayer = dues.length > 0;
-    const lignes = repartir();
-    const m = montant();
+    const lignes = repartir(m);
     if (aPayer) rendreCases(lignes);
-    else $("#cases").innerHTML = `<p class="solde-annee" style="grid-column:1/-1;margin:0">Toute l'année 2026-2027 est payée. Rien à encaisser.</p>`;
+    else $("#cases").innerHTML = `<p class="solde-annee" style="grid-column:1/-1;margin:0">Toute l'année ${ANNEE.libelle} est payée. Rien à encaisser.</p>`;
     $("#bloc-montant").hidden = !aPayer;
-    $("#total").textContent = ar(m);
+    if (source === "champ") champ.value = fmt(m);
 
-    const ok2 = aPayer && m > 0;
+    // Contrôle du montant : entier, non nul, pas au-delà du reste dû de l'année (ni trop-perçu, ni report)
+    const max = resteAnnee();
+    let erreur = "";
+    if (erreurSaisie === "format") erreur = "Saisissez un montant entier en ariary, sans virgule ni lettre.";
+    else if (erreurSaisie === "zero") erreur = "Le montant doit être supérieur à zéro.";
+    else if (m > max) erreur = `Ce montant dépasse ce qui reste dû sur l'année ${ANNEE.libelle} (${ar(max)}). Saisissez ${ar(max)} au maximum.`;
+    const blocErreur = $("#montant-erreur");
+    blocErreur.textContent = erreur; blocErreur.hidden = !erreur;
+    if (erreur) champ.setAttribute("aria-invalid", "true"); else champ.removeAttribute("aria-invalid");
+    const phrase = erreur ? "" : phraseAcompte(lignes);
+    $("#repartition").textContent = phrase; $("#repartition").hidden = !phrase;
+
+    const ok2 = aPayer && m > 0 && !erreur;
     const mm = mode() === "MM", op = operateur(), ref = $("#reference").value.trim();
     const ok3 = !mm || (op && ref);
     activer(2, true, ok2);
@@ -457,9 +527,10 @@
       const lib = (l) => l.court;
       const premier = touchees[0], dernier = touchees[touchees.length - 1];
       const plage = touchees.length === 1 ? maj(lib(premier)) : `${maj(lib(premier))} → ${lib(dernier)}`;
-      const nbMois = touchees.filter((l) => l.type === "MENSUALITE").length;
-      const nbDroits = touchees.filter((l) => l.type === "DROITS").length;
-      const quoi = [nbDroits ? ((etu.droitsEn || 1) > 1 ? `${nbDroits} tranche${nbDroits > 1 ? "s" : ""} de droits` : "droits") : "", nbMois ? `${nbMois} mensualité${nbMois > 1 ? "s" : ""}` : ""].filter(Boolean).join(" + ");
+      const entieres = touchees.filter((l) => l.entiere);
+      const nbMois = entieres.filter((l) => l.type === "MENSUALITE").length;
+      const nbDroits = entieres.filter((l) => l.type === "DROITS").length;
+      const quoi = [nbDroits ? ((etu.droitsEn || 1) > 1 ? `${nbDroits} tranche${nbDroits > 1 ? "s" : ""} de droits` : "droits") : "", nbMois ? `${nbMois} mensualité${nbMois > 1 ? "s" : ""}` : "", touchees.some((l) => l.partielle) ? "acompte" : ""].filter(Boolean).join(" + ");
       const modeTxt = mm ? (op ? modeLibelle(op) : "Mobile Money") : "Espèces";
       recap = `${plage} · ${quoi} · ${modeTxt}`;
     }
@@ -467,14 +538,15 @@
 
     let raison = "";
     if (!aPayer) raison = "";
-    else if (!m) raison = "Cochez au moins un mois.";
+    else if (erreur) raison = "Corrigez le montant reçu pour encaisser.";
+    else if (!m) raison = "Saisissez le montant reçu, ou cochez au moins un mois.";
     else if (mm && !op) raison = "Choisissez l'opérateur Mobile Money.";
     else if (mm && !ref) raison = "Saisissez la référence de la transaction.";
     $("#raison").textContent = raison;
     const bouton = $("#encaisser");
     if (bouton.getAttribute("aria-busy") !== "true") {
       bouton.disabled = !!raison || !aPayer;
-      bouton.textContent = m ? `Encaisser ${ar(m)} et imprimer le reçu` : "Encaisser et imprimer le reçu";
+      bouton.textContent = m && !erreur ? `Encaisser ${ar(m)} et imprimer le reçu` : "Encaisser et imprimer le reçu";
     }
   }
 
@@ -482,7 +554,8 @@
   let dernierUrl = "";
   $("#encaisser").addEventListener("click", () => {
     const b = $("#encaisser"); if (b.disabled) return;
-    const m = montant(), mm = mode() === "MM", code = mm ? operateur() : "ESPECES", ref = mm ? $("#reference").value.trim() : "";
+    const phrase = phraseAcompte(repartir(m));
+    const mm = mode() === "MM", code = mm ? operateur() : "ESPECES", ref = mm ? $("#reference").value.trim() : "";
     const recu = `R-2027-${String(numeroRecu).padStart(5, "0")}`;
     const base = `recu.html?recu=${recu}&nouveau=1&id=${etu.id}&montant=${m}&mode=${code}${ref ? "&ref=" + encodeURIComponent(ref) : ""}`;
     dernierUrl = base + "&imprimer=1";
@@ -493,15 +566,15 @@
     setTimeout(() => {
       if (onglet) onglet.location.href = dernierUrl;
       if (!co.enLigne) { co.attente++; afficherConnexion(); }
-      afficherSucces(recu, m, code, !onglet);
+      afficherSucces(recu, m, code, !onglet, phrase);
       numeroRecu++;
       b.removeAttribute("aria-busy");
     }, 900);
   });
 
-  function afficherSucces(recu, m, code, bloque) {
+  function afficherSucces(recu, m, code, bloque, acompte) {
     $("#succes-titre").textContent = `Paiement enregistré — reçu ${recu}`;
-    $("#succes-texte").textContent = `${ar(m)} · ${modeLibelle(code)} · ${nomComplet(etu)}. ` +
+    $("#succes-texte").textContent = `${ar(m)} · ${modeLibelle(code)} · ${nomComplet(etu)}. ` + (acompte ? acompte + " " : "") +
       (bloque ? "Le navigateur a bloqué l'ouverture du reçu : cliquez sur « Réimprimer le reçu »." : "Le reçu s'imprime dans un nouvel onglet.") +
       (co.enLigne ? "" : " Hors ligne : le paiement est gardé sur ce poste et sera envoyé à la prochaine synchronisation.");
     $("#reimprimer").href = dernierUrl;
@@ -553,15 +626,16 @@
   if (demoCo.get("hors-ligne") === "1") { co.enLigne = false; co.attente = Number(demoCo.get("attente")) || 0; co.derniere = "08:02"; }
   afficherConnexion();
 
-  /* ══ Démarrage — démo : ?id=4 · ?id=4&etape=paiement · ?id=4&mois=3 · ?id=4&mode=mm ══ */
+  /* ══ Démarrage — démo : ?id=4 · ?id=4&etape=paiement · ?id=4&mois=3 · ?id=4&mode=mm · ?id=4&montant=100000 (acompte) ══ */
   const depart = new URLSearchParams(location.search);
   const initial = IFSPA.etudiant(depart.get("id"));
   if (initial && initial.statut === "ACTIF") {
     choisir(initial);
     const pre = Number(depart.get("mois"));
-    if (pre) k = Math.min(pre, dues.length);
+    if (pre) m = somme(Math.min(pre, dues.length));
+    if (Number(depart.get("montant")) > 0) m = Math.floor(Number(depart.get("montant")));
     if (depart.get("mode") === "mm") { document.querySelector("input[name=mode][value=MM]").checked = true; $("#mm").hidden = false; }
-    rendre();
+    rendre("champ");
     if (depart.get("etape") === "paiement") {
       $("#etape-3").scrollIntoView({ block: "start" });
       document.querySelector("input[name=mode]:checked").focus({ preventScroll: true });
