@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { defineConfig, devices } from "@playwright/test";
 
 const URL_APP = "http://localhost:3100";
@@ -28,14 +29,23 @@ export default defineConfig({
     ...(sansApp
       ? []
       : [
+          // Connexion des deux comptes du seed, une fois ; les sessions sont réutilisées par les tests.
+          {
+            name: "connexion",
+            testDir: "./e2e/app",
+            testMatch: /.*\.setup\.ts/,
+            use: { ...devices["Desktop Chrome"], baseURL: URL_APP },
+          },
           {
             name: "app",
             testDir: "./e2e/app",
+            dependencies: ["connexion"],
             use: { ...devices["Desktop Chrome"], baseURL: URL_APP },
           },
           {
             name: "app-mobile",
             testDir: "./e2e/app",
+            dependencies: ["connexion"],
             use: { ...devices["Pixel 7"], baseURL: URL_APP },
           },
         ]),

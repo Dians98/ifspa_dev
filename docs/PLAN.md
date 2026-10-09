@@ -248,9 +248,9 @@ Le cœur métier est dans des fonctions pures et testables :
 - [ ] Créer un widget Turnstile dans Cloudflare (gratuit), avec le domaine du site, et renseigner les deux clés en production
 - [x] Galerie photo (section `#galerie`) : diaporama shadcn Carousel (Embla) avec flèches, compteur, légende et vignettes, sans défilement automatique. Composant `src/components/landing/galerie.tsx`, liste des photos `PHOTOS_GALERIE` dans `src/app/page.tsx`, images dans `public/images/galerie/`.
 - [ ] Remplacer les photos d'illustration Pexels (`public/images/illustration/`) par les vraies photos de l'institut
-- [ ] Page `/connexion`
-- [ ] `proxy.ts` (redirection vers `/connexion` si pas de session) et `src/lib/permissions.ts` (`requireSession`, `requireRole`)
-- [ ] Layout de l'application : sidebar, menu utilisateur, déconnexion
+- [x] Page `/connexion`
+- [x] `proxy.ts` (redirection vers `/connexion` si pas de session) et `src/lib/permissions.ts` (`requireSession`, `requireRole`)
+- [x] Layout de l'application : sidebar, menu utilisateur, déconnexion
 
 ### Prototype de présentation client ✅
 - [x] Maquettes HTML navigables de toute l'application, avec données fictives, dans `prototype/`. Point d'entrée : `prototype/index.html`. Deux comptes de démonstration : Administrateur et Secrétariat.

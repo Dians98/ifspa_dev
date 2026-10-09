@@ -9,17 +9,10 @@ const db = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
 });
 
-async function seedAdmin() {
-  const email = process.env.SEED_ADMIN_EMAIL;
-  const password = process.env.SEED_ADMIN_PASSWORD;
-  const name = process.env.SEED_ADMIN_NAME ?? "Administrateur";
-  if (!email || !password) {
-    throw new Error("SEED_ADMIN_EMAIL et SEED_ADMIN_PASSWORD doivent être définis dans .env");
-  }
-
+async function seedCompte(role: "admin" | "user", email: string, password: string, name: string) {
   const existant = await db.user.findUnique({ where: { email } });
   if (existant) {
-    console.log(`• Admin déjà présent : ${email}`);
+    console.log(`• Compte ${role} déjà présent : ${email}`);
     return;
   }
 
@@ -30,7 +23,7 @@ async function seedAdmin() {
       name,
       email,
       emailVerified: true,
-      role: "admin",
+      role,
       accounts: {
         create: {
           id: randomUUID(),
@@ -41,7 +34,24 @@ async function seedAdmin() {
       },
     },
   });
-  console.log(`✓ Admin créé : ${email}`);
+  console.log(`✓ Compte ${role} créé : ${email}`);
+}
+
+async function seedAdmin() {
+  const email = process.env.SEED_ADMIN_EMAIL;
+  const password = process.env.SEED_ADMIN_PASSWORD;
+  if (!email || !password) {
+    throw new Error("SEED_ADMIN_EMAIL et SEED_ADMIN_PASSWORD doivent être définis dans .env");
+  }
+  await seedCompte("admin", email, password, process.env.SEED_ADMIN_NAME ?? "Administrateur");
+}
+
+// Compte secrétariat de développement et de tests (facultatif : ne pas définir en production).
+async function seedSecretariat() {
+  const email = process.env.SEED_USER_EMAIL;
+  const password = process.env.SEED_USER_PASSWORD;
+  if (!email || !password) return;
+  await seedCompte("user", email, password, process.env.SEED_USER_NAME ?? "Secrétariat");
 }
 
 async function seedReferentiels() {
@@ -100,6 +110,7 @@ async function seedReferentiels() {
 async function main() {
   await seedReferentiels();
   await seedAdmin();
+  await seedSecretariat();
 }
 
 main()
