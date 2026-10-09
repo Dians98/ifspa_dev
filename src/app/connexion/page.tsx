@@ -53,7 +53,7 @@ export default async function PageConnexion({
         <footer className="text-xs text-muted-foreground">
           © {new Date().getFullYear()} IFSPA — Conçu et réalisé par{" "}
           <a
-            href="https://portfolio-blue-iota-21.vercel.app/"
+            href="https://dians98.vercel.app/"
             target="_blank"
             rel="noopener"
             className="underline hover:text-primary"

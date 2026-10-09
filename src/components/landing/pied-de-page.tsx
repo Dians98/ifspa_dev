@@ -86,7 +86,7 @@ export function PiedDePage({ coord }: { coord: Coordonnees }) {
           <p>
             © {new Date().getFullYear()} {ETABLISSEMENT.sigle} — Conçu et réalisé par {" "}
             <a
-              href="https://portfolio-blue-iota-21.vercel.app/"
+              href="https://dians98.vercel.app/"
               target="_blank"
               rel="noopener"
               className="font-medium text-primary underline-offset-4 hover:underline"

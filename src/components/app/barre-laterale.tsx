@@ -62,7 +62,7 @@ export function BarreLaterale({ nom, role }: { nom: string; role: Role }) {
         <p className="px-2 text-[0.7rem] text-sidebar-foreground/75">
           © {new Date().getFullYear()} IFSPA — Conçu et réalisé par{" "}
           <a
-            href="https://portfolio-blue-iota-21.vercel.app/"
+            href="https://dians98.vercel.app/"
             target="_blank"
             rel="noopener"
             className="underline hover:text-sidebar-primary"

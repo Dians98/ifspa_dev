@@ -66,7 +66,7 @@
           <span><b>${UTIL.nom}</b><span>${UTIL.role}</span></span>
           <a href="connexion.html" title="Se déconnecter" aria-label="Se déconnecter">${svg("sortie")}</a>
         </div>
-        <p style="margin:.75rem .5rem 0;font-size:.68rem;color:#8fa6c4">© 2027 IFSPA — Conçu et réalisé par <a href="https://portfolio-blue-iota-21.vercel.app/" target="_blank" rel="noopener" style="color:#c9d6e6">Diano ANDRIANTSALAMA</a></p>
+        <p style="margin:.75rem .5rem 0;font-size:.68rem;color:#8fa6c4">© 2027 IFSPA — Conçu et réalisé par <a href="https://dians98.vercel.app/" target="_blank" rel="noopener" style="color:#c9d6e6">Diano ANDRIANTSALAMA</a></p>
       </div>`;
   }
 
