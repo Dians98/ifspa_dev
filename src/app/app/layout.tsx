@@ -2,6 +2,9 @@ import { BarreLaterale } from "@/components/app/barre-laterale";
 import { EnTeteApp } from "@/components/app/en-tete-app";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { requireSession, roleDe } from "@/lib/permissions";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function LayoutApp({ children }: { children: React.ReactNode }) {
   const session = await requireSession();

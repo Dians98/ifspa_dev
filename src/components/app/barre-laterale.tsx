@@ -22,6 +22,8 @@ export function BarreLaterale({ nom, role }: { nom: string; role: Role }) {
 
   return (
     <Sidebar>
+      {/* Repère pour les lecteurs d'écran : logo, menu et compte forment un seul bloc nommé. */}
+      <aside aria-label="Barre latérale" className="flex h-full min-h-0 w-full flex-col">
       <SidebarHeader className="p-4 pb-2">
         <Link
           href={CHEMIN_ACCUEIL_APP}
@@ -66,9 +68,11 @@ export function BarreLaterale({ nom, role }: { nom: string; role: Role }) {
             className="underline hover:text-sidebar-primary"
           >
             Diano ANDRIANTSALAMA
+            <span className="sr-only"> (nouvel onglet)</span>
           </a>
         </p>
       </SidebarFooter>
+      </aside>
     </Sidebar>
   );
 }

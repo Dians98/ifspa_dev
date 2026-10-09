@@ -9,7 +9,7 @@ import { destinationApresConnexion } from "@/lib/roles";
 import logo from "../../../public/brand/logo-ifspa.png";
 import photo from "../../../public/images/illustration/hero-etudiants-1920.webp";
 
-export const metadata: Metadata = { title: "Connexion" };
+export const metadata: Metadata = { title: "Connexion", robots: { index: false, follow: false } };
 
 export default async function PageConnexion({
   searchParams,
@@ -24,13 +24,15 @@ export default async function PageConnexion({
   return (
     <div className="grid h-svh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
       <div className="flex min-h-0 flex-col overflow-y-auto px-5 py-4 sm:px-10 lg:px-16">
-        <Link
-          href="/"
-          className="inline-flex w-fit items-center gap-1.5 rounded-md text-sm font-medium text-muted-foreground transition-colors hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-        >
-          <ArrowLeft className="size-4" aria-hidden />
-          Retour au site
-        </Link>
+        <header>
+          <Link
+            href="/"
+            className="inline-flex min-h-6 w-fit items-center gap-1.5 rounded-md text-sm font-medium text-muted-foreground transition-colors hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          >
+            <ArrowLeft className="size-4" aria-hidden />
+            Retour au site
+          </Link>
+        </header>
 
         <main className="m-auto w-full max-w-100 py-6">
           <Image src={logo} alt="Logo de l'IFSPA" className="h-auto w-20" priority />
@@ -48,7 +50,7 @@ export default async function PageConnexion({
           </p>
         </main>
 
-        <p className="text-xs text-muted-foreground">
+        <footer className="text-xs text-muted-foreground">
           © {new Date().getFullYear()} IFSPA — Conçu et réalisé par{" "}
           <a
             href="https://portfolio-blue-iota-21.vercel.app/"
@@ -57,8 +59,9 @@ export default async function PageConnexion({
             className="underline hover:text-primary"
           >
             Diano ANDRIANTSALAMA
+            <span className="sr-only"> (nouvel onglet)</span>
           </a>
-        </p>
+        </footer>
       </div>
 
       <aside aria-hidden className="relative hidden overflow-hidden bg-primary lg:block">
@@ -70,7 +73,7 @@ export default async function PageConnexion({
           className="object-cover object-[center_35%]"
         />
         <div className="absolute inset-0 bg-linear-to-b from-primary/15 via-primary/55 to-primary/95" />
-        <small className="absolute top-4 right-4 text-xs text-white/80">Photo d&apos;illustration</small>
+        <small className="absolute top-4 right-4 rounded bg-black/55 px-2 py-1 text-xs text-white">Photo d&apos;illustration</small>
         <div className="absolute inset-x-0 bottom-0 p-12 text-white">
           <span className="mb-6 block h-1.5 w-18 rounded-full bg-rose" />
           <p className="max-w-[24ch] font-heading text-3xl leading-tight font-semibold">

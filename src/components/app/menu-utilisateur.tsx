@@ -38,7 +38,7 @@ export function MenuUtilisateur({ nom, role }: { nom: string; role: Role }) {
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-3 px-2 py-1">
         <Avatar className="size-9">
-          <AvatarFallback className="bg-rose text-sm font-bold text-white">{initiales(nom)}</AvatarFallback>
+          <AvatarFallback className="bg-rose-fonce text-sm font-bold text-white">{initiales(nom)}</AvatarFallback>
         </Avatar>
         <p className="min-w-0 leading-tight">
           <span className="block truncate text-sm font-semibold text-sidebar-primary">{nom}</span>

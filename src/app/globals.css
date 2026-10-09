@@ -192,6 +192,11 @@
   --hauteur-chrome: calc(4.5rem + 1px);
 }
 
+/* Un élément qui reçoit le focus au clavier ne doit pas finir caché sous l'en-tête collant (WCAG 2.4.11). */
+:focus-visible {
+  scroll-margin-top: calc(var(--hauteur-chrome) + 1rem);
+}
+
 /* ── Ouverture recouverte au défilement ──
    La photo est fixe (section sticky) ; pendant que la page la recouvre, elle
    s'assombrit et le texte s'efface. Animations liées au défilement, sans JavaScript :

@@ -92,6 +92,7 @@ export function PiedDePage({ coord }: { coord: Coordonnees }) {
               className="font-medium text-primary underline-offset-4 hover:underline"
             >
               Diano ANDRIANTSALAMA
+              <span className="sr-only"> (nouvel onglet)</span>
             </a>
           </p>
           <p className="tabular">Établissement autorisé par arrêté {ARRETES[0].reference}</p>

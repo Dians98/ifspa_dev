@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import { connection } from "next/server";
 import { ArrowRight, CircleCheck, Clock, Mail, MapPin, Phone, ShieldCheck } from "lucide-react";
@@ -6,6 +7,7 @@ import { EnTete } from "@/components/landing/en-tete";
 import { FormulaireContact } from "@/components/landing/formulaire-contact";
 import { PiedDePage } from "@/components/landing/pied-de-page";
 import { ARRETES, ETABLISSEMENT, getCoordonnees } from "@/lib/etablissement";
+import { URL_SITE } from "@/lib/site";
 import logo from "../../public/brand/logo-ifspa.png";
 import photoHero from "../../public/images/illustration/hero-etudiants-1920.webp";
 import photoInfirmier from "../../public/images/illustration/filiere-infirmier-1920.webp";
@@ -16,6 +18,8 @@ import galPrelevement from "../../public/images/galerie/prelevement-sanguin.webp
 import galSimulation from "../../public/images/galerie/simulation-mannequin.webp";
 import galTension from "../../public/images/galerie/tension-arterielle.webp";
 import { Galerie, type PhotoGalerie } from "@/components/landing/galerie";
+
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 // Photos d'illustration (Pexels) à remplacer par les vraies photos de l'institut.
 const PHOTOS_GALERIE: PhotoGalerie[] = [
@@ -59,11 +63,40 @@ export default async function Accueil() {
   // Sans clé (dev), le formulaire s'affiche sans widget anti-robot.
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || undefined;
 
+  // Données structurées : uniquement ce qui est affiché sur la page (les coordonnées non saisies sont omises).
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "EducationalOrganization",
+    name: ETABLISSEMENT.nom,
+    alternateName: ETABLISSEMENT.sigle,
+    url: `${URL_SITE}/`,
+    logo: `${URL_SITE}/brand/logo-ifspa.png`, // chemin public stable, pas l'URL hachée du build
+    address: {
+      "@type": "PostalAddress",
+      ...(coord.adresse && { streetAddress: coord.adresse }),
+      addressLocality: coord.ville,
+      addressRegion: ETABLISSEMENT.region,
+      addressCountry: "MG",
+    },
+    ...(coord.telephone && { telephone: coord.telephone }),
+    ...(coord.email && { email: coord.email }),
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+      />
+      <a
+        href="#contenu"
+        className="sr-only z-50 rounded-md bg-background px-3 py-2 text-sm font-medium text-primary focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+      >
+        Aller au contenu
+      </a>
       <EnTete />
 
-      <main className="flex-1">
+      <main id="contenu" className="flex-1">
         {/* ── Ouverture ── */}
         {/* Exactement un écran (100svh moins l'en-tête). La section reste collée
             sous l'en-tête pendant que le reste de la page glisse par-dessus et la recouvre. */}
@@ -79,7 +112,9 @@ export default async function Accueil() {
               className="object-cover object-[center_35%]"
             />
           </div>
-          <div aria-hidden className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgb(18_36_60/0.92)_0%,rgb(18_36_60/0.78)_45%,rgb(18_36_60/0.25)_100%)]" />
+          {/* Voile uniforme tant que le texte occupe toute la largeur ; dégradé vers la droite seulement en grand écran,
+              où le texte reste dans la partie sombre (contraste ≥ 4,5:1 mesuré, même devant les foulards blancs). */}
+          <div aria-hidden className="absolute inset-0 -z-10 bg-[rgb(18_36_60/0.82)] lg:bg-[linear-gradient(90deg,rgb(18_36_60/0.92)_0%,rgb(18_36_60/0.8)_55%,rgb(18_36_60/0.3)_100%)]" />
           {/* Voile qui s'assombrit à mesure que la photo est recouverte */}
           <div aria-hidden className="ouverture-voile absolute inset-0 -z-10 bg-[rgb(12_24_40)] opacity-0" />
           <div className="ouverture-texte mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
@@ -109,7 +144,7 @@ export default async function Accueil() {
               </div>
             </div>
           </div>
-          <p className="absolute bottom-3 right-4 text-[11px] text-white/70">Photo d&apos;illustration</p>
+          <p className="absolute right-4 bottom-3 rounded bg-black/55 px-2 py-1 text-[11px] text-white">Photo d&apos;illustration</p>
         </section>
 
         {/* Tout ce qui suit l'ouverture glisse par-dessus elle */}
@@ -252,14 +287,14 @@ export default async function Accueil() {
                 { icon: Mail, label: "Courriel", value: coord.email },
                 { icon: Clock, label: "Secrétariat", value: null },
               ].map(({ icon: Icon, label, value }) => (
-                <div key={label} className="flex gap-4">
-                  <Icon className="mt-1 size-5 shrink-0 text-rose" aria-hidden />
-                  <div>
-                    <dt className="text-sm font-medium text-primary-foreground/70">{label}</dt>
-                    <dd className="mt-1 text-lg font-medium">
-                      {value ?? <span className="italic text-rose-clair">À compléter</span>}
-                    </dd>
-                  </div>
+                <div key={label} className="relative pl-9">
+                  <dt className="text-sm font-medium text-primary-foreground/70">
+                    <Icon className="absolute top-1 left-0 size-5 text-rose" aria-hidden />
+                    {label}
+                  </dt>
+                  <dd className="mt-1 text-lg font-medium">
+                    {value ?? <span className="italic text-rose-clair">À compléter</span>}
+                  </dd>
                 </div>
               ))}
             </dl>

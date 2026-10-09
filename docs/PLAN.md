@@ -314,6 +314,26 @@ Script `scripts/import-excel.ts`, lancé par le développeur (pas un écran de l
 - [ ] Configurer « Setup Node.js App » : fichier de démarrage `server.js`, et variables d'environnement `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (vrai domaine), `TURNSTILE_SECRET_KEY`, `SMTP2GO_API_KEY`, `EMAIL_EXPEDITEUR` et `CONTACT_DESTINATAIRE`
 - [ ] Lancer `npx prisma migrate deploy` en SSH, puis le seed une seule fois
 - [ ] HTTPS via AutoSSL ; sauvegardes via les outils de cPanel
+- [ ] **Une seule adresse officielle** : cPanel > Domaines > « Forcer la redirection HTTPS » activé ; choisir avec ou sans `www` (la même que `NEXT_PUBLIC_APP_URL`) et rediriger l'autre en 301 (cPanel > Redirections, ou `.htaccess`). Sinon Google voit deux sites en double.
+- [ ] Contrôler en ligne : `https://<domaine>/robots.txt` et `/sitemap.xml` répondent et contiennent le vrai domaine (pas `localhost` : sinon `NEXT_PUBLIC_APP_URL` manquait au build) ; le code source de la page d'accueil porte la bonne URL canonique.
+- [ ] En-têtes de sécurité (`Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options`) dans `next.config.ts` (`headers()`), vérifiés en ligne.
+
+### Phase 9 — Référencement Google (après la mise en ligne)
+Le site n'apparaît pas tout seul ni tout de suite : il faut le déclarer à Google, puis compter **quelques jours à quelques semaines** pour l'indexation. Rien n'est à payer. Le code est déjà prêt (titre, description, canonique, Open Graph, `robots.txt`, `sitemap.xml`, données structurées, `noindex` sur `/connexion` et `/app`).
+
+**Prérequis** : phase 8 terminée (vrai domaine en HTTPS) et vraies coordonnées saisies (adresse, téléphone, e-mail) : tant qu'il reste des « À compléter » sur la page, attendre.
+
+- [ ] **Google Search Console** (https://search.google.com/search-console, gratuit, compte Google de l'institut de préférence, Diano ajouté comme utilisateur) :
+  - ajouter une propriété de type **Domaine** et la valider par un enregistrement **TXT** : cPanel > **Zone Editor** > « + Ajouter un enregistrement » > TXT, coller la valeur donnée par Google. Si les DNS ne sont pas gérés dans ce cPanel (registrar ou Cloudflare), ajouter le TXT là où ils le sont. Validation : de quelques minutes à 48 h ;
+  - à défaut, propriété **Préfixe d'URL** validée par un fichier HTML fourni par Google, déposé dans `public/` (puis build et envoi) ;
+  - **Sitemaps** > soumettre `https://<domaine>/sitemap.xml` ;
+  - **Inspection de l'URL** > page d'accueil > « Demander l'indexation ».
+- [ ] **Fiche Google Business Profile** (https://business.google.com, gratuit) : c'est elle qui fait apparaître l'institut sur Google Maps et dans les recherches locales (« école infirmière Toamasina »). Catégorie « Établissement d'enseignement supérieur » ou proche, adresse, horaires, téléphone, photos, **lien vers le site**. Google vérifie que l'institut existe (appel, SMS, vidéo ou courrier postal à l'adresse) : à faire **avec l'institut**, qui doit être propriétaire de la fiche.
+- [ ] **Bing Webmaster Tools** (facultatif, gratuit) : importer la propriété depuis Search Console en un clic.
+- [ ] **Liens vers le site** : l'ajouter sur la page Facebook de l'institut, et demander un lien aux partenaires (hôpitaux de stage, ministère, annuaires d'établissements). Chaque lien sérieux aide le référencement.
+- [ ] **Image d'aperçu des partages** (Open Graph, 1200 × 630) avec une vraie photo de l'institut, dès qu'elle est fournie.
+- [ ] **Contrôle à J+7 puis J+30** : rechercher `site:<domaine>` sur Google ; dans Search Console, rapports « Pages » (indexée ? pourquoi exclue ?) et « Signaux Web essentiels » ; corriger ce qui est signalé.
+- Pas de promesse de classement : Google décide. Ce qui le fait progresser ensuite, c'est le contenu réel (présentation, filières, conditions d'admission), la fiche Google à jour et les liens depuis d'autres sites.
 
 ## Points ouverts (sans bloquer le démarrage)
 
