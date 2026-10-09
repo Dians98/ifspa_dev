@@ -187,10 +187,9 @@
   }
 }
 
-/* Bandeau prototype (2rem) + en-tête (4.5rem) + sa bordure : la photo d'ouverture
-   occupe exactement le reste de l'écran. */
+/* En-tête (4.5rem) + sa bordure : la photo d'ouverture occupe exactement le reste de l'écran. */
 :root {
-  --hauteur-chrome: calc(6.5rem + 1px);
+  --hauteur-chrome: calc(4.5rem + 1px);
 }
 
 /* ── Ouverture recouverte au défilement ──

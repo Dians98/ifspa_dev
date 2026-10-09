@@ -6,21 +6,17 @@ import "server-only";
 // Variables d'environnement :
 //   NEXT_PUBLIC_TURNSTILE_SITE_KEY  clé publique (widget)
 //   TURNSTILE_SECRET_KEY            clé secrète (vérification serveur)
-// En développement sans clés, on utilise les clés de test officielles qui valident toujours.
-
-const CLE_SECRETE_TEST = "1x0000000000000000000000000000000AA";
-
-function cleSecrete() {
-  const cle = process.env.TURNSTILE_SECRET_KEY;
-  if (cle) return cle;
-  if (process.env.NODE_ENV !== "production") return CLE_SECRETE_TEST;
-  throw new Error("TURNSTILE_SECRET_KEY doit être défini en production.");
-}
+// En développement sans clé secrète, la vérification est désactivée (le widget n'est pas affiché non plus).
 
 export async function verifierTurnstile(jeton: string, ip?: string | null): Promise<boolean> {
+  const cle = process.env.TURNSTILE_SECRET_KEY;
+  if (!cle) {
+    if (process.env.NODE_ENV !== "production") return true;
+    throw new Error("TURNSTILE_SECRET_KEY doit être défini en production.");
+  }
   if (!jeton) return false;
   const corps = new FormData();
-  corps.append("secret", cleSecrete());
+  corps.append("secret", cle);
   corps.append("response", jeton);
   if (ip) corps.append("remoteip", ip);
 

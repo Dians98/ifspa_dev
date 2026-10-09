@@ -24,10 +24,9 @@ Source officielle : `LOGO ET ARRËTEE IFSPA.pdf` (logo et arrêtés : ouverture 
 | Remises | Aucune : même tarif pour une même filière, une même année scolaire et un même niveau |
 | Hébergement | cPanel (Node.js App + PostgreSQL + SSH), sans Docker. Docker sert seulement à Postgres en développement. Node ≥ 20.9 requis (22 idéalement), version du cPanel à vérifier. |
 
-## Fonctionnement : CLAUDE.md et docs/PLAN.md
+## Ce document
 
-- **`CLAUDE.md`** (racine) : chargé automatiquement dans chaque session Claude Code. Il reste court et stable : stack, commandes, conventions de code, règles métier clés (matricule, rôles, pas de suppression physique des paiements), et un lien vers PLAN.md.
-- **`docs/PLAN.md`** (ce fichier) : la spec détaillée et la feuille de route par phases, avec des cases à cocher mises à jour au fil du développement.
+`docs/PLAN.md` (ce fichier) : la spec détaillée et la feuille de route par phases, avec des cases à cocher mises à jour au fil du développement.
 
 ## Stack
 
@@ -52,7 +51,7 @@ Source officielle : `LOGO ET ARRËTEE IFSPA.pdf` (logo et arrêtés : ouverture 
   - **Droits d'inscription en 1, 2 ou 3 fois** (demande du client) : choix fait à l'inscription (`Inscription.droitsEnTranches`, 1 par défaut). Tranches égales arrondies au millier, le reste sur la 1re (ex. 100 000 en 3 fois = 34 000 + 33 000 + 33 000). Exigibles : 1re tranche en octobre (à l'inscription), 2e en novembre, 3e en décembre. Au passage en année supérieure, le choix de l'année précédente est repris ; il reste modifiable sur la fiche tant qu'aucune tranche n'est payée.
   - **Où et quand encaisser les droits** : au guichet, sur l'écran Encaisser, comme les mensualités. Ordre de solde : pour chaque mois, la tranche de droits éventuelle puis la mensualité. Un nouvel étudiant paie ses droits (ou la 1re tranche) juste après son inscription ; un étudiant qui passe en année supérieure paie ceux de la nouvelle année à la rentrée d'octobre.
 - **Paiement** : `numeroRecu` (unique), `etudiantId`, `date`, `montant`, `mode` (`ESPECES` | `MOBILE_MONEY`), `operateur?` (`MVOLA` | `ORANGE` | `AIRTEL`), `reference?`, `observation?`, `saisiParId`, `annule`, `annuleParId?`, `motifAnnulation?`, `idClient?` (unique : identifiant généré sur le poste pour l'encaissement hors ligne, rend un double envoi sans effet), `aVerifier` (paiement synchronisé alors que l'échéance avait été soldée ailleurs)
-- **BlocRecus** : bloc de numéros de reçu réservé à l'avance par un poste pour l'encaissement hors ligne. Champs : `poste`, `annee`, `premier`, `dernier`, `reserveParId`.
+- **BlocNumeros** : bloc de numéros réservé à l'avance par un poste, pour attribuer hors ligne un numéro définitif. Sert aux reçus de l'encaissement hors ligne (clé `RECU:{annee}`) et pourra servir aux matricules (`MATRICULE:{CODE}:{annee}`). Champs : `poste`, `cle` (clé du `Compteur`), `premier`, `dernier`, `reserveParId`.
 - **PaiementLigne** : `paiementId`, `echeanceId`, `montant`. Répartit un paiement sur les échéances, de la plus ancienne à la plus récente. **Paiement partiel autorisé** (rétabli à la demande du client le 01/10/2026), sur les droits comme sur les mensualités : le montant reçu est libre. Ce qui dépasse les échéances soldées va en acompte sur l'échéance suivante (l'étudiant apporte 100 000 Ar pour un mois à 80 000 Ar : le mois est soldé, 20 000 Ar d'acompte sur le mois suivant) ; un montant inférieur à une échéance la paie en partie. `PaiementLigne.montant` peut donc être inférieur à `Echeance.montantDu` ; le payé d'une échéance est la somme de ses lignes de paiements non annulés. Un montant qui dépasse le reste dû de l'année est refusé (pas de trop-perçu). **Pas de notion d'« arriérés »** (retirée à la demande du client) : les impayés d'une année restent dus sur cette année, rien n'est reporté sur l'année suivante.
 - **Compteur** : `cle` (ex. `MATRICULE:IF:2026`, `RECU:2026`), `valeur`. Incrémenté de façon atomique dans une transaction (`UPDATE … RETURNING`).
 - **OperationAdmission** : `anneeSourceId`, `anneeCibleId`, `filiereId`, `niveauSource`, `creeParId`, `date`, `annulee`, `annuleeParId?`, `dateAnnulation?`, avec des lignes (`etudiantId`, `decision`, `inscriptionSourceId`, `inscriptionCibleId?`, `ancienStatutEtudiant`)
@@ -109,6 +108,7 @@ Les permissions sont vérifiées **côté serveur** dans chaque Server Action (`
   - **Au serveur** : chaque paiement envoyé est revalidé. Si une échéance a été soldée ailleurs entre-temps, le paiement est enregistré mais signalé « à vérifier » à l'administrateur, qui l'annule ou le régularise. L'argent reçu n'est jamais perdu.
   - **Accès concurrents** : une seule synchronisation à la fois par poste, même avec deux onglets ouverts (Web Locks API) ; le prochain numéro du bloc est pris dans une transaction IndexedDB ; au serveur, l'enregistrement d'un paiement verrouille les échéances de l'inscription (`SELECT … FOR UPDATE`) avant de recalculer le reste dû. Deux postes en ligne sur la même échéance : le second est refusé avec un message clair. Un poste hors ligne : son paiement est enregistré « à vérifier ».
   - La session doit rester valide hors ligne : un poste déconnecté ne redemande pas le mot de passe avant la synchronisation.
+  - **Évolution possible vers d'autres écrans** (décision du 09/10/2026 : on ne la construit pas, mais la base ne doit pas l'empêcher). Déjà prêt : identifiants `cuid` générables sur le poste, aucune suppression physique, `updatedAt` sur les modèles modifiables, blocs de numéros génériques (`BlocNumeros`, qui peut réserver des matricules comme des reçus). À ajouter le jour venu, sans risque pour les données : un `idClient` unique sur chaque table saisie hors ligne (ex. `Etudiant`) et un numéro de version pour détecter les modifications concurrentes.
 - **Paiements** : historique des paiements du jour et de la période ; annulation réservée à l'admin.
 - **Impayés** : liste des étudiants en retard avec le montant et le nombre de mois de retard, export Excel.
 - **Passage en année supérieure** (admissions, écran refait à la demande du client ; maquette `prototype/admissions.html`, captures `12a` à `12h` et `m12`). Principe : **tous les étudiants sont cochés, on décoche ceux qui ne passent pas**.
@@ -201,7 +201,6 @@ Pas de graphiques : uniquement des cartes, des tableaux et des listes.
 
 ```
 ifspa/
-  CLAUDE.md
   docs/PLAN.md
   docker-compose.yml            # postgres (dev uniquement)
   prisma/schema.prisma, prisma/seed.ts   # admin initial, 2 filières, année courante, tarifs d'exemple
@@ -231,21 +230,21 @@ Le cœur métier est dans des fonctions pures et testables :
 - [x] Better Auth (email et mot de passe, plugin admin, inscription publique désactivée), route `/api/auth/[...all]`
 - [x] Seed : admin, filières IF et SF, année 2026-2027, tarifs d'exemple
 - [x] Vitest configuré, scripts npm
-- [x] CLAUDE.md et docs/PLAN.md
+- [x] docs/PLAN.md
 
 ### Phase 1 — Charte, landing et connexion
 - [x] Extraire le logo du PDF vers `public/brand/logo-ifspa.png` (fond transparent)
-- [x] Direction visuelle choisie via impeccable : « standard des écoles », palette bleu nuit + rose poudré (tokens dans `globals.css`, thèmes alternatifs conservés)
+- [x] Direction visuelle choisie : « standard des écoles », palette bleu nuit + rose poudré (tokens dans `globals.css`, thèmes alternatifs conservés)
 - [ ] Page `/demo-palette` (facultative)
 - [x] Landing page (header avec logo et « Se connecter », hero, bandeau d'agrément, présentation, filières, agréments, contact, footer)
 - [x] Formulaire de contact (section « Nous contacter ») :
   - fichiers : `src/components/landing/formulaire-contact.tsx` et l'action `src/server/actions/contact.ts` ;
   - anti-robot :
-    - **Cloudflare Turnstile**, gratuit : widget `src/components/landing/turnstile.tsx`, vérification serveur dans `src/lib/turnstile.ts`, variables `NEXT_PUBLIC_TURNSTILE_SITE_KEY` et `TURNSTILE_SECRET_KEY`. En développement, sans clés, les clés de test Cloudflare s'appliquent ;
+    - **Cloudflare Turnstile**, gratuit : widget `src/components/landing/turnstile.tsx`, vérification serveur dans `src/lib/turnstile.ts`, variables `NEXT_PUBLIC_TURNSTILE_SITE_KEY` et `TURNSTILE_SECRET_KEY`. Sans clés en développement, ni widget ni vérification ; en production, les deux clés sont obligatoires ;
     - un champ piège invisible en plus ;
   - envoi : API SMTP2GO (`src/lib/email.ts`, variables `SMTP2GO_API_KEY`, `EMAIL_EXPEDITEUR`, `CONTACT_DESTINATAIRE`). Sans clé, l'envoi est simulé en développement.
 - [ ] Créer le compte SMTP2GO (gratuit), vérifier l'expéditeur et renseigner les variables en production
-- [ ] Créer un widget Turnstile dans Cloudflare (gratuit), avec le domaine du site, et renseigner les deux clés en production
+- [x] Créer un widget Turnstile dans Cloudflare (gratuit), avec le domaine du site (09/10/2026 : clés dans le `.env` de dev ; leur place en production est décrite en phase 8)
 - [x] Galerie photo (section `#galerie`) : diaporama shadcn Carousel (Embla) avec flèches, compteur, légende et vignettes, sans défilement automatique. Composant `src/components/landing/galerie.tsx`, liste des photos `PHOTOS_GALERIE` dans `src/app/page.tsx`, images dans `public/images/galerie/`.
 - [ ] Remplacer les photos d'illustration Pexels (`public/images/illustration/`) par les vraies photos de l'institut
 - [x] Page `/connexion`
@@ -297,7 +296,7 @@ L'administrateur de l'institut ajuste ensuite lui-même dans Paramètres. Les é
 - [ ] Trois cartes d'indicateurs, tableau par filière et par niveau, 10 derniers paiements (sans graphiques, sans « plus gros impayés »)
 
 ### Phase 7 — Reprise des données Excel
-Script `scripts/import-excel.ts`, lancé par `npm run import -- fichier.xlsx`, avec la librairie `exceljs`.
+Script `scripts/import-excel.ts`, lancé par le développeur (pas un écran de l'application) avec `pnpm import fichier.xlsx`, et la librairie `exceljs`. En production, il tourne une seule fois, au démarrage, contre la base cPanel.
    - Il lit le fichier Excel actuel. Les colonnes seront adaptées une fois le fichier vu.
    - Il crée les étudiants, puis les inscriptions et les échéances, puis les paiements.
    - Les étudiants déjà en place reçoivent un matricule attribué par ordre d'inscription.
@@ -309,8 +308,10 @@ Script `scripts/import-excel.ts`, lancé par `npm run import -- fichier.xlsx`, a
 - [ ] Vérifier la version de Node proposée par « Setup Node.js App » : au moins 20.9, idéalement 22
 - [ ] Créer la base PostgreSQL et son utilisateur dans cPanel
 - [ ] Ajouter `output: "standalone"` dans `next.config.ts` ; faire le build en local sur le PC de dev
+  - ⚠️ **Variables `NEXT_PUBLIC_*` figées au build** : Next.js les inscrit dans le code au moment de `pnpm build`. Elles doivent donc être dans le `.env` du PC de dev **avec leurs valeurs de production** avant le build (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `NEXT_PUBLIC_APP_URL` avec le vrai domaine). Les définir seulement dans cPanel ne sert à rien ; en changer une impose de refaire le build et de le renvoyer.
+  - Les autres variables (secrètes ou non) sont lues au démarrage du serveur : elles se mettent dans « Setup Node.js App » (voir plus bas), jamais dans le build envoyé.
 - [ ] Envoyer par SSH ou SFTP le dossier `.next/standalone`, `.next/static` et `public/`
-- [ ] Configurer « Setup Node.js App » : fichier de démarrage `server.js`, et variables d'environnement `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` et `NEXT_PUBLIC_APP_URL` avec le vrai domaine
+- [ ] Configurer « Setup Node.js App » : fichier de démarrage `server.js`, et variables d'environnement `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (vrai domaine), `TURNSTILE_SECRET_KEY`, `SMTP2GO_API_KEY`, `EMAIL_EXPEDITEUR` et `CONTACT_DESTINATAIRE`
 - [ ] Lancer `npx prisma migrate deploy` en SSH, puis le seed une seule fois
 - [ ] HTTPS via AutoSSL ; sauvegardes via les outils de cPanel
 

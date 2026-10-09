@@ -47,15 +47,6 @@ next-env.d.ts
 # Données locales (import Excel, photos sources) : données personnelles, jamais versionnées
 /data/
 
-# Outils d'agents IA : binaire retéléchargé au premier lancement, captures de revue, copies pour d'autres outils
-/.claude/skills/impeccable/scripts/bin/
-/.impeccable/review/
-/.impeccable/live/
-.impeccable/**/questions/
-/.agents/
-/.windsurf/
-/.claude/settings.local.json
-
 
 # Playwright (tests de bout en bout)
 /test-results/

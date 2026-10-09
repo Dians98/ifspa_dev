@@ -56,23 +56,16 @@ export default async function Accueil() {
   // Coordonnées lues à chaque requête (modifiables dans Paramètres), jamais figées au build.
   await connection();
   const coord = await getCoordonnees();
-  // Clé de test Cloudflare (valide toujours) tant que la vraie clé n'est pas configurée.
-  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "1x00000000000000000000AA";
+  // Sans clé (dev), le formulaire s'affiche sans widget anti-robot.
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || undefined;
 
   return (
     <>
-      {/* Hauteur fixe (h-8) : entre dans le calcul de la hauteur de l'ouverture (--hauteur-chrome). */}
-      <div className="flex h-8 items-center justify-center bg-primary px-4 text-xs font-medium text-primary-foreground">
-        <span className="truncate">
-          Prototype — photos d&apos;illustration et contenus provisoires
-          <span className="hidden sm:inline">, à valider par l&apos;institut</span>.
-        </span>
-      </div>
       <EnTete />
 
       <main className="flex-1">
         {/* ── Ouverture ── */}
-        {/* Exactement un écran (100svh moins le bandeau et l'en-tête). La section reste collée
+        {/* Exactement un écran (100svh moins l'en-tête). La section reste collée
             sous l'en-tête pendant que le reste de la page glisse par-dessus et la recouvre. */}
         <section className="sticky top-18.25 z-0 isolate flex h-[calc(100svh-var(--hauteur-chrome))] min-h-136 items-center overflow-hidden">
           <div className="absolute inset-0 -z-10">

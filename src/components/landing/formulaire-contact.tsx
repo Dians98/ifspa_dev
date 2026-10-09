@@ -21,7 +21,7 @@ function Erreur({ id, texte }: { id: string; texte?: string }) {
   );
 }
 
-export function FormulaireContact({ turnstileSiteKey }: { turnstileSiteKey: string }) {
+export function FormulaireContact({ turnstileSiteKey }: { turnstileSiteKey?: string }) {
   const [etat, action, envoiEnCours] = useActionState(envoyerMessageContact, INITIAL);
   const e = etat.erreurs ?? {};
   const v = etat.valeurs ?? {};
@@ -61,12 +61,12 @@ export function FormulaireContact({ turnstileSiteKey }: { turnstileSiteKey: stri
           <Input id="c-tel" name="telephone" type="tel" autoComplete="tel" placeholder="034 00 000 00" defaultValue={v.telephone} aria-invalid={!!e.telephone} aria-describedby="c-tel-err" className="h-11" />
           <Erreur id="c-tel-err" texte={e.telephone} />
         </div>
-        <div className="grid gap-1.5">
+        <div className="grid gap-1.5 sm:col-span-2">
           <Label htmlFor="c-email">Courriel</Label>
           <Input id="c-email" name="email" type="email" autoComplete="email" defaultValue={v.email} aria-invalid={!!e.email} aria-describedby="c-email-err" className="h-11" />
           <Erreur id="c-email-err" texte={e.email} />
         </div>
-        <div className="grid gap-1.5">
+        <div className="grid gap-1.5 sm:col-span-2">
           <Label htmlFor="c-objet">Objet *</Label>
           <select
             id="c-objet"
@@ -88,10 +88,12 @@ export function FormulaireContact({ turnstileSiteKey }: { turnstileSiteKey: stri
         </div>
 
         {/* Anti-robot Cloudflare Turnstile : invisible ou simple case à cocher */}
-        <div className="grid gap-1.5 sm:col-span-2">
-          <Turnstile siteKey={turnstileSiteKey} reinitialiser={etat} />
-          <Erreur id="c-captcha-err" texte={e.captcha} />
-        </div>
+        {turnstileSiteKey && (
+          <div className="grid gap-1.5 sm:col-span-2">
+            <Turnstile siteKey={turnstileSiteKey} reinitialiser={etat} />
+            <Erreur id="c-captcha-err" texte={e.captcha} />
+          </div>
+        )}
 
         {/* Champ piège invisible pour les robots */}
         <div aria-hidden className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
@@ -100,10 +102,12 @@ export function FormulaireContact({ turnstileSiteKey }: { turnstileSiteKey: stri
         </div>
       </div>
 
-      <Button type="submit" size="lg" disabled={envoiEnCours} className="mt-6 h-12 w-full bg-rose-fonce text-white hover:bg-rose-fonce/90 sm:w-auto sm:px-8">
-        {envoiEnCours ? <Loader2 className="animate-spin" aria-hidden /> : <Send aria-hidden />}
-        {envoiEnCours ? "Envoi en cours…" : "Envoyer le message"}
-      </Button>
+      <div className="mt-6 flex justify-end">
+        <Button type="submit" size="lg" disabled={envoiEnCours} className="h-12 w-full bg-rose-fonce text-white hover:bg-rose-fonce/90 sm:w-auto sm:px-8">
+          {envoiEnCours ? <Loader2 className="animate-spin" aria-hidden /> : <Send aria-hidden />}
+          {envoiEnCours ? "Envoi en cours…" : "Envoyer le message"}
+        </Button>
+      </div>
     </form>
   );
 }

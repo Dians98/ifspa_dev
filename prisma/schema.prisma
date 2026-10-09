@@ -34,7 +34,7 @@ model User {
   etudiantsCrees     Etudiant[]           @relation("EtudiantCreePar")
   paiementsSaisis    Paiement[]           @relation("PaiementSaisiPar")
   paiementsAnnules   Paiement[]           @relation("PaiementAnnulePar")
-  blocsRecusReserves BlocRecus[]          @relation("BlocRecusReservePar")
+  blocsReserves      BlocNumeros[]        @relation("BlocNumerosReservePar")
   admissionsCreees   OperationAdmission[] @relation("AdmissionCreePar")
   admissionsAnnulees OperationAdmission[] @relation("AdmissionAnnuleePar")
 
@@ -319,21 +319,22 @@ model Paiement {
   @@map("paiement")
 }
 
-// Bloc de numéros de reçu réservé à l'avance par un poste (encaissement hors ligne).
-// Les numéros d'un bloc sans paiement sont listés « non utilisés » dans Paiements.
-model BlocRecus {
+// Bloc de numéros réservé à l'avance par un poste, pour attribuer hors ligne un numéro définitif.
+// Aujourd'hui les reçus ("RECU:2026") ; prévu pour les matricules ("MATRICULE:IF:2026") si la saisie hors ligne s'étend.
+// Les numéros d'un bloc de reçus sans paiement sont listés « non utilisés » dans Paiements.
+model BlocNumeros {
   id           String   @id @default(cuid())
   poste        String // identifiant du poste, généré par le navigateur
-  annee        Int // année du compteur "RECU:{annee}"
+  cle          String // clé du Compteur dont le bloc est tiré
   premier      Int
   dernier      Int
   reserveParId String
-  reservePar   User     @relation("BlocRecusReservePar", fields: [reserveParId], references: [id])
+  reservePar   User     @relation("BlocNumerosReservePar", fields: [reserveParId], references: [id])
   createdAt    DateTime @default(now())
 
-  @@unique([annee, premier])
-  @@index([poste, annee])
-  @@map("bloc_recus")
+  @@unique([cle, premier])
+  @@index([poste, cle])
+  @@map("bloc_numeros")
 }
 
 model PaiementLigne {
