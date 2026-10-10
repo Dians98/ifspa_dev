@@ -18,8 +18,6 @@ export type EntreeMenu = {
   icone: LucideIcon;
   /** Entrée masquée pour le rôle `user` (la vérification serveur reste obligatoire). */
   adminSeulement?: boolean;
-  /** Action principale du guichet : mise en avant en rose. */
-  principale?: boolean;
   /** Écran utilisable sans connexion. Les autres seront grisés hors ligne (à venir). */
   disponibleHorsLigne?: boolean;
 };
@@ -45,7 +43,7 @@ export const NAVIGATION: GroupeMenu[] = [
     id: "ecolage",
     libelle: "Écolage",
     entrees: [
-      { id: "encaisser", libelle: "Encaisser", href: "/app/encaisser", icone: Banknote, principale: true, disponibleHorsLigne: true },
+      { id: "encaisser", libelle: "Encaisser", href: "/app/encaisser", icone: Banknote, disponibleHorsLigne: true },
       { id: "paiements", libelle: "Paiements", href: "/app/paiements", icone: Receipt },
       { id: "impayes", libelle: "Impayés", href: "/app/impayes", icone: TriangleAlert },
     ],

@@ -112,9 +112,7 @@ export default async function Accueil() {
               className="object-cover object-[center_35%]"
             />
           </div>
-          {/* Voile uniforme tant que le texte occupe toute la largeur ; dégradé vers la droite seulement en grand écran,
-              où le texte reste dans la partie sombre (contraste ≥ 4,5:1 mesuré, même devant les foulards blancs). */}
-          <div aria-hidden className="absolute inset-0 -z-10 bg-[rgb(18_36_60/0.82)] lg:bg-[linear-gradient(90deg,rgb(18_36_60/0.92)_0%,rgb(18_36_60/0.8)_55%,rgb(18_36_60/0.3)_100%)]" />
+          <div aria-hidden className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgb(18_36_60/0.92)_0%,rgb(18_36_60/0.78)_45%,rgb(18_36_60/0.25)_100%)]" />
           {/* Voile qui s'assombrit à mesure que la photo est recouverte */}
           <div aria-hidden className="ouverture-voile absolute inset-0 -z-10 bg-[rgb(12_24_40)] opacity-0" />
           <div className="ouverture-texte mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
@@ -144,7 +142,6 @@ export default async function Accueil() {
               </div>
             </div>
           </div>
-          <p className="absolute right-4 bottom-3 rounded bg-black/55 px-2 py-1 text-[11px] text-white">Photo d&apos;illustration</p>
         </section>
 
         {/* Tout ce qui suit l'ouverture glisse par-dessus elle */}
@@ -202,9 +199,6 @@ export default async function Accueil() {
                 <article key={f.code} className="grid items-center gap-8 md:grid-cols-2 lg:gap-16">
                   <div className={`relative aspect-[4/3] overflow-hidden rounded-2xl ${i % 2 ? "md:order-2" : ""}`}>
                     <Image src={f.photo} alt={f.alt} fill placeholder="blur" sizes="(min-width: 768px) 50vw, 100vw" className="object-cover object-[center_30%]" />
-                    <span className="absolute bottom-3 left-3 rounded bg-black/55 px-2 py-1 text-[11px] text-white">
-                      Photo d&apos;illustration
-                    </span>
                   </div>
                   <div>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">

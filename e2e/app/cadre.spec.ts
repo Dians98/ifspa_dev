@@ -24,6 +24,21 @@ test.describe("Cadre de l'application — administrateur", () => {
     await expect(page.getByRole("button", { name: "Se déconnecter" })).toBeVisible();
   });
 
+  test("sur ordinateur, le bouton de repli réduit la barre aux icônes sans perdre les entrées", async ({ page, isMobile }) => {
+    test.skip(isMobile, "Le repli n'existe que sur ordinateur : sur mobile, le bouton ouvre le tiroir.");
+    await page.goto("/app/dashboard");
+    const barre = page.locator('[data-slot="sidebar"]');
+    await expect(barre).toHaveAttribute("data-state", "expanded");
+    await page.getByRole("button", { name: "Replier le menu", exact: true }).click();
+    await expect(barre).toHaveAttribute("data-state", "collapsed");
+    const menu = page.getByRole("navigation", { name: "Menu principal" });
+    await expect(menu.getByRole("link", { name: "Encaisser", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Se déconnecter" })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+    await page.getByRole("button", { name: "Déplier le menu", exact: true }).click();
+    await expect(barre).toHaveAttribute("data-state", "expanded");
+  });
+
   test("/app renvoie au tableau de bord", async ({ page }) => {
     await page.goto("/app");
     await expect(page).toHaveURL(/\/app\/dashboard$/);

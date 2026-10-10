@@ -23,6 +23,9 @@ Source officielle : `LOGO ET ARRËTEE IFSPA.pdf` (logo et arrêtés : ouverture 
 | Reçu | PDF numéroté (`R-2026-00001`) avec logo et montant en lettres |
 | Remises | Aucune : même tarif pour une même filière, une même année scolaire et un même niveau |
 | Hébergement | cPanel (Node.js App + PostgreSQL + SSH), sans Docker. Docker sert seulement à Postgres en développement. Node ≥ 20.9 requis (22 idéalement), version du cPanel à vérifier. |
+| Retard (11/10/2026) | Une échéance du mois M non soldée passe **en retard le 1er du mois M+1**. Pendant le mois M, elle est « à venir » (ou « partielle » si un acompte est versé). |
+| Inscription (11/10/2026) | **Pas d'inscription en cours d'année** : tout étudiant est inscrit à la rentrée, ses échéances couvrent toute l'année scolaire (octobre → juillet). |
+| Impayés d'années antérieures (11/10/2026) | Encaisser affiche **tout ce qui est impayé**, toutes années confondues. Un paiement solde d'abord l'échéance la plus ancienne, même si elle appartient à une année précédente. |
 
 ## Ce document
 
@@ -52,14 +55,15 @@ Source officielle : `LOGO ET ARRËTEE IFSPA.pdf` (logo et arrêtés : ouverture 
   - **Où et quand encaisser les droits** : au guichet, sur l'écran Encaisser, comme les mensualités. Ordre de solde : pour chaque mois, la tranche de droits éventuelle puis la mensualité. Un nouvel étudiant paie ses droits (ou la 1re tranche) juste après son inscription ; un étudiant qui passe en année supérieure paie ceux de la nouvelle année à la rentrée d'octobre.
 - **Paiement** : `numeroRecu` (unique), `etudiantId`, `date`, `montant`, `mode` (`ESPECES` | `MOBILE_MONEY`), `operateur?` (`MVOLA` | `ORANGE` | `AIRTEL`), `reference?`, `observation?`, `saisiParId`, `annule`, `annuleParId?`, `motifAnnulation?`, `idClient?` (unique : identifiant généré sur le poste pour l'encaissement hors ligne, rend un double envoi sans effet), `aVerifier` (paiement synchronisé alors que l'échéance avait été soldée ailleurs)
 - **BlocNumeros** : bloc de numéros réservé à l'avance par un poste, pour attribuer hors ligne un numéro définitif. Sert aux reçus de l'encaissement hors ligne (clé `RECU:{annee}`) et pourra servir aux matricules (`MATRICULE:{CODE}:{annee}`). Champs : `poste`, `cle` (clé du `Compteur`), `premier`, `dernier`, `reserveParId`.
-- **PaiementLigne** : `paiementId`, `echeanceId`, `montant`. Répartit un paiement sur les échéances, de la plus ancienne à la plus récente. **Paiement partiel autorisé** (rétabli à la demande du client le 01/10/2026), sur les droits comme sur les mensualités : le montant reçu est libre. Ce qui dépasse les échéances soldées va en acompte sur l'échéance suivante (l'étudiant apporte 100 000 Ar pour un mois à 80 000 Ar : le mois est soldé, 20 000 Ar d'acompte sur le mois suivant) ; un montant inférieur à une échéance la paie en partie. `PaiementLigne.montant` peut donc être inférieur à `Echeance.montantDu` ; le payé d'une échéance est la somme de ses lignes de paiements non annulés. Un montant qui dépasse le reste dû de l'année est refusé (pas de trop-perçu). **Pas de notion d'« arriérés »** (retirée à la demande du client) : les impayés d'une année restent dus sur cette année, rien n'est reporté sur l'année suivante.
+- **PaiementLigne** : `paiementId`, `echeanceId`, `montant`. Répartit un paiement sur les échéances, de la plus ancienne à la plus récente. **Paiement partiel autorisé** (rétabli à la demande du client le 01/10/2026), sur les droits comme sur les mensualités : le montant reçu est libre. Ce qui dépasse les échéances soldées va en acompte sur l'échéance suivante (l'étudiant apporte 100 000 Ar pour un mois à 80 000 Ar : le mois est soldé, 20 000 Ar d'acompte sur le mois suivant) ; un montant inférieur à une échéance la paie en partie. `PaiementLigne.montant` peut donc être inférieur à `Echeance.montantDu` ; le payé d'une échéance est la somme de ses lignes de paiements non annulés. Un montant qui dépasse le reste dû total de l'étudiant (toutes années confondues) est refusé (pas de trop-perçu). **Pas de notion d'« arriérés »** (retirée à la demande du client) : les impayés d'une année restent dus sur cette année, rien n'est reporté sur l'année suivante. Ils restent toutefois visibles et encaissables : un paiement peut couvrir des échéances de plusieurs années, de la plus ancienne à la plus récente (décision du 11/10/2026).
 - **Compteur** : `cle` (ex. `MATRICULE:IF:2026`, `RECU:2026`), `valeur`. Incrémenté de façon atomique dans une transaction (`UPDATE … RETURNING`).
 - **OperationAdmission** : `anneeSourceId`, `anneeCibleId`, `filiereId`, `niveauSource`, `creeParId`, `date`, `annulee`, `annuleeParId?`, `dateAnnulation?`, avec des lignes (`etudiantId`, `decision`, `inscriptionSourceId`, `inscriptionCibleId?`, `ancienStatutEtudiant`)
 - ~~JournalAudit~~ : **retiré à la demande du client.** Pas de journal d'audit. Les annulations restent tracées sur l'objet lui-même : `annulePar`, `dateAnnulation`, motif.
 
 **Règles clés**
 - Le matricule est généré à la création : `{Filiere.code}-{AnneeEntree.anneeDebut}-{séquence sur 4 chiffres}`.
-- Une échéance est soit **payée**, soit **partielle** (acompte versé, reste dû, mois pas encore passé), soit **en retard** (mois passé, pas entièrement payée ; on affiche le reste dû), soit **à venir**. Les droits (ou leur 1re tranche) sont dus à l'inscription.
+- Une échéance est soit **payée**, soit **partielle** (acompte versé, reste dû, mois pas encore passé), soit **en retard** (mois passé, pas entièrement payée ; on affiche le reste dû), soit **à venir**. « Mois passé » : une échéance du mois M est en retard **à partir du 1er du mois M+1** (l'échéance d'octobre non soldée est en retard le 1er novembre). La règle vaut aussi pour les tranches de droits. Les droits (ou leur 1re tranche) sont dus à l'inscription.
+- **Pas d'inscription en cours d'année** : la création d'un étudiant génère toujours les échéances de l'année complète (droits et 10 mensualités d'octobre à juillet).
 - Aucune suppression physique de paiement. L'admin **annule** le paiement avec un motif : le reçu reste dans l'historique, marqué ANNULÉ.
 
 ## Rôles et permissions
@@ -96,7 +100,7 @@ Les permissions sont vérifiées **côté serveur** dans chaque Server Action (`
   - boutons **Encaisser**, **Imprimer la fiche**, et **Sortie** (admin).
 - **Encaisser** (UX simplifiée à la demande du client ; maquette `prototype/encaissement.html`). On coche des mois, et le montant reçu reste modifiable (paiement partiel). Une seule colonne en 4 gestes, **sans fenêtre de confirmation** :
   1. **Quel étudiant ?** Grande recherche (nom, prénoms, matricule, accents ignorés) avec la liste « Derniers servis ».
-  2. **Que paie-t-il ?** Les échéances non soldées s'affichent en cases. Celles **en retard sont cochées par défaut**. Le cochage se fait dans l'ordre, puisque les plus anciennes sont soldées d'abord. Le champ **« Montant reçu »** est prérempli avec la somme des cases cochées et **reste modifiable** (paiement partiel) : s'il dépasse les cases cochées, le surplus va en acompte sur l'échéance suivante et l'écran le dit (« 20 000 Ar d'acompte sur avril, il restera 60 000 Ar ») ; s'il est inférieur, la dernière échéance n'est payée qu'en partie. Refusé s'il dépasse le reste dû de l'année.
+  2. **Que paie-t-il ?** **Toutes** les échéances non soldées s'affichent en cases, années précédentes comprises, regroupées par année scolaire. Celles **en retard sont cochées par défaut** ; celles du mois en cours, encore « à venir », ne le sont pas. Le cochage se fait dans l'ordre, puisque les plus anciennes sont soldées d'abord. Le champ **« Montant reçu »** est prérempli avec la somme des cases cochées et **reste modifiable** (paiement partiel) : s'il dépasse les cases cochées, le surplus va en acompte sur l'échéance suivante et l'écran le dit (« 20 000 Ar d'acompte sur avril, il restera 60 000 Ar ») ; s'il est inférieur, la dernière échéance n'est payée qu'en partie. Refusé s'il dépasse le reste dû total de l'étudiant.
   3. **Comment ?** Espèces ou Mobile Money. L'opérateur et la référence ne sont demandés que pour le Mobile Money.
   4. **Un seul bouton**, qui dit ce qu'il fait : « Encaisser 160 000 Ar et imprimer le reçu ». Le ticket s'imprime et l'écran se remet à zéro pour le parent suivant.
 - **Encaissement hors ligne** (demande du client, **uniquement l'écran Encaisser**) : maquette `prototype/encaissement.html?hors-ligne=1`, captures `06d` et `m06d`.
@@ -182,7 +186,7 @@ Un filtre global permet de choisir l'année scolaire et la filière.
 **Indicateurs (cartes)**
 Trois cartes seulement :
 1. Effectif actif, avec le détail par filière
-2. **Taux de recouvrement en %** (encaissé / attendu à date), avec une jauge
+2. **Taux de recouvrement en %** (encaissé / attendu à date), avec une jauge. « Attendu à date » : échéances dont le mois est révolu, selon la même règle que le retard.
 3. Nombre d'étudiants en retard (au moins un mois impayé)
 
 Retirés à la demande du client, à ne pas réintroduire : « Encaissements du mois en cours », « Encaissé sur l'année », « Reste à recouvrer ».
@@ -352,8 +356,8 @@ Le site n'apparaît pas tout seul ni tout de suite : il faut le déclarer à Goo
 - **Tests unitaires (Vitest)** :
   - matricule : format, séquence, unicité quand plusieurs créations arrivent en même temps ;
   - échéances : génération à partir du tarif ;
-  - répartition d'un paiement : plusieurs mois d'un coup, paiement partiel (acompte sur l'échéance suivante, échéance payée en partie, tranche de droits payée en partie), refus du trop-perçu au-delà du reste de l'année ;
-  - calcul des retards à une date donnée ;
+  - répartition d'un paiement : plusieurs mois d'un coup, paiement partiel (acompte sur l'échéance suivante, échéance payée en partie, tranche de droits payée en partie), paiement couvrant des échéances de deux années, refus du trop-perçu au-delà du reste dû total ;
+  - calcul des retards à une date donnée (dernier jour du mois M : à venir ; 1er du mois M+1 : en retard) ;
   - montant en lettres ;
   - admission puis annulation, qui doit restaurer exactement l'état d'avant.
 - **Parcours manuel** :

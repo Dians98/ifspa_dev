@@ -6,6 +6,7 @@ import { Loader2, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { signOut } from "@/lib/auth-client";
 import { CHEMIN_CONNEXION, LIBELLE_ROLE, type Role } from "@/lib/roles";
 
@@ -35,26 +36,31 @@ export function MenuUtilisateur({ nom, role }: { nom: string; role: Role }) {
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-3 px-2 py-1">
-        <Avatar className="size-9">
-          <AvatarFallback className="bg-rose-fonce text-sm font-bold text-white">{initiales(nom)}</AvatarFallback>
-        </Avatar>
-        <p className="min-w-0 leading-tight">
-          <span className="block truncate text-sm font-semibold text-sidebar-primary">{nom}</span>
-          <span className="block truncate text-xs text-sidebar-foreground/80">{LIBELLE_ROLE[role]}</span>
-        </p>
-      </div>
-      <Button
-        type="button"
-        variant="ghost"
-        onClick={deconnecter}
-        disabled={enCours}
-        className="h-9 w-full justify-start gap-3 px-3 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-sidebar-ring"
-      >
-        {enCours ? <Loader2 className="animate-spin" aria-hidden /> : <LogOut aria-hidden />}
-        {enCours ? "Déconnexion…" : "Se déconnecter"}
-      </Button>
+    <div className="flex items-center gap-3 py-1 pl-2 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-2 group-data-[collapsible=icon]:p-0">
+      <Avatar className="size-9 group-data-[collapsible=icon]:size-8">
+        <AvatarFallback className="bg-rose-fonce text-sm font-bold text-white">{initiales(nom)}</AvatarFallback>
+      </Avatar>
+      {/* sr-only plutôt que hidden : nom et rôle restent lus quand la barre est repliée. */}
+      <p className="min-w-0 flex-1 leading-tight group-data-[collapsible=icon]:sr-only">
+        <span className="block truncate text-sm font-semibold text-sidebar-primary">{nom}</span>
+        <span className="block truncate text-xs text-sidebar-foreground/80">{LIBELLE_ROLE[role]}</span>
+      </p>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={deconnecter}
+            disabled={enCours}
+            aria-label={enCours ? "Déconnexion…" : "Se déconnecter"}
+            className="size-9 shrink-0 group-data-[collapsible=icon]:size-8 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-sidebar-ring"
+          >
+            {enCours ? <Loader2 className="animate-spin" aria-hidden /> : <LogOut aria-hidden />}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top">Se déconnecter</TooltipContent>
+      </Tooltip>
     </div>
   );
 }

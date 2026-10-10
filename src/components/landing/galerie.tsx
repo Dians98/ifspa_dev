@@ -55,9 +55,6 @@ export function Galerie({ photos }: { photos: PhotoGalerie[] }) {
                   priority={i === 0}
                   className="object-cover"
                 />
-                <span className="absolute right-4 top-4 rounded bg-black/55 px-2 py-1 text-[11px] text-white sm:right-8">
-                  Photo d&apos;illustration
-                </span>
               </div>
             </CarouselItem>
           ))}
