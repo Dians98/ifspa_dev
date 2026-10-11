@@ -1,7 +1,12 @@
 import "server-only";
 import type { Session } from "@/lib/auth";
 import { echec, type EtatErreur } from "@/lib/etat-action";
-import { ErreurPermission, requireRole } from "@/lib/permissions";
+import { ErreurPermission, requireRole, requireSession } from "@/lib/permissions";
+
+/** Session de toute action de l'espace connecté ; sans session, renvoie vers la connexion. */
+export async function exigerSession(): Promise<Session> {
+  return requireSession();
+}
 
 type Acces = { session: Session; refus: null } | { session: null; refus: EtatErreur };
 

@@ -76,7 +76,19 @@ export function totalAnnuel(tarif: MontantsTarif): number {
   return tarif.droitsInscription + tarif.montantMensuel * tarif.nombreMois;
 }
 
-export type FiliereGrille = { id: string; code: string; nom: string; dureeAnnees: number; actif: boolean };
+export type FiliereGrille = {
+  id: string;
+  code: string;
+  nom: string;
+  dureeAnnees: number;
+  actif: boolean;
+  /** Filière désactivée qui a encore des étudiants actifs : ses tarifs restent saisissables pour leur passage. */
+  avecActifs?: boolean;
+};
+
+function filiereTarifable(f: Pick<FiliereGrille, "actif" | "avecActifs">): boolean {
+  return f.actif || f.avecActifs === true;
+}
 export type TarifGrille = MontantsTarif & { filiereId: string; niveau: number };
 
 export type CaseGrille = {
@@ -84,18 +96,20 @@ export type CaseGrille = {
   codeFiliere: string;
   nomFiliere: string;
   niveau: number;
+  /** false : filière désactivée gardée dans la grille pour ses étudiants encore actifs. */
+  filiereActive: boolean;
   /** null : tarif manquant, inscription et admission bloquées pour cette classe. */
   tarif: (MontantsTarif & { total: number }) | null;
 };
 
-/** Une case par filière active et par niveau (1..durée), triée par code puis niveau ; les tarifs hors grille sont ignorés. */
+/** Une case par filière active (ou désactivée avec des actifs) et par niveau (1..durée), triée par code puis niveau ; les tarifs hors grille sont ignorés. */
 export function grilleTarifs(
   filieres: FiliereGrille[],
   tarifs: TarifGrille[],
 ): { cases: CaseGrille[]; manquants: number } {
   const parCle = new Map(tarifs.map((t) => [`${t.filiereId}:${t.niveau}`, t]));
   const cases: CaseGrille[] = [];
-  const actives = filieres.filter((f) => f.actif).sort((a, b) => a.code.localeCompare(b.code));
+  const actives = filieres.filter(filiereTarifable).sort((a, b) => a.code.localeCompare(b.code));
   for (const f of actives) {
     for (let niveau = 1; niveau <= f.dureeAnnees; niveau++) {
       const t = parCle.get(`${f.id}:${niveau}`);
@@ -104,6 +118,7 @@ export function grilleTarifs(
         codeFiliere: f.code,
         nomFiliere: f.nom,
         niveau,
+        filiereActive: f.actif,
         tarif: t
           ? {
               droitsInscription: t.droitsInscription,
@@ -281,7 +296,7 @@ type LigneTarifCle = { filiereId: string; niveau: number };
 /** Contrôle d'un enregistrement de tarifs : année ouverte, filières actives, niveaux dans la durée, pas de doublon. */
 export function controleLignesTarifs(
   annee: { cloturee: boolean; libelle: string },
-  filieres: Pick<FiliereGrille, "id" | "code" | "dureeAnnees" | "actif">[],
+  filieres: Pick<FiliereGrille, "id" | "code" | "dureeAnnees" | "actif" | "avecActifs">[],
   lignes: LigneTarifCle[],
 ): { message: string; erreurs: Record<string, string> } | null {
   if (annee.cloturee) {
@@ -297,7 +312,7 @@ export function controleLignesTarifs(
     const f = parId.get(ligne.filiereId);
     const cle = `${ligne.filiereId}:${ligne.niveau}`;
     if (!f) erreurs[`lignes.${i}.filiereId`] = "Cette filière n'existe plus. Rechargez la page.";
-    else if (!f.actif) erreurs[`lignes.${i}.filiereId`] = `La filière ${f.code} est désactivée : réactivez-la avant de saisir ses tarifs.`;
+    else if (!filiereTarifable(f)) erreurs[`lignes.${i}.filiereId`] = `La filière ${f.code} est désactivée : réactivez-la avant de saisir ses tarifs.`;
     else if (ligne.niveau > f.dureeAnnees) {
       erreurs[`lignes.${i}.niveau`] = `La filière ${f.code} dure ${f.dureeAnnees} ans : pas de ${libelleNiveau(ligne.niveau)}.`;
     } else if (vues.has(cle)) erreurs[`lignes.${i}.niveau`] = "Ce tarif apparaît deux fois.";

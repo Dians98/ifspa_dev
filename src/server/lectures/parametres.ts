@@ -197,7 +197,16 @@ export async function lireGrilleTarifs(
   if (!choisie) return { annees: options, annee: null, cases: [], manquants: 0 };
 
   const [filieres, tarifs, inscrits] = await Promise.all([
-    db.filiere.findMany({ select: { id: true, code: true, nom: true, dureeAnnees: true, actif: true } }),
+    db.filiere.findMany({
+      select: {
+        id: true,
+        code: true,
+        nom: true,
+        dureeAnnees: true,
+        actif: true,
+        _count: { select: { etudiants: { where: { statut: "ACTIF" } } } },
+      },
+    }),
     db.tarif.findMany({
       where: { anneeScolaireId: choisie.id },
       select: { filiereId: true, niveau: true, droitsInscription: true, montantMensuel: true, nombreMois: true },
@@ -209,7 +218,10 @@ export async function lireGrilleTarifs(
       GROUP BY e."filiereId", i.niveau`,
   ]);
   const inscritsParCase = new Map(inscrits.map((l) => [`${l.filiereId}:${l.niveau}`, l.n]));
-  const grille = grilleTarifs(filieres, tarifs);
+  const grille = grilleTarifs(
+    filieres.map(({ _count, ...f }) => ({ ...f, avecActifs: _count.etudiants > 0 })),
+    tarifs,
+  );
 
   return {
     annees: options,

@@ -285,8 +285,10 @@ export async function enregistrerTarifs(entree: z.input<typeof schemaTarifs>): P
     const [annee] = await tx.$queryRaw<{ libelle: string; cloturee: boolean }[]>`
       SELECT libelle, cloturee FROM annee_scolaire WHERE id = ${anneeId} FOR SHARE`;
     if (!annee) return echec(ANNEE_INTROUVABLE);
-    const filieres = await tx.$queryRaw<{ id: string; code: string; dureeAnnees: number; actif: boolean }[]>`
-      SELECT id, code, "dureeAnnees", actif FROM filiere FOR SHARE`;
+    const filieres = await tx.$queryRaw<{ id: string; code: string; dureeAnnees: number; actif: boolean; avecActifs: boolean }[]>`
+      SELECT f.id, f.code, f."dureeAnnees", f.actif,
+        EXISTS (SELECT 1 FROM etudiant e WHERE e."filiereId" = f.id AND e.statut = 'ACTIF') AS "avecActifs"
+      FROM filiere f FOR SHARE OF f`;
 
     const probleme = controleLignesTarifs(annee, filieres, lignes);
     if (probleme) return echec(probleme.message, probleme.erreurs);

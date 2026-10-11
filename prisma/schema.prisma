@@ -198,6 +198,8 @@ model Etudiant {
   email           String?
   adresse         String?
   photo           String?
+  // Nom, prénoms et matricule sans accents, en minuscules (normaliserRecherche) : recherche sans extension unaccent
+  recherche       String
   filiereId       String
   filiere         Filiere        @relation(fields: [filiereId], references: [id])
   anneeEntreeId   String
@@ -215,6 +217,7 @@ model Etudiant {
   lignesAdmission LigneAdmission[]
 
   @@index([nom, prenoms])
+  @@index([recherche])
   @@index([filiereId, statut])
   @@map("etudiant")
 }
@@ -266,6 +269,8 @@ model Echeance {
   mois          DateTime     @db.Date // 1er du mois concerné (date d'exigibilité)
   ordre         Int // ordre de solde : pour chaque mois, la tranche de droits éventuelle puis la mensualité
   montantDu     Int // copié depuis le tarif à la génération ; payé = somme des lignes de paiements non annulés (paiement partiel possible)
+  // Mois postérieur à une sortie (abandon, exclusion), rien payé dessus : hors du reste dû, des impayés et du taux
+  nonDueSortie  Boolean      @default(false)
 
   lignesPaiement PaiementLigne[]
 
@@ -312,6 +317,9 @@ model Paiement {
   idClient        String?          @unique
   // Échéance soldée ailleurs avant la synchronisation : l'admin annule ou régularise
   aVerifier       Boolean          @default(false)
+  // Figés à l'émission pour réimprimer le reçu à l'identique : reste toutes années, et part en retard
+  resteApres      Int
+  retardApres     Int
   createdAt       DateTime         @default(now())
 
   lignes PaiementLigne[]
@@ -319,6 +327,7 @@ model Paiement {
   @@index([etudiantId])
   @@index([date])
   @@index([aVerifier])
+  @@index([saisiParId])
   @@map("paiement")
 }
 
@@ -347,6 +356,8 @@ model PaiementLigne {
   echeanceId String
   echeance   Echeance @relation(fields: [echeanceId], references: [id])
   montant    Int
+  // Reste dû sur l'échéance juste après ce paiement, figé pour réimprimer le reçu à l'identique
+  resteEcheanceApres Int
 
   @@index([echeanceId])
   @@map("paiement_ligne")
@@ -360,6 +371,7 @@ enum DecisionAdmission {
   ADMIS
   REDOUBLANT
   DIPLOME
+  ABANDON
 }
 
 model OperationAdmission {
@@ -382,6 +394,7 @@ model OperationAdmission {
   lignes       LigneAdmission[]
   inscriptions Inscription[]
 
+  @@index([anneeSourceId, filiereId, niveauSource])
   @@map("operation_admission")
 }
 
@@ -395,8 +408,13 @@ model LigneAdmission {
   inscriptionSourceId     String
   ancienStatutInscription StatutInscription
   ancienStatutEtudiant    StatutEtudiant
-  inscriptionCibleId      String? // null si DIPLOME
+  // Restaurés tels quels si le passage est annulé (un diplômé ou un abandon reçoit une date de sortie)
+  ancienneDateSortie      DateTime?          @db.Date
+  ancienMotifSortie       String?
+  inscriptionCibleId      String? // null si DIPLOME ou ABANDON
 
+  @@index([operationId])
+  @@index([inscriptionSourceId])
   @@map("ligne_admission")
 }
 

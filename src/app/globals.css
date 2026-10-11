@@ -197,6 +197,33 @@
   scroll-margin-top: calc(var(--hauteur-chrome) + 1rem);
 }
 
+/* Ticket de caisse : monté par un portail directement sous <body> (src/components/recu), invisible à l'écran.
+   À l'impression, tout le reste disparaît et chaque ticket tient sur sa propre page. */
+.zone-impression {
+  display: none;
+}
+@media print {
+  body > *:not(.zone-impression) {
+    display: none !important;
+  }
+  html,
+  body {
+    background: var(--background);
+    min-height: 0;
+  }
+  .zone-impression {
+    display: block;
+  }
+  .zone-impression > * + * {
+    break-before: page;
+  }
+  .zone-impression,
+  .zone-impression * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
 /* ── Ouverture recouverte au défilement ──
    La photo est fixe (section sticky) ; pendant que la page la recouvre, elle
    s'assombrit et le texte s'efface. Animations liées au défilement, sans JavaScript :

@@ -18,6 +18,9 @@ const eslintConfig = defineConfig([
     ".*/**",
     // Maquettes HTML statiques
     "prototype/**",
+    // Rapports Playwright générés
+    "playwright-report/**",
+    "test-results/**",
   ]),
 ]);
 

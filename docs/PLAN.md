@@ -274,30 +274,30 @@ L'administrateur de l'institut ajuste ensuite lui-même dans Paramètres. Les é
 - [x] Filières, années scolaires (année courante), tarifs par filière, année et niveau
 - [x] Utilisateurs : création, rôle, désactivation, réinitialisation du mot de passe
 
-### Phase 3 — Étudiants
-- [ ] `src/lib/matricule.ts` et `src/lib/ecolage.ts` (génération des échéances), avec leurs tests
-- [ ] Création : matricule automatique, première inscription et échéances, en transaction
-- [ ] Liste avec recherche et filtres, fiche étudiant, modification
+### Phase 3 — Étudiants ✅
+- [x] `src/lib/matricule.ts` et `src/lib/ecolage.ts` (génération des échéances), avec leurs tests
+- [x] Création : matricule automatique, première inscription et échéances, en transaction
+- [x] Liste avec recherche et filtres, fiche étudiant, modification
 
 ### Phase 4 — Écolage
-- [ ] Répartition des paiements et calcul des retards et soldes (`ecolage.ts`), avec leurs tests
-- [ ] `montant-en-lettres.ts`, avec ses tests
-- [ ] Encaissement (saisie rapide et depuis la fiche), numérotation des reçus
-- [ ] Reçu au format ticket thermique 80 mm (58 mm en option), sans QR code
-- [ ] Droits d'inscription en 1, 2 ou 3 tranches
-- [ ] Paiement partiel : montant reçu libre, acompte sur l'échéance suivante, statut « partiel »
+- [x] Répartition des paiements et calcul des retards et soldes (`ecolage.ts`), avec leurs tests
+- [x] `montant-en-lettres.ts`, avec ses tests
+- [x] Encaissement (saisie rapide et depuis la fiche), numérotation des reçus
+- [x] Reçu au format ticket thermique 80 mm (58 mm en option), sans QR code
+- [x] Droits d'inscription en 1, 2 ou 3 tranches
+- [x] Paiement partiel : montant reçu libre, acompte sur l'échéance suivante, statut « partiel »
 - [ ] Encaissement hors ligne (écran Encaisser seul, rien à installer) : page en cache, copie locale légère (IndexedDB), file d'attente, blocs de numéros de reçu, synchronisation automatique et manuelle
-- [ ] Relevé d'écolage PDF A4, impression directe
-- [ ] Annulation d'un paiement par l'admin, filigrane ANNULÉ
-- [ ] Page Impayés et export Excel
+- [x] Relevé d'écolage PDF A4, impression directe
+- [x] Annulation d'un paiement par l'admin, filigrane ANNULÉ
+- [x] Page Impayés et export Excel
 
-### Phase 5 — Admissions et sorties
-- [ ] Écran par classe (tous cochés, on décoche ceux qui ne passent pas), une seule confirmation, exécution en transaction
-- [ ] Historique des opérations et annulation par l'admin (bloquée s'il existe des paiements), avec les tests
-- [ ] Sorties : abandon et exclusion (admin)
+### Phase 5 — Admissions et sorties ✅
+- [x] Écran par classe (tous cochés, on décoche ceux qui ne passent pas), une seule confirmation, exécution en transaction
+- [x] Historique des opérations et annulation par l'admin (bloquée s'il existe des paiements), avec les tests
+- [x] Sorties : abandon et exclusion (admin)
 
-### Phase 6 — Dashboard
-- [ ] Trois cartes d'indicateurs, tableau par filière et par niveau, 10 derniers paiements (sans graphiques, sans « plus gros impayés »)
+### Phase 6 — Dashboard ✅
+- [x] Trois cartes d'indicateurs, tableau par filière et par niveau, 10 derniers paiements (sans graphiques, sans « plus gros impayés »)
 
 ### Phase 7 — Reprise des données Excel
 Script `scripts/import-excel.ts`, lancé par le développeur (pas un écran de l'application) avec `pnpm import fichier.xlsx`, et la librairie `exceljs`. En production, il tourne une seule fois, au démarrage, contre la base cPanel.
