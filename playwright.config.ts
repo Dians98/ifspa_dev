@@ -10,6 +10,8 @@ export default defineConfig({
   testDir: "./e2e",
   outputDir: "./test-results",
   fullyParallel: true,
+  // Au-delà, le serveur de dev (compilation à la demande) sature et des tests échouent par lenteur.
+  workers: 3,
   forbidOnly: !!process.env.CI,
   retries: 0,
   reporter: [["list"], ["html", { open: "never" }]],

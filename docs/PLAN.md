@@ -271,8 +271,8 @@ Le cœur métier est dans des fonctions pures et testables :
 L'administrateur de l'institut ajuste ensuite lui-même dans Paramètres. Les écrans doivent donc être compréhensibles par un non-informaticien. L'inscription et l'admission sont bloquées, avec un message clair, si le tarif concerné manque.
 
 - ~~Établissement~~ : **pas d'écran de paramétrage, à la demande du client.** Les coordonnées (adresse, téléphone, courriel, NIF/STAT, devise) utilisées par la landing et les PDF sont renseignées une fois pour toutes dans `src/lib/etablissement.ts` ou par le seed de la table `Etablissement`.
-- [ ] Filières, années scolaires (année courante), tarifs par filière, année et niveau
-- [ ] Utilisateurs : création, rôle, désactivation, réinitialisation du mot de passe
+- [x] Filières, années scolaires (année courante), tarifs par filière, année et niveau
+- [x] Utilisateurs : création, rôle, désactivation, réinitialisation du mot de passe
 
 ### Phase 3 — Étudiants
 - [ ] `src/lib/matricule.ts` et `src/lib/ecolage.ts` (génération des échéances), avec leurs tests

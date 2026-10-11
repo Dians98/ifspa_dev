@@ -2,8 +2,9 @@
 // Après chaque modification : npx prisma migrate dev --name <description>
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes"]
 }
 
 datasource db {
@@ -146,6 +147,8 @@ model AnneeScolaire {
   admissionsSource OperationAdmission[] @relation("AdmissionAnneeSource")
   admissionsCible  OperationAdmission[] @relation("AdmissionAnneeCible")
 
+  // Index unique partiel : au plus une année courante en base.
+  @@unique([estCourante], where: { estCourante: true }, map: "annee_scolaire_une_seule_courante")
   @@map("annee_scolaire")
 }
 
