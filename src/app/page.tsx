@@ -7,7 +7,7 @@ import { EnTete } from "@/components/landing/en-tete";
 import { FormulaireContact } from "@/components/landing/formulaire-contact";
 import { PiedDePage } from "@/components/landing/pied-de-page";
 import { ARRETES, ETABLISSEMENT, getCoordonnees } from "@/lib/etablissement";
-import { URL_SITE } from "@/lib/site";
+import { DESCRIPTION_SITE, TITRE_SITE, URL_SITE } from "@/lib/site";
 import logo from "../../public/brand/logo-ifspa.png";
 import photoHero from "../../public/images/illustration/hero-etudiants-1920.webp";
 import photoInfirmier from "../../public/images/illustration/filiere-infirmier-1920.webp";
@@ -19,7 +19,18 @@ import galSimulation from "../../public/images/galerie/simulation-mannequin.webp
 import galTension from "../../public/images/galerie/tension-arterielle.webp";
 import { Galerie, type PhotoGalerie } from "@/components/landing/galerie";
 
-export const metadata: Metadata = { alternates: { canonical: "/" } };
+// L'objet openGraph de la page remplace celui du layout : on le répète en entier, avec l'adresse de la page.
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    locale: "fr_FR",
+    siteName: "IFSPA",
+    title: TITRE_SITE,
+    description: DESCRIPTION_SITE,
+    url: "/",
+  },
+};
 
 // Photos d'illustration (Pexels) à remplacer par les vraies photos de l'institut.
 const PHOTOS_GALERIE: PhotoGalerie[] = [

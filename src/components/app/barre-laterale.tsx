@@ -18,7 +18,7 @@ import { MenuEntree } from "./menu-entree";
 import { MenuUtilisateur } from "./menu-utilisateur";
 import { navigationPour } from "./navigation";
 
-export function BarreLaterale({ nom, role }: { nom: string; role: Role }) {
+export function BarreLaterale({ utilisateurId, nom, role }: { utilisateurId: string; nom: string; role: Role }) {
   const groupes = navigationPour(role);
 
   return (
@@ -51,8 +51,12 @@ export function BarreLaterale({ nom, role }: { nom: string; role: Role }) {
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="gap-1">
-                  {groupe.entrees.map(({ id, icone: Icone, libelle, href }) => (
-                    <MenuEntree key={id} entree={{ libelle, href }} icone={<Icone aria-hidden />} />
+                  {groupe.entrees.map(({ id, icone: Icone, libelle, href, disponibleHorsLigne }) => (
+                    <MenuEntree
+                      key={id}
+                      entree={{ libelle, href, disponibleHorsLigne }}
+                      icone={<Icone aria-hidden />}
+                    />
                   ))}
                 </SidebarMenu>
               </SidebarGroupContent>
@@ -63,7 +67,7 @@ export function BarreLaterale({ nom, role }: { nom: string; role: Role }) {
 
       <SidebarSeparator className="mx-0" />
       <SidebarFooter className="p-3 group-data-[collapsible=icon]:p-2">
-        <MenuUtilisateur nom={nom} role={role} />
+        <MenuUtilisateur utilisateurId={utilisateurId} nom={nom} role={role} />
       </SidebarFooter>
       <SidebarRail aria-label="Replier ou déplier le menu" title="Replier ou déplier le menu" />
       </aside>

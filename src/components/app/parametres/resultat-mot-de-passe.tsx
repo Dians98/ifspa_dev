@@ -10,10 +10,13 @@ export function ResultatMotDePasse({
   titre,
   description,
   motDePasse,
+  message,
 }: {
   titre: string;
   description: string;
   motDePasse: string;
+  /** Compte rendu du serveur, avertissement éventuel compris. */
+  message?: string;
 }) {
   // « echec » garde le texte visible et sélectionnable : la copie peut être refusée (page non sécurisée, autorisation).
   const [copie, setCopie] = useState<"non" | "oui" | "echec">("non");
@@ -33,6 +36,12 @@ export function ResultatMotDePasse({
         <DialogTitle className="text-lg">{titre}</DialogTitle>
         <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
+
+      {message && (
+        <p role="status" className="rounded-lg bg-secondary px-3 py-2 text-sm text-secondary-foreground">
+          {message}
+        </p>
+      )}
 
       <div className="rounded-lg bg-rose-pale px-4 py-4 text-center">
         <p className="text-xs font-medium text-rose-fonce">Mot de passe provisoire</p>

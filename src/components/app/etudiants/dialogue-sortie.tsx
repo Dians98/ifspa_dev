@@ -25,7 +25,14 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { formaterAriary } from "@/lib/montant";
-import { LIBELLE_TYPE_SORTIE, schemaSortie } from "@/lib/sorties";
+import { lireJour } from "@/lib/dates";
+import {
+  apercuSortie,
+  LIBELLE_TYPE_SORTIE,
+  messageApercuSortie,
+  schemaSortie,
+  type EcheanceAvantSortie,
+} from "@/lib/sorties";
 import { enregistrerSortie } from "@/server/actions/sorties";
 import { ChoixRadio } from "./champs-identite";
 
@@ -34,16 +41,26 @@ type Sortie = z.output<typeof schemaSortie>;
 
 const CHAMPS = ["type", "date", "motif"] as const;
 
+function jourValide(v: string | undefined): v is string {
+  if (!v) return false;
+  try {
+    lireJour(v);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Admin seulement, étudiant actif : la sortie est définitive, la fenêtre est la seule confirmation. */
 export function DialogueSortie({
   etudiantId,
   jour,
-  resteEnRetard,
+  echeances,
 }: {
   etudiantId: string;
   /** Aujourd'hui (Madagascar), « AAAA-MM-JJ » : date proposée et borne haute. */
   jour: string;
-  resteEnRetard: number;
+  echeances: EcheanceAvantSortie[];
 }) {
   const [ouvert, setOuvert] = useState(false);
 
@@ -56,7 +73,7 @@ export function DialogueSortie({
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
-        <FormulaireSortie etudiantId={etudiantId} jour={jour} resteEnRetard={resteEnRetard} fermer={() => setOuvert(false)} />
+        <FormulaireSortie etudiantId={etudiantId} jour={jour} echeances={echeances} fermer={() => setOuvert(false)} />
       </DialogContent>
     </Dialog>
   );
@@ -65,12 +82,12 @@ export function DialogueSortie({
 function FormulaireSortie({
   etudiantId,
   jour,
-  resteEnRetard,
+  echeances,
   fermer,
 }: {
   etudiantId: string;
   jour: string;
-  resteEnRetard: number;
+  echeances: EcheanceAvantSortie[];
   fermer: () => void;
 }) {
   const [erreurGenerale, setErreurGenerale] = useState<string | null>(null);
@@ -80,6 +97,8 @@ function FormulaireSortie({
   });
   const { errors, isSubmitting } = form.formState;
   const type = useWatch({ control: form.control, name: "type" });
+  const date = useWatch({ control: form.control, name: "date" });
+  const apercu = jourValide(date) ? messageApercuSortie(apercuSortie(echeances, date), formaterAriary) : null;
 
   const soumettre = form.handleSubmit(async (valeurs) => {
     setErreurGenerale(null);
@@ -104,14 +123,10 @@ function FormulaireSortie({
       <div className="flex gap-2.5 rounded-lg border border-attention/30 bg-attention-pale px-3 py-2.5 text-sm">
         <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-attention" />
         <p>
-          Cette sortie est <strong>définitive</strong>. Les mois après la sortie ne seront plus dus ;{" "}
-          {resteEnRetard > 0 ? (
-            <>
-              ce qui est en retard reste dû (<span className="font-semibold tabular-nums">{formaterAriary(resteEnRetard)}</span>).
-            </>
-          ) : (
-            "rien n'est en retard aujourd'hui."
-          )}
+          Cette sortie est <strong>définitive</strong>. Les mois après la sortie sans aucun paiement ne seront plus dus.{" "}
+          <span aria-live="polite" className="font-semibold tabular-nums">
+            {apercu ?? "Indiquez la date de sortie pour voir ce qui restera à payer."}
+          </span>
         </p>
       </div>
 

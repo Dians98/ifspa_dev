@@ -6,6 +6,7 @@ import { TableRow } from "@/components/ui/table";
 import { formaterAriary } from "@/lib/montant";
 import { cn } from "@/lib/utils";
 import type { DossierEtudiant, PaiementFiche } from "@/server/lectures/etudiants";
+import { InfoVerification } from "@/components/app/paiements/info-verification";
 import { EtatVide, PanneauParametre } from "@/components/app/parametres/panneau-parametre";
 import {
   CelluleAdaptative,
@@ -37,21 +38,28 @@ function LignePaiement({ p }: { p: PaiementFiche }) {
       <CelluleAdaptative libelle="Caissier" className={cn(p.annule && "text-muted-foreground")}>
         {p.caissier}
       </CelluleAdaptative>
-      <CelluleAdaptative libelle="Statut">
+      <CelluleAdaptative libelle="Statut" className="whitespace-normal">
         <div className="flex flex-wrap items-center gap-1.5">
           {p.annule ? (
-            <Badge className="bg-muted text-muted-foreground">Annulé</Badge>
+            <Badge className="bg-retard-pale text-retard">Annulé</Badge>
           ) : (
-            <Badge className="bg-paye-pale text-paye">Validé</Badge>
+            <Badge className="bg-paye-pale text-paye">Valide</Badge>
           )}
-          {p.aVerifier && (
+          {p.aVerifier && !p.annule && (
             <Badge className="bg-attention-pale text-attention">
               <TriangleAlert aria-hidden />À vérifier
             </Badge>
           )}
         </div>
+        <InfoVerification
+          aVerifier={p.aVerifier}
+          annule={p.annule}
+          noteVerification={p.noteVerification}
+          verification={p.verification}
+        />
+        {p.observation && <p className="mt-1 text-xs text-muted-foreground">{p.observation}</p>}
         {p.annulation && (
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 max-w-64 text-xs text-muted-foreground wrap-anywhere">
             {p.annulation.motif}
             {p.annulation.par && ` · par ${p.annulation.par}`}
             {p.annulation.date && `, le ${p.annulation.date}`}
@@ -77,7 +85,8 @@ export function PaiementsFiche({ e }: { e: DossierEtudiant }) {
         <EtatVide
           texte="Aucun paiement enregistré. Les reçus apparaissent ici après le premier encaissement."
           action={
-            e.statut === "ACTIF" ? (
+            // Un sorti qui doit encore reste encaissable (décision 20).
+            e.statut === "ACTIF" || e.situation.reste > 0 ? (
               <Button asChild className="bg-rose-fonce text-white hover:bg-rose-fonce/90 max-md:h-11">
                 <Link href={`/app/encaisser?etudiant=${e.id}`}>Encaisser</Link>
               </Button>

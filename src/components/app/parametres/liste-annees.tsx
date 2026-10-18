@@ -79,7 +79,11 @@ export function ListeAnnees({ annees, anneeDebutProposee }: { annees: AnneeParam
 }
 
 function LigneAnnee({ annee: a, couranteActuelle }: { annee: AnneeParametre; couranteActuelle?: string }) {
-  const motifs = [a.refus.supprimer, a.estCourante ? a.refus.cloturer : null].filter((m): m is string => m !== null);
+  const motifs = [
+    a.estCourante ? null : a.refus.definirCourante,
+    a.refus.supprimer,
+    a.estCourante ? a.refus.cloturer : null,
+  ].filter((m): m is string => m !== null);
 
   return (
     <LigneAdaptative>
@@ -147,7 +151,7 @@ function LigneAnnee({ annee: a, couranteActuelle }: { annee: AnneeParametre; cou
               Tarifs
             </Link>
           </Button>
-          {a.refus.supprimer === null ? (
+          {a.refus.supprimer === null && (
             <ConfirmationAction
               destructif
               titre={`Supprimer l'année ${a.libelle} ?`}
@@ -165,9 +169,8 @@ function LigneAnnee({ annee: a, couranteActuelle }: { annee: AnneeParametre; cou
                 </Button>
               }
             />
-          ) : (
-            <MotifsRefus motifs={motifs} />
           )}
+          <MotifsRefus motifs={motifs} />
         </div>
       </CelluleAdaptative>
     </LigneAdaptative>

@@ -20,11 +20,13 @@ type Valeurs = z.infer<typeof schema>;
 
 const MESSAGE_IDENTIFIANTS = "Adresse e-mail ou mot de passe incorrect.";
 const MESSAGE_DESACTIVE = "Ce compte est désactivé. Contactez l'administrateur.";
-const MESSAGE_RESEAU = "Connexion au serveur impossible. Vérifiez votre connexion Internet.";
+const MESSAGE_TROP_DE_TENTATIVES = "Trop de tentatives, réessayez dans quelques secondes.";
+const MESSAGE_RESEAU ="Connexion au serveur impossible. Vérifiez votre connexion Internet.";
 
 function messageDepuisErreur(erreur: { code?: string; status?: number } | null | undefined): string {
   if (!erreur) return MESSAGE_IDENTIFIANTS;
   if (erreur.code === "BANNED_USER") return MESSAGE_DESACTIVE;
+  if (erreur.status === 429) return MESSAGE_TROP_DE_TENTATIVES;
   // 0 : requête sans réponse ; 5xx : serveur injoignable ou en panne (proxy, base indisponible).
   if (!erreur.status || erreur.status >= 500) return MESSAGE_RESEAU;
   return MESSAGE_IDENTIFIANTS;

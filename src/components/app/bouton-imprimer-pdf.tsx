@@ -54,11 +54,10 @@ export function BoutonImprimerPdf({
       URL.revokeObjectURL(lien);
     };
     const repli = () => {
-      window.open(lien, "_blank", "noopener");
+      // L'adresse du serveur plutôt que le blob : le lecteur PDF enregistre sous le nom de la route (releve-IF-2025-0001.pdf), pas sous un identifiant.
+      window.open(url, "_blank", "noopener");
       setEnCours(false);
-      // L'onglet garde le blob ouvert : on le libère plus tard.
-      setTimeout(() => URL.revokeObjectURL(lien), DELAI_NETTOYAGE_MS);
-      cadre.remove();
+      nettoyer();
     };
 
     cadre.onload = () => {

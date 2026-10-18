@@ -1,5 +1,6 @@
 import { BarreLaterale } from "@/components/app/barre-laterale";
 import { EnTeteApp } from "@/components/app/en-tete-app";
+import { InscriptionServiceWorker } from "@/components/app/inscription-service-worker";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { requireSession, roleDe } from "@/lib/permissions";
 import type { Metadata } from "next";
@@ -17,7 +18,8 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       >
         Aller au contenu
       </a>
-      <BarreLaterale nom={session.user.name} role={roleDe(session)} />
+      <InscriptionServiceWorker utilisateurId={session.user.id} />
+      <BarreLaterale utilisateurId={session.user.id} nom={session.user.name} role={roleDe(session)} />
       <div className="flex min-w-0 flex-1 flex-col bg-muted">
         <EnTeteApp />
         <main id="contenu" className="mx-auto w-full max-w-350 flex-1 p-4 sm:p-6 lg:p-8">

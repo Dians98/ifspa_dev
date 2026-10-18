@@ -21,10 +21,20 @@ declare global {
  * formulaire dans le champ caché « cf-turnstile-response ».
  * `reinitialiser` : change de valeur pour redemander un jeton (un jeton ne sert qu'une fois).
  */
-export function Turnstile({ siteKey, reinitialiser }: { siteKey: string; reinitialiser?: unknown }) {
+export function Turnstile({
+  siteKey,
+  reinitialiser,
+  onIndisponible,
+}: {
+  siteKey: string;
+  reinitialiser?: unknown;
+  /** Le script Cloudflare n'a pas pu se charger : le formulaire masque alors le message « Cochez la case ». */
+  onIndisponible?: () => void;
+}) {
   const conteneur = useRef<HTMLDivElement>(null);
   const widget = useRef<string | null>(null);
   const [scriptPret, setScriptPret] = useState(false);
+  const [echecChargement, setEchecChargement] = useState(false);
 
   useEffect(() => {
     if (!scriptPret || !conteneur.current || !window.turnstile || widget.current) return;
@@ -50,8 +60,18 @@ export function Turnstile({ siteKey, reinitialiser }: { siteKey: string; reiniti
         src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
         strategy="afterInteractive"
         onReady={() => setScriptPret(true)}
+        onError={() => {
+          setEchecChargement(true);
+          onIndisponible?.();
+        }}
       />
       <div ref={conteneur} className="min-h-[65px]" />
+      {echecChargement && (
+        <p role="alert" data-focus-erreur tabIndex={-1} className="text-sm text-destructive">
+          La vérification anti-robot n&apos;a pas pu se charger. Vérifiez votre connexion Internet, rechargez la page,
+          ou appelez directement le secrétariat.
+        </p>
+      )}
     </>
   );
 }

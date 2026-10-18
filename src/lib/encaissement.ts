@@ -33,39 +33,47 @@ const facultatif = (max: number, tropLong: string) =>
     .nullish()
     .transform((v) => (v ? v : null));
 
-export const schemaEncaissement = z
-  .object(
-    {
-      etudiantId: z.string({ error: "Choisissez l'étudiant." }).min(1, "Choisissez l'étudiant."),
-      montant: champMontant,
-      mode: z.enum(ModePaiement, "Choisissez le mode de paiement."),
-      operateur: z.enum(OperateurMobile, "Choisissez l'opérateur Mobile Money.").nullish().transform((v) => v ?? null),
-      reference: facultatif(60, "Référence trop longue (60 caractères maximum)."),
-      observation: facultatif(200, "Observation trop longue (200 caractères maximum)."),
-      /** Généré sur le poste (`crypto.randomUUID()`) : un second envoi du même paiement est sans effet. */
-      idClient: z
-        .string(DONNEES_INVALIDES)
-        .refine((v) => UUID.test(v) || CUID.test(v), "Identifiant de paiement invalide. Rechargez la page."),
-      /** Reste dû affiché au caissier : s'il ne correspond plus, la situation a changé entre-temps. */
-      resteDuAffiche: z.number(DONNEES_INVALIDES).int(DONNEES_INVALIDES.error).min(0, DONNEES_INVALIDES.error),
-    },
-    DONNEES_INVALIDES,
-  )
-  .superRefine((v, ctx) => {
-    if (v.mode === "MOBILE_MONEY") {
-      if (!v.operateur) ctx.addIssue({ code: "custom", path: ["operateur"], message: "Choisissez l'opérateur Mobile Money." });
-      if (!v.reference) {
-        ctx.addIssue({ code: "custom", path: ["reference"], message: "Saisissez la référence de la transaction Mobile Money." });
-      }
-    } else {
-      if (v.operateur) {
-        ctx.addIssue({ code: "custom", path: ["operateur"], message: "L'opérateur ne concerne que le Mobile Money." });
-      }
-      if (v.reference) {
-        ctx.addIssue({ code: "custom", path: ["reference"], message: "La référence ne concerne que le Mobile Money." });
-      }
+/** Identifiant généré sur le poste (`crypto.randomUUID()`). */
+export function estIdentifiantPoste(v: string): boolean {
+  return UUID.test(v);
+}
+
+/** Champs communs à l'encaissement en ligne et à l'élément de file hors ligne. */
+export const champsEncaissement = {
+  etudiantId: z.string({ error: "Choisissez l'étudiant." }).min(1, "Choisissez l'étudiant."),
+  montant: champMontant,
+  mode: z.enum(ModePaiement, "Choisissez le mode de paiement."),
+  operateur: z.enum(OperateurMobile, "Choisissez l'opérateur Mobile Money.").nullish().transform((v) => v ?? null),
+  reference: facultatif(60, "Référence trop longue (60 caractères maximum)."),
+  observation: facultatif(200, "Observation trop longue (200 caractères maximum)."),
+  /** Généré sur le poste (`crypto.randomUUID()`) : un second envoi du même paiement est sans effet. */
+  idClient: z
+    .string(DONNEES_INVALIDES)
+    .refine((v) => UUID.test(v) || CUID.test(v), "Identifiant de paiement invalide. Rechargez la page."),
+  /** Reste dû affiché au caissier : s'il ne correspond plus, la situation a changé entre-temps. */
+  resteDuAffiche: z.number(DONNEES_INVALIDES).int(DONNEES_INVALIDES.error).min(0, DONNEES_INVALIDES.error),
+};
+
+export function controleMobileMoney(
+  v: { mode: ModePaiement; operateur: OperateurMobile | null; reference: string | null },
+  ctx: z.RefinementCtx,
+): void {
+  if (v.mode === "MOBILE_MONEY") {
+    if (!v.operateur) ctx.addIssue({ code: "custom", path: ["operateur"], message: "Choisissez l'opérateur Mobile Money." });
+    if (!v.reference) {
+      ctx.addIssue({ code: "custom", path: ["reference"], message: "Saisissez la référence de la transaction Mobile Money." });
     }
-  });
+  } else {
+    if (v.operateur) {
+      ctx.addIssue({ code: "custom", path: ["operateur"], message: "L'opérateur ne concerne que le Mobile Money." });
+    }
+    if (v.reference) {
+      ctx.addIssue({ code: "custom", path: ["reference"], message: "La référence ne concerne que le Mobile Money." });
+    }
+  }
+}
+
+export const schemaEncaissement = z.object(champsEncaissement, DONNEES_INVALIDES).superRefine(controleMobileMoney);
 export type EntreeEncaissement = z.input<typeof schemaEncaissement>;
 export type Encaissement = z.output<typeof schemaEncaissement>;
 
@@ -87,6 +95,14 @@ export const schemaAnnulationPaiement = z.object(
   DONNEES_INVALIDES,
 );
 export type EntreeAnnulationPaiement = z.input<typeof schemaAnnulationPaiement>;
+
+export const schemaVerificationPaiement = z.object(
+  {
+    paiementId: z.string({ error: "Paiement introuvable. Rechargez la page." }).min(1, "Paiement introuvable. Rechargez la page."),
+  },
+  DONNEES_INVALIDES,
+);
+export type EntreeVerificationPaiement = z.input<typeof schemaVerificationPaiement>;
 
 export type LigneRecu = {
   /** « Droits d'inscription », « Droits — tranche 2/3 », « Octobre 2026 ». */

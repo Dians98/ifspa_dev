@@ -72,8 +72,8 @@ export function FiltresPaiements({ filtres, periode, caissiers, annees }: Props)
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
           <Input
             type="search"
-            aria-label="Rechercher un reçu ou un étudiant"
-            placeholder="N° de reçu, nom, matricule…"
+            aria-label="Rechercher un reçu, un étudiant, une note ou un n° de reçu papier"
+            placeholder="Reçu, nom, matricule, note, reçu papier…"
             value={recherche}
             autoComplete="off"
             onChange={(e) => {

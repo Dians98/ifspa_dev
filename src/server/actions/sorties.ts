@@ -35,12 +35,16 @@ export async function enregistrerSortie(entree: EntreeSortie): Promise<EtatActio
     const etudiant = await verrouillerEtudiant(tx, etudiantId);
     if (!etudiant) return echecCode("INTROUVABLE", ETUDIANT_INTROUVABLE);
 
-    const inscriptions = await tx.inscription.findMany({
-      where: { etudiantId },
-      select: { id: true, statut: true, anneeScolaire: { select: { dateDebut: true } } },
-    });
+    const [inscriptions, { sexe }] = await Promise.all([
+      tx.inscription.findMany({
+        where: { etudiantId },
+        select: { id: true, statut: true, anneeScolaire: { select: { dateDebut: true } } },
+      }),
+      tx.etudiant.findUniqueOrThrow({ where: { id: etudiantId }, select: { sexe: true } }),
+    ]);
     const refusSortie = controleSortie({
       statutEtudiant: etudiant.statut,
+      sexe,
       date,
       jour,
       borneDebut: borneDebutSortie(

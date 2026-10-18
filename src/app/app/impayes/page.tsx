@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { TableRow } from "@/components/ui/table";
 import { formaterJour } from "@/lib/dates";
 import { formaterAriary } from "@/lib/montant";
+import { exigerSessionPage } from "@/server/acces";
 import { lireImpayes } from "@/server/lectures/paiements";
 
 export const metadata: Metadata = { title: "Impayés" };
@@ -23,6 +24,7 @@ export const metadata: Metadata = { title: "Impayés" };
 const FILTRES_URL = ["q", "filiereId", "niveau", "moisMin"] as const;
 
 export default async function PageImpayes({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  await exigerSessionPage();
   const liste = await lireImpayes(await searchParams);
   const { lignes, totaux, filtres, jour } = liste;
 

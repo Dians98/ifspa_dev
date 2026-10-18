@@ -41,7 +41,7 @@ export function FiltresDashboard({ filtres, options }: Props) {
         </SelectContent>
       </Select>
       <Select value={filtres.anneeId ?? undefined} onValueChange={(v) => appliquer("anneeId", v)}>
-        <SelectTrigger aria-label="Année scolaire" className="w-full max-md:h-11 sm:w-44">
+        <SelectTrigger aria-label="Année scolaire" className="w-full max-md:h-11 sm:w-56">
           <SelectValue />
         </SelectTrigger>
         <SelectContent position="popper">

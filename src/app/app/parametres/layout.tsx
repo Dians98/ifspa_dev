@@ -1,20 +1,20 @@
 import type { Metadata } from "next";
 import { AccesReserve } from "@/components/app/parametres/acces-reserve";
-import { estAdministrateur } from "@/components/app/parametres/acces";
 import { OngletsParametres } from "@/components/app/parametres/onglets-parametres";
 import { TitrePage } from "@/components/app/titre-page";
+import { exigerSessionPage } from "@/server/acces";
 
 export async function generateMetadata(): Promise<Metadata> {
-  return { title: (await estAdministrateur()) ? "Paramètres" : "Accès réservé" };
+  return { title: (await exigerSessionPage()).admin ? "Paramètres" : "Accès réservé" };
 }
 
 export default async function LayoutParametres({ children }: { children: React.ReactNode }) {
   // C'est le layout qui décide : le secrétariat voit le panneau, pas une redirection.
-  if (!(await estAdministrateur())) return <AccesReserve />;
+  if (!(await exigerSessionPage()).admin) return <AccesReserve />;
 
   return (
     <>
-      <TitrePage titre="Paramètres" description="Filières, années scolaires, tarifs et comptes utilisateurs." />
+      <TitrePage titre="Paramètres" description="Filières, années scolaires, tarifs, comptes utilisateurs et reprise des données." />
       <OngletsParametres />
       {children}
     </>

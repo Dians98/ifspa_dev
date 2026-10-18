@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -28,6 +29,8 @@ type Props = {
   declencheur?: ReactNode;
   ouvert?: boolean;
   onOuvertChange?: (ouvert: boolean) => void;
+  /** Après un refus du serveur, recharge la liste (l'état affiché était périmé). */
+  rafraichirSiRefus?: boolean;
 };
 
 /** Une seule confirmation explicite ; l'erreur du serveur reste dans la fenêtre pour être lue. */
@@ -40,7 +43,9 @@ export function ConfirmationAction({
   declencheur,
   ouvert: ouvertPilote,
   onOuvertChange,
+  rafraichirSiRefus,
 }: Props) {
+  const router = useRouter();
   const [ouvertInterne, setOuvertInterne] = useState(false);
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -65,6 +70,11 @@ export function ConfirmationAction({
         (onOuvertChange ?? setOuvertInterne)(false);
       } else {
         setErreur(etat.message);
+        if (rafraichirSiRefus) {
+          // L'action disparaît de la ligne après le rafraîchissement : la notification garde le motif lisible.
+          toast.error(etat.message);
+          router.refresh();
+        }
       }
     } catch {
       setErreur(MESSAGE_RESEAU);

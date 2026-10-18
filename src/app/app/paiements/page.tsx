@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { FiltresPaiements } from "@/components/app/paiements/filtres-paiements";
+import { NumerosNonUtilisesSection } from "@/components/app/paiements/numeros-non-utilises";
 import { TableauPaiements } from "@/components/app/paiements/tableau-paiements";
 import { TitrePage } from "@/components/app/titre-page";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { formaterAriary } from "@/lib/montant";
 import { requireSession, roleDe } from "@/lib/permissions";
-import { lirePaiements, type FiltresPaiements as FiltresLus } from "@/server/lectures/paiements";
+import { lirePaiements, numerosNonUtilises, type FiltresPaiements as FiltresLus } from "@/server/lectures/paiements";
 
 export const metadata: Metadata = { title: "Paiements" };
 
@@ -27,7 +29,8 @@ function adressePage(f: FiltresLus, page: number): string {
 
 export default async function PagePaiements({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requireSession();
-  const liste = await lirePaiements(await searchParams);
+  const estAdmin = roleDe(session) === "admin";
+  const [liste, numeros] = await Promise.all([lirePaiements(await searchParams), estAdmin ? numerosNonUtilises() : null]);
   const { totaux, periode, filtres, page, pages, total, taillePage } = liste;
   const debut = total === 0 ? 0 : (page - 1) * taillePage + 1;
   const fin = Math.min(page * taillePage, total);
@@ -49,7 +52,14 @@ export default async function PagePaiements({ searchParams }: { searchParams: Pr
             <Total libelle="Total encaissé" valeur={formaterAriary(totaux.montant)} />
             <Total libelle="dont espèces" valeur={formaterAriary(totaux.especes)} />
             <Total libelle="dont Mobile Money" valeur={formaterAriary(totaux.mobileMoney)} />
-            {totaux.aVerifier > 0 && <Total libelle="À vérifier" valeur={String(totaux.aVerifier)} />}
+            {totaux.aVerifier > 0 && (
+              <Total
+                libelle="À vérifier"
+                valeur={String(totaux.aVerifier)}
+                alerte
+                lien={filtres.statut === "aVerifier" ? undefined : { href: adressePage({ ...filtres, statut: "aVerifier" }, 1), texte: "Les voir" }}
+              />
+            )}
           </dl>
         </div>
 
@@ -71,7 +81,7 @@ export default async function PagePaiements({ searchParams }: { searchParams: Pr
             </div>
           </div>
         ) : (
-          <TableauPaiements lignes={liste.lignes} peutAnnuler={roleDe(session) === "admin"} />
+          <TableauPaiements lignes={liste.lignes} peutAnnuler={estAdmin} />
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 text-sm text-muted-foreground sm:px-5">
@@ -103,17 +113,36 @@ export default async function PagePaiements({ searchParams }: { searchParams: Pr
           )}
         </div>
       </section>
+
+      {numeros && <NumerosNonUtilisesSection donnees={numeros} />}
     </>
   );
 }
 
-function Total({ libelle, valeur, detail }: { libelle: string; valeur: string; detail?: string }) {
+function Total({
+  libelle,
+  valeur,
+  detail,
+  alerte,
+  lien,
+}: {
+  libelle: string;
+  valeur: string;
+  detail?: string;
+  alerte?: boolean;
+  lien?: { href: string; texte: string };
+}) {
   return (
     <div className="sm:border-l sm:border-rose/30 sm:pl-6 sm:first:border-l-0 sm:first:pl-0">
       <dt className="text-xs font-semibold text-rose-fonce">{libelle}</dt>
-      <dd className="mt-0.5 text-lg font-bold tabular-nums">
+      <dd className={cn("mt-0.5 text-lg font-bold tabular-nums", alerte && "text-attention")}>
         {valeur}
         {detail && <small className="ml-1.5 text-xs font-medium text-muted-foreground">{detail}</small>}
+        {lien && (
+          <Link href={lien.href} className="ml-2 inline-flex min-h-6 items-center text-xs font-semibold text-primary underline underline-offset-4">
+            {lien.texte}
+          </Link>
+        )}
       </dd>
     </div>
   );

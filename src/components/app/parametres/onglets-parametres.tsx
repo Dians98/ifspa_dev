@@ -9,6 +9,7 @@ export const ONGLETS_PARAMETRES = [
   { href: "/app/parametres/annees", libelle: "Années scolaires" },
   { href: "/app/parametres/tarifs", libelle: "Tarifs" },
   { href: "/app/parametres/utilisateurs", libelle: "Utilisateurs" },
+  { href: "/app/parametres/import", libelle: "Reprise des données" },
 ] as const;
 
 /** Onglets en vraies pages : l'adresse, le retour arrière et l'actualisation restent justes. */

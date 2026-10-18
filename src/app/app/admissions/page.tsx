@@ -3,9 +3,9 @@ import Link from "next/link";
 import { EcranBloque } from "@/components/app/admissions/ecran-bloque";
 import { ListeClasses } from "@/components/app/admissions/liste-classes";
 import { PanneauClasse } from "@/components/app/admissions/panneau-classe";
-import { estAdministrateur } from "@/components/app/parametres/acces";
 import { EtatVide } from "@/components/app/parametres/panneau-parametre";
 import { Button } from "@/components/ui/button";
+import { exigerSessionPage } from "@/server/acces";
 import { lireClasse, type ClasseAdmission } from "@/server/lectures/admissions";
 import { lireEcran } from "./lecture";
 
@@ -33,7 +33,8 @@ export default async function PageAdmissions({
 }: {
   searchParams: Promise<{ classe?: string | string[] }>;
 }) {
-  const [ecran, { classe: cleDemandee }, admin] = await Promise.all([lireEcran(), searchParams, estAdministrateur()]);
+  const { admin } = await exigerSessionPage();
+  const [ecran, { classe: cleDemandee }] = await Promise.all([lireEcran(), searchParams]);
 
   if (ecran.refus) {
     return (

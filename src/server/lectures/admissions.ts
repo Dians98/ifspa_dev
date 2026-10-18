@@ -42,7 +42,7 @@ export type ClasseAdmission = {
   libelleNiveau: string;
   /** « Infirmier(e)s 1re année » */
   libelle: string;
-  /** Inscriptions en cours d'étudiants actifs sur l'année source. */
+  /** Classe validée : étudiants figés par ses passages (toutes décisions) ; sinon inscriptions en cours d'étudiants actifs. */
   effectif: number;
   derniereAnnee: boolean;
   etat: EtatClasse;
@@ -107,7 +107,14 @@ export const lireEcranAdmissions = cache(async (): Promise<EcranAdmissions> => {
     db.operationAdmission.findMany({
       where: { anneeSourceId: source.id, annulee: false },
       orderBy: { createdAt: "desc" },
-      select: { id: true, filiereId: true, niveauSource: true, createdAt: true, creePar: { select: { name: true } } },
+      select: {
+        id: true,
+        filiereId: true,
+        niveauSource: true,
+        createdAt: true,
+        creePar: { select: { name: true } },
+        _count: { select: { lignes: true } },
+      },
     }),
     cible
       ? db.tarif.findMany({ where: { anneeScolaireId: cible.id }, select: { filiereId: true, niveau: true } })
@@ -126,11 +133,14 @@ export const lireEcranAdmissions = cache(async (): Promise<EcranAdmissions> => {
     const niveauMax = Math.max(f.dureeAnnees, ...niveauxInscrits);
     for (let niveau = 1; niveau <= niveauMax; niveau++) {
       const cle = `${f.id}:${niveau}`;
-      const effectif = effectifDe.get(cle) ?? 0;
+      const enCours = effectifDe.get(cle) ?? 0;
       const derniere = estDerniereAnnee(niveau, f.dureeAnnees);
-      const derniereOp = opsFiliere.find((o) => o.niveauSource === niveau) ?? null;
+      const opsClasse = opsFiliere.filter((o) => o.niveauSource === niveau);
+      const derniereOp = opsClasse[0] ?? null;
       const tarifRequisPresent = derniere || tarifPresent.has(`${f.id}:${niveau + 1}`);
-      const etat = etatClasse({ effectif, operationActive: derniereOp !== null, cibleDisponible, tarifRequisPresent });
+      const etat = etatClasse({ effectif: enCours, operationActive: derniereOp !== null, cibleDisponible, tarifRequisPresent });
+      // Validée : plus aucune inscription en cours, l'effectif est celui de la liste figée.
+      const effectif = etat === "validee" ? opsClasse.reduce((n, o) => n + o._count.lignes, 0) : enCours;
       let blocage: string | null = null;
       if (etat === "cible_absente") blocage = passage.refus;
       if (etat === "tarif_manquant") {

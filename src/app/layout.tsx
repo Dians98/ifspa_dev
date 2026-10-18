@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Figtree, Source_Serif_4 } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { URL_SITE } from "@/lib/site";
+import { DESCRIPTION_SITE, TITRE_SITE, URL_SITE } from "@/lib/site";
 import "./globals.css";
 
 const texte = Figtree({
@@ -16,20 +16,16 @@ const titre = Source_Serif_4({
   weight: ["500", "600", "700"],
 });
 
-const TITRE = "IFSPA — Institut de Formation Supérieur des Paramédicaux Atsinanana";
-const DESCRIPTION =
-  "Établissement supérieur privé de formation paramédicale à Toamasina : filières Infirmier(e)s et Sage-femmes, domaine « Science de la Santé ».";
-
 export const metadata: Metadata = {
   metadataBase: new URL(URL_SITE),
-  title: { default: TITRE, template: "%s · IFSPA" },
-  description: DESCRIPTION,
+  title: { default: TITRE_SITE, template: "%s · IFSPA" },
+  description: DESCRIPTION_SITE,
   openGraph: {
     type: "website",
     locale: "fr_FR",
     siteName: "IFSPA",
-    title: TITRE,
-    description: DESCRIPTION,
+    title: TITRE_SITE,
+    description: DESCRIPTION_SITE,
   },
 };
 

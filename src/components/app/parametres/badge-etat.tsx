@@ -7,6 +7,7 @@ const TONS = {
   bleu: "bg-secondary text-secondary-foreground",
   rose: "bg-rose-pale text-rose-fonce",
   neutre: "bg-muted text-muted-foreground",
+  rouge: "bg-retard-pale text-retard",
 } as const;
 
 export type TonEtat = keyof typeof TONS;

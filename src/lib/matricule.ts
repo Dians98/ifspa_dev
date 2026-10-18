@@ -34,6 +34,18 @@ export function formaterNumeroRecu(annee: number, seq: number): string {
   return `R-${annee}-${String(seq).padStart(5, "0")}`;
 }
 
+const FORMAT_RECU = /^R-(\d{4})-(\d{5})$/;
+
+/** « R-2027-00023 » → { annee: 2027, numero: 23 } ; null si le format n'est pas celui d'un reçu. */
+export function lireNumeroRecu(numeroRecu: string): { annee: number; numero: number } | null {
+  const m = FORMAT_RECU.exec(numeroRecu);
+  if (!m) return null;
+  const annee = Number(m[1]);
+  const numero = Number(m[2]);
+  if (annee < 1000 || numero < 1) return null;
+  return { annee, numero };
+}
+
 export function cleCompteurRecu(annee: number): string {
   verifierAnnee(annee);
   return `RECU:${annee}`;

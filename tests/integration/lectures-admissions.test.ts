@@ -98,9 +98,47 @@ describe("lireEcranAdmissions", () => {
     const e = await lireEcranAdmissions();
 
     const if1 = e.classes.find((c) => c.filiere.code === "IF" && c.niveau === 1)!;
-    expect(if1).toMatchObject({ etat: "validee", effectif: 0, libelleEtat: "Validée" });
+    expect(if1).toMatchObject({ etat: "validee", effectif: 2, libelleEtat: "Validée" });
     expect(if1.operation).toMatchObject({ par: "Caissier Test" });
     expect(e.avancement).toEqual({ validees: 1, total: 2, libelle: "1 classe validée sur 2" });
+  });
+
+  it("classe validée : l'effectif est la somme des étudiants de ses passages actifs, toutes décisions confondues", async () => {
+    const premiers = [await inscrire(m.ifs.id, 1), await inscrire(m.ifs.id, 1), await inscrire(m.ifs.id, 1)];
+    reussi(await valider(m.ifs.id, 1, premiers, ["ADMIS", "REDOUBLANT", "ABANDON"]));
+    expect(await classeDe(m.ifs.id, 1)).toMatchObject({ etat: "validee", effectif: 3 });
+
+    const complementaires = [await inscrire(m.ifs.id, 1), await inscrire(m.ifs.id, 1)];
+    reussi(await valider(m.ifs.id, 1, complementaires, ["ADMIS", "ADMIS"]));
+
+    expect(await classeDe(m.ifs.id, 1)).toMatchObject({ etat: "validee", effectif: 5 });
+  });
+
+  it("un passage annulé ne compte pas dans l'effectif de la classe validée", async () => {
+    const premiers = [await inscrire(m.ifs.id, 1), await inscrire(m.ifs.id, 1)];
+    reussi(await valider(m.ifs.id, 1, premiers, ["ADMIS", "ADMIS"]));
+    const complementaires = [await inscrire(m.ifs.id, 1), await inscrire(m.ifs.id, 1), await inscrire(m.ifs.id, 1)];
+    const second = reussi(await valider(m.ifs.id, 1, complementaires, ["ADMIS", "REDOUBLANT", "ADMIS"]));
+    expect((await classeDe(m.ifs.id, 1)).effectif).toBe(5);
+
+    connecter(getSession, m.admin);
+    reussi(await actions.annulerOperation({ operationId: second.operationId }));
+
+    // Les trois inscrits du passage annulé sont de nouveau en cours : la classe est « à faire » pour eux seuls.
+    expect(await classeDe(m.ifs.id, 1)).toMatchObject({ etat: "a_faire", effectif: 3 });
+  });
+
+  it("classe redevenue « à faire » après annulation : ses inscriptions en cours reviennent dans l'effectif, sans opération", async () => {
+    const membres = [await inscrire(m.ifs.id, 1), await inscrire(m.ifs.id, 1), await inscrire(m.ifs.id, 1)];
+    const { operationId } = reussi(await valider(m.ifs.id, 1, membres, ["ADMIS", "REDOUBLANT", "ABANDON"]));
+    expect(await classeDe(m.ifs.id, 1)).toMatchObject({ etat: "validee", effectif: 3 });
+    connecter(getSession, m.admin);
+    reussi(await actions.annulerOperation({ operationId }));
+
+    const c = await classeDe(m.ifs.id, 1);
+
+    expect(c).toMatchObject({ etat: "a_faire", effectif: 3, operation: null });
+    expect((await lireEcranAdmissions()).avancement).toEqual({ validees: 0, total: 1, libelle: "0 classe validée sur 1" });
   });
 
   it("passage complémentaire : un étudiant inscrit après la validation remet la classe « à faire »", async () => {

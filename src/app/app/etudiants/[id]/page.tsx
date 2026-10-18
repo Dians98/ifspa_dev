@@ -10,13 +10,16 @@ import { ongletValide } from "@/components/app/etudiants/onglets";
 import { OngletsFiche } from "@/components/app/etudiants/onglets-fiche";
 import { PaiementsFiche } from "@/components/app/etudiants/paiements-fiche";
 import { ParcoursFiche } from "@/components/app/etudiants/parcours-fiche";
-import { estAdministrateur } from "@/components/app/parametres/acces";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { formaterAriary } from "@/lib/montant";
+import { exigerSessionPage } from "@/server/acces";
 import { lireFicheEtudiant } from "@/server/lectures/etudiants";
 
-// La page et ses métadonnées lisent la même fiche : une seule lecture par requête.
-const lireFiche = cache((id: string) => lireFicheEtudiant(id));
+// La page et ses métadonnées lisent la même fiche : une seule lecture par requête, après contrôle de session.
+const lireFiche = cache(async (id: string) => {
+  await exigerSessionPage();
+  return lireFicheEtudiant(id);
+});
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const e = await lireFiche((await params).id);
@@ -31,7 +34,7 @@ export default async function PageFicheEtudiant({
   searchParams: Promise<{ nouveau?: string; onglet?: string }>;
 }) {
   const [{ id }, { nouveau, onglet }] = await Promise.all([params, searchParams]);
-  const [e, admin] = await Promise.all([lireFiche(id), estAdministrateur()]);
+  const [e, { admin }] = await Promise.all([lireFiche(id), exigerSessionPage()]);
   if (!e) notFound();
 
   const inscrit = nouveau === "1";

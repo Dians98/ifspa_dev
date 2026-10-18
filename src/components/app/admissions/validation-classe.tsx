@@ -224,7 +224,7 @@ export function ValidationClasse({
         </p>
       </div>
 
-      {exceptions.length > 0 && classe.tarifRedoublementManquant && (
+      {comptes.redoublants > 0 && classe.tarifRedoublementManquant && (
         <Alert id="avertissement-tarif" className="mx-4 mt-3 w-auto border-attention/30 bg-attention-pale text-foreground sm:mx-5">
           <TriangleAlert aria-hidden className="text-attention" />
           <AlertDescription className="text-foreground">
@@ -371,7 +371,7 @@ export function ValidationClasse({
             {nbInscriptions > 0 && (
               <li>
                 {nbInscriptions} {pluriel(nbInscriptions, "inscription", "inscriptions")} {cible.libelle}{" "}
-                {pluriel(nbInscriptions, "sera créée", "seront créées")}, avec leurs mensualités.
+                {pluriel(nbInscriptions, "sera créée, avec ses mensualités", "seront créées, avec leurs mensualités")}.
               </li>
             )}
             {nbImpayes > 0 && (

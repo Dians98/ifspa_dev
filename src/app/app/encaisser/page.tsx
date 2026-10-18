@@ -18,7 +18,12 @@ export default async function PageEncaisser({ searchParams }: { searchParams: Pr
   return (
     <div className="mx-auto max-w-3xl">
       <TitrePage titre="Encaisser un paiement" description={`Guichet du ${formaterJour(jourMadagascar(new Date()))}`} />
-      <Guichet derniersServis={derniers} situationInitiale={situation} etudiantIntrouvable={id !== null && situation === null} />
+      <Guichet
+        utilisateur={{ id: session.user.id, nom: session.user.name }}
+        derniersServis={derniers}
+        situationInitiale={situation}
+        etudiantIntrouvable={id !== null && situation === null}
+      />
     </div>
   );
 }

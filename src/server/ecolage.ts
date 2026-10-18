@@ -2,12 +2,17 @@ import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import type { StatutEtudiant, TypeEcheance } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { jourDeDate } from "@/lib/dates";
 import { libelleEcheance, trierPourSolde, type EcheancePayee } from "@/lib/ecolage";
+import type { EcheanceCopie } from "@/lib/encaissement-hors-ligne";
 
 type Tx = Prisma.TransactionClient;
 
 /** Base cPanel parfois lente : on laisse du temps aux transactions interactives. */
 export const OPTIONS_TRANSACTION = { timeout: 15_000, maxWait: 10_000 } as const;
+
+/** Reprise des données : jusqu'à 2 000 étudiants et 10 000 paiements dans une seule transaction. */
+export const OPTIONS_TRANSACTION_REPRISE = { timeout: 120_000, maxWait: 10_000 } as const;
 
 /**
  * Verrou de l'étudiant puis de toutes ses échéances (toutes années), toujours dans cet ordre :
@@ -35,7 +40,43 @@ export type EcheanceDossier = EcheancePayee & {
   anneeLibelle: string;
   libelle: string;
   nonDueSortie: boolean;
+  /** Lignes de paiements non annulés : une seule suffit à garder l'échéance due après une sortie. */
+  lignesNonAnnulees: number;
 };
+
+const SELECT_ECHEANCE_DOSSIER = {
+  id: true,
+  inscriptionId: true,
+  type: true,
+  tranche: true,
+  mois: true,
+  ordre: true,
+  montantDu: true,
+  nonDueSortie: true,
+  inscription: {
+    select: { etudiantId: true, droitsEnTranches: true, anneeScolaire: { select: { anneeDebut: true, libelle: true } } },
+  },
+  lignesPaiement: { where: { paiement: { annule: false } }, select: { montant: true } },
+} as const satisfies Prisma.EcheanceSelect;
+
+function echeanceDossier(e: Prisma.EcheanceGetPayload<{ select: typeof SELECT_ECHEANCE_DOSSIER }>): EcheanceDossier {
+  return {
+    id: e.id,
+    inscriptionId: e.inscriptionId,
+    type: e.type,
+    tranche: e.tranche,
+    mois: e.mois,
+    ordre: e.ordre,
+    montantDu: e.montantDu,
+    nonDueSortie: e.nonDueSortie,
+    paye: e.lignesPaiement.reduce((s, l) => s + l.montant, 0),
+    lignesNonAnnulees: e.lignesPaiement.length,
+    anneeDebut: e.inscription.anneeScolaire.anneeDebut,
+    anneeLibelle: e.inscription.anneeScolaire.libelle,
+    droitsEnTranches: e.inscription.droitsEnTranches,
+    libelle: libelleEcheance(e, e.inscription.droitsEnTranches),
+  };
+}
 
 /**
  * Échéances de l'étudiant, payé = lignes des paiements non annulés, dans l'ordre de solde.
@@ -48,36 +89,44 @@ export async function echeancesEtudiant(
 ): Promise<EcheanceDossier[]> {
   const lignes = await client.echeance.findMany({
     where: { inscription: { etudiantId }, ...(options.avecNonDues ? {} : { nonDueSortie: false }) },
-    select: {
-      id: true,
-      inscriptionId: true,
-      type: true,
-      tranche: true,
-      mois: true,
-      ordre: true,
-      montantDu: true,
-      nonDueSortie: true,
-      inscription: { select: { droitsEnTranches: true, anneeScolaire: { select: { anneeDebut: true, libelle: true } } } },
-      lignesPaiement: { where: { paiement: { annule: false } }, select: { montant: true } },
-    },
+    select: SELECT_ECHEANCE_DOSSIER,
   });
-  return trierPourSolde(
-    lignes.map((e) => ({
-      id: e.id,
-      inscriptionId: e.inscriptionId,
-      type: e.type,
-      tranche: e.tranche,
-      mois: e.mois,
-      ordre: e.ordre,
-      montantDu: e.montantDu,
-      nonDueSortie: e.nonDueSortie,
-      paye: e.lignesPaiement.reduce((s, l) => s + l.montant, 0),
-      anneeDebut: e.inscription.anneeScolaire.anneeDebut,
-      anneeLibelle: e.inscription.anneeScolaire.libelle,
-      droitsEnTranches: e.inscription.droitsEnTranches,
-      libelle: libelleEcheance(e, e.inscription.droitsEnTranches),
-    })),
-  );
+  return trierPourSolde(lignes.map(echeanceDossier));
+}
+
+/** Échéances dues (hors « non dues » après sortie) de plusieurs étudiants en une requête, par étudiant, dans l'ordre de solde. */
+export async function echeancesDesEtudiants(
+  client: Tx,
+  etudiants: Prisma.EtudiantWhereInput,
+): Promise<Map<string, EcheanceDossier[]>> {
+  const lignes = await client.echeance.findMany({
+    where: { nonDueSortie: false, inscription: { etudiant: etudiants } },
+    select: SELECT_ECHEANCE_DOSSIER,
+  });
+  const parEtudiant = new Map<string, EcheanceDossier[]>();
+  for (const l of lignes) {
+    const liste = parEtudiant.get(l.inscription.etudiantId) ?? [];
+    liste.push(echeanceDossier(l));
+    parEtudiant.set(l.inscription.etudiantId, liste);
+  }
+  for (const [id, liste] of parEtudiant) parEtudiant.set(id, trierPourSolde(liste));
+  return parEtudiant;
+}
+
+/** Forme partagée avec le poste hors ligne (`construireSituationGuichet`, copie du guichet). */
+export function echeanceCopie(e: EcheanceDossier): EcheanceCopie {
+  return {
+    id: e.id,
+    anneeDebut: e.anneeDebut,
+    anneeLibelle: e.anneeLibelle,
+    type: e.type,
+    tranche: e.tranche,
+    droitsEnTranches: e.droitsEnTranches,
+    mois: jourDeDate(e.mois),
+    ordre: e.ordre,
+    montantDu: e.montantDu,
+    paye: e.paye,
+  };
 }
 
 /**

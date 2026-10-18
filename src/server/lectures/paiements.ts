@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
-import { ModePaiement, OperateurMobile, type StatutEtudiant, type TypeEcheance } from "@/generated/prisma/enums";
+import { ModePaiement, OperateurMobile } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import {
   ajouterJours,
@@ -14,21 +14,23 @@ import {
   premierDuMoisSuivant,
   type Jour,
 } from "@/lib/dates";
-import {
-  dateLimiteRetard,
-  LIBELLE_STATUT_ECHEANCE,
-  preselection,
-  resteDuTotal,
-  situation,
-  suivreEcheance,
-  type StatutEcheance,
-  type TotauxEcolage,
-} from "@/lib/ecolage";
+import { dateLimiteRetard, type TotauxEcolage } from "@/lib/ecolage";
 import { construireRecu, type DonneesRecu } from "@/lib/encaissement";
-import { ARRETES, ETABLISSEMENT, getCoordonnees } from "@/lib/etablissement";
-import { formaterTelephone, LIBELLE_STATUT_ETUDIANT, libelleNiveauInscription, motsRecherche } from "@/lib/etudiants";
-import { DUREE_MAX, libelleAnnee, NOMS_MOIS } from "@/lib/parametres";
 import {
+  construireSituationGuichet,
+  encaissable,
+  resultatGuichet,
+  type EtudiantGuichetSource,
+  type ResultatGuichet,
+  type SituationGuichet,
+} from "@/lib/encaissement-hors-ligne";
+import { ARRETES, ETABLISSEMENT, getCoordonnees } from "@/lib/etablissement";
+import { formaterTelephone, libelleNiveauInscription, motsRecherche } from "@/lib/etudiants";
+import { formaterNumeroRecu } from "@/lib/matricule";
+import { DUREE_MAX, NOMS_MOIS } from "@/lib/parametres";
+import { blocsAvecLibres } from "@/server/blocs-recus";
+import {
+  echeanceCopie,
   echeancesEtudiant,
   restesDe,
   restesParEtudiant,
@@ -49,62 +51,51 @@ import {
   type ParamsRecherche,
 } from "@/server/lectures/filtres";
 
-// Lectures sans contrôle de rôle : pages sous /app (layout protégé) ; les appels depuis le client
+// Lectures sans contrôle de rôle : chaque page appelle `exigerSessionPage()` avant de lire ; les appels depuis le client
 // passent par les actions de `src/server/actions/paiements.ts`, qui vérifient la session.
 
-export type ResultatGuichet = {
-  id: string;
-  matricule: string;
-  nom: string;
-  prenoms: string;
-  filiereCode: string;
-  /** « 2e année (redoublant) », null sans inscription */
-  niveau: string | null;
-  statut: StatutEtudiant;
-  libelleStatut: string;
-  /** Sorti (diplômé, abandon, exclu) : encaissable seulement pour solder ce qu'il doit encore. */
-  sorti: boolean;
-  resteEnRetard: number;
-  resteDu: number;
-};
+export type { EcheanceGuichet, ResultatGuichet, SituationGuichet } from "@/lib/encaissement-hors-ligne";
 
 const SELECT_GUICHET = {
   id: true,
   matricule: true,
   nom: true,
   prenoms: true,
+  sexe: true,
   statut: true,
   filiere: { select: { code: true } },
   inscriptions: {
     orderBy: { anneeScolaire: { anneeDebut: "desc" } },
     take: 1,
-    select: { niveau: true, redoublement: true },
+    select: { niveau: true, redoublement: true, anneeScolaire: { select: { anneeDebut: true, libelle: true } } },
   },
 } as const satisfies Prisma.EtudiantSelect;
 
-type EtudiantGuichet = Prisma.EtudiantGetPayload<{ select: typeof SELECT_GUICHET }>;
-
-function resultatGuichet(e: EtudiantGuichet, restes: Map<string, ReturnType<typeof restesDe>>): ResultatGuichet {
-  const r = restesDe(restes, e.id);
-  const ins = e.inscriptions[0];
+export function sourceGuichet(
+  e: Omit<EtudiantGuichet, "filiere"> & { filiere: { code: string; nom?: string } },
+): EtudiantGuichetSource {
   return {
     id: e.id,
     matricule: e.matricule,
     nom: e.nom,
     prenoms: e.prenoms,
-    filiereCode: e.filiere.code,
-    niveau: ins ? libelleNiveauInscription(ins.niveau, ins.redoublement) : null,
+    sexe: e.sexe,
     statut: e.statut,
-    libelleStatut: LIBELLE_STATUT_ETUDIANT[e.statut],
-    sorti: e.statut !== "ACTIF",
-    resteEnRetard: r.resteEnRetard,
-    resteDu: r.resteDu,
+    filiereCode: e.filiere.code,
+    filiereNom: e.filiere.nom ?? "",
+    inscriptions: e.inscriptions.map((i) => ({
+      anneeDebut: i.anneeScolaire.anneeDebut,
+      libelle: i.anneeScolaire.libelle,
+      niveau: i.niveau,
+      redoublement: i.redoublement,
+    })),
   };
 }
 
-/** Encaissables : les actifs, et les sortis qui doivent encore quelque chose. */
-function encaissable(e: { statut: StatutEtudiant }, resteDu: number): boolean {
-  return e.statut === "ACTIF" || resteDu > 0;
+type EtudiantGuichet = Prisma.EtudiantGetPayload<{ select: typeof SELECT_GUICHET }>;
+
+function resultatRecherche(e: EtudiantGuichet, restes: Map<string, ReturnType<typeof restesDe>>): ResultatGuichet {
+  return resultatGuichet(sourceGuichet(e), restesDe(restes, e.id));
 }
 
 /** Recherche du guichet (nom, prénoms, matricule, sans accents), 10 résultats, actifs d'abord. */
@@ -129,7 +120,7 @@ export async function rechercherAuGuichet(
     .map((id) => parId.get(id))
     .filter((e): e is EtudiantGuichet => !!e && encaissable(e, restesDe(restes, e.id).resteDu))
     .slice(0, 10)
-    .map((e) => resultatGuichet(e, restes));
+    .map((e) => resultatRecherche(e, restes));
 }
 
 /** Derniers étudiants distincts encaissés par ce caissier (paiements non annulés), du plus récent au plus ancien. */
@@ -151,120 +142,28 @@ export async function derniersServis(
   return derniers.flatMap((d) => {
     const e = parId.get(d.etudiantId);
     if (!e || !encaissable(e, restesDe(restes, e.id).resteDu)) return [];
-    return [{ ...resultatGuichet(e, restes), dernierPassageISO: d.dernier.toISOString() }];
+    return [{ ...resultatRecherche(e, restes), dernierPassageISO: d.dernier.toISOString() }];
   });
 }
 
-export type EcheanceGuichet = {
-  id: string;
-  libelle: string;
-  type: TypeEcheance;
-  /** « 2026-10-01 » */
-  mois: Jour;
-  montantDu: number;
-  paye: number;
-  reste: number;
-  echue: boolean;
-  statut: StatutEcheance;
-  libelleStatut: string;
-};
+export const SELECT_SOURCE_GUICHET = {
+  ...SELECT_GUICHET,
+  filiere: { select: { code: true, nom: true } },
+  inscriptions: {
+    orderBy: { anneeScolaire: { anneeDebut: "desc" } },
+    select: { niveau: true, redoublement: true, anneeScolaire: { select: { anneeDebut: true, libelle: true } } },
+  },
+} as const satisfies Prisma.EtudiantSelect;
 
-export type SituationGuichet = {
-  etudiant: ResultatGuichet & { filiereNom: string; telephone: string | null; anneeScolaire: string | null };
-  jour: Jour;
-  /** Message à afficher à la place du formulaire (rien à encaisser), sinon null. */
-  refus: string | null;
-  /** Par année scolaire, de la plus ancienne à la plus récente ; seulement les échéances non soldées. */
-  annees: { anneeDebut: number; libelle: string; niveau: string | null; reste: number; resteEnRetard: number; echeances: EcheanceGuichet[] }[];
-  /** Mêmes échéances, à plat, dans l'ordre de solde : base de `montantPourCases` et `repartirPaiement`. */
-  echeances: EcheanceGuichet[];
-  /** Cases cochées par défaut : les échéances en retard. */
-  preselection: string[];
-  /** À renvoyer tel quel dans `encaisser({ resteDuAffiche })`. */
-  resteDuTotal: number;
-  resteEnRetard: number;
-  /** Année de l'inscription la plus récente, échéances soldées comprises ; null sans inscription. */
-  anneeEnCours: { anneeDebut: number; libelle: string; du: number; paye: number; reste: number } | null;
-};
-
-/** Ce que le guichet affiche pour un étudiant : échéances non soldées toutes années, cases présélectionnées. */
+/** Ce que le guichet affiche pour un étudiant : même calcul que le poste hors ligne (`construireSituationGuichet`). */
 export async function situationGuichet(
   etudiantId: string,
   jour: Jour = jourMadagascar(new Date()),
 ): Promise<SituationGuichet | null> {
-  const e = await db.etudiant.findUnique({
-    where: { id: etudiantId },
-    select: {
-      ...SELECT_GUICHET,
-      telephone: true,
-      filiere: { select: { code: true, nom: true } },
-      inscriptions: {
-        orderBy: { anneeScolaire: { anneeDebut: "desc" } },
-        select: { niveau: true, redoublement: true, anneeScolaire: { select: { anneeDebut: true, libelle: true } } },
-      },
-    },
-  });
+  const e = await db.etudiant.findUnique({ where: { id: etudiantId }, select: SELECT_SOURCE_GUICHET });
   if (!e) return null;
-
-  const toutes = await echeancesEtudiant(db, etudiantId);
-  const nonSoldees = toutes.map((x) => ({ ...x, ...suivreEcheance(x, jour) })).filter((x) => x.reste > 0);
-  const derniere = e.inscriptions[0]?.anneeScolaire;
-  const totauxDerniere = derniere
-    ? situation(toutes, jour).parAnnee.find((a) => a.anneeDebut === derniere.anneeDebut)
-    : undefined;
-  const echeances: EcheanceGuichet[] = nonSoldees.map((x) => ({
-    id: x.id,
-    libelle: x.libelle,
-    type: x.type,
-    mois: jourDeDate(x.mois),
-    montantDu: x.montantDu,
-    paye: x.paye,
-    reste: x.reste,
-    echue: x.echue,
-    statut: x.statut,
-    libelleStatut: LIBELLE_STATUT_ECHEANCE[x.statut],
-  }));
-  const total = resteDuTotal(nonSoldees);
-  const retard = nonSoldees.filter((x) => x.echue).reduce((s, x) => s + x.reste, 0);
-  const restes = new Map([[e.id, { resteDu: total, resteEnRetard: retard, moisEnRetard: 0, anneesEnRetard: [] }]]);
-
-  const annees = [...new Set(nonSoldees.map((x) => x.anneeDebut))].map((anneeDebut) => {
-    const ins = e.inscriptions.find((i) => i.anneeScolaire.anneeDebut === anneeDebut);
-    const ech = nonSoldees.filter((x) => x.anneeDebut === anneeDebut);
-    return {
-      anneeDebut,
-      libelle: ins?.anneeScolaire.libelle ?? libelleAnnee(anneeDebut),
-      niveau: ins ? libelleNiveauInscription(ins.niveau, ins.redoublement) : null,
-      reste: resteDuTotal(ech),
-      resteEnRetard: ech.filter((x) => x.echue).reduce((s, x) => s + x.reste, 0),
-      echeances: echeances.filter((x) => ech.some((y) => y.id === x.id)),
-    };
-  });
-
-  return {
-    etudiant: {
-      ...resultatGuichet(e, restes),
-      filiereNom: e.filiere.nom,
-      telephone: e.telephone ? formaterTelephone(e.telephone) : null,
-      anneeScolaire: e.inscriptions[0]?.anneeScolaire.libelle ?? null,
-    },
-    jour,
-    refus: total === 0 ? "Rien à encaisser : toutes les échéances de cet étudiant sont soldées." : null,
-    annees,
-    echeances,
-    preselection: preselection(nonSoldees, jour),
-    resteDuTotal: total,
-    resteEnRetard: retard,
-    anneeEnCours: derniere
-      ? {
-          anneeDebut: derniere.anneeDebut,
-          libelle: derniere.libelle,
-          du: totauxDerniere?.du ?? 0,
-          paye: totauxDerniere?.paye ?? 0,
-          reste: totauxDerniere?.reste ?? 0,
-        }
-      : null,
-  };
+  const echeances = (await echeancesEtudiant(db, etudiantId)).map(echeanceCopie);
+  return construireSituationGuichet(sourceGuichet(e), echeances, jour);
 }
 
 /**
@@ -451,12 +350,15 @@ export async function lirePaiements(
   if (f.caissierId) et.push({ saisiParId: f.caissierId });
   if (f.statut === "valides") et.push({ annule: false });
   if (f.statut === "annules") et.push({ annule: true });
-  if (f.statut === "aVerifier") et.push({ aVerifier: true });
+  // Annulé, il n'y a plus rien à vérifier (décision 43).
+  if (f.statut === "aVerifier") et.push({ aVerifier: true, annule: false });
   const mots = motsRecherche(f.q ?? "");
   if (f.q && mots.length) {
     et.push({
       OR: [
         { numeroRecu: { contains: f.q.trim(), mode: "insensitive" } },
+        // Note du guichet ou n° de reçu papier d'un paiement repris (« 0412 »).
+        { observation: { contains: f.q.trim(), mode: "insensitive" } },
         { AND: mots.map((m) => ({ etudiant: { recherche: { contains: m } } })) },
       ],
     });
@@ -469,7 +371,7 @@ export async function lirePaiements(
     db.paiement.aggregate({ where: valides, _sum: { montant: true }, _count: { _all: true } }),
     db.paiement.groupBy({ by: ["mode"], where: valides, _sum: { montant: true } }),
     db.paiement.count({ where: { AND: [...et, { annule: true }] } }),
-    db.paiement.count({ where: { AND: [...et, { aVerifier: true }] } }),
+    db.paiement.count({ where: { AND: [...et, { aVerifier: true, annule: false }] } }),
     db.user.findMany({
       where: { paiementsSaisis: { some: {} } },
       orderBy: { name: "asc" },
@@ -506,6 +408,63 @@ export async function lirePaiements(
     caissiers: caissiers.map((c) => ({ id: c.id, nom: c.name })),
     annees,
   };
+}
+
+// Numéros de reçu non utilisés (blocs des postes hors ligne)
+
+export type NumerosNonUtilises = {
+  /** Années civiles closes : numéros de blocs jamais portés par un paiement, définitivement inutilisés. */
+  anneesCloses: { annee: number; nombre: number; numeros: string[] }[];
+  /** Année en cours (et suivante, réservée dès décembre) : numéros encore détenus par les postes. */
+  anneesOuvertes: {
+    annee: number;
+    restants: number;
+    /** `posteCourt` : 8 premiers caractères de l'identifiant du poste, pour l'affichage. */
+    postes: { poste: string; posteCourt: string; caissier: { id: string; nom: string }; restants: number; blocs: number }[];
+  }[];
+};
+
+/** Pour l'admin seulement : la page Paiements ne l'appelle que si la session est admin. Les années les plus récentes d'abord. */
+export async function numerosNonUtilises(jour: Jour = jourMadagascar(new Date())): Promise<NumerosNonUtilises> {
+  const blocs = await db.blocNumeros.findMany({
+    where: { cle: { startsWith: "RECU:" } },
+    orderBy: [{ cle: "desc" }, { premier: "asc" }],
+    select: { id: true, cle: true, premier: true, dernier: true, poste: true, reservePar: { select: { id: true, name: true } } },
+  });
+  const parAnnee = new Map<number, typeof blocs>();
+  for (const b of blocs) {
+    const annee = Number(b.cle.slice("RECU:".length));
+    if (!Number.isInteger(annee)) continue;
+    parAnnee.set(annee, [...(parAnnee.get(annee) ?? []), b]);
+  }
+
+  const anneeCourante = lireJour(jour).annee;
+  const resultat: NumerosNonUtilises = { anneesCloses: [], anneesOuvertes: [] };
+  for (const [annee, liste] of [...parAnnee].sort(([a], [b]) => b - a)) {
+    const libres = new Map((await blocsAvecLibres(db, annee, liste)).map((b) => [b.id, b.libres]));
+    if (annee < anneeCourante) {
+      const numeros = liste.flatMap((b) => (libres.get(b.id) ?? []).map((n) => formaterNumeroRecu(annee, n)));
+      if (numeros.length > 0) resultat.anneesCloses.push({ annee, nombre: numeros.length, numeros });
+      continue;
+    }
+    const postes = new Map<string, NumerosNonUtilises["anneesOuvertes"][number]["postes"][number]>();
+    for (const b of liste) {
+      const cle = `${b.poste}|${b.reservePar.id}`;
+      const p = postes.get(cle) ?? {
+        poste: b.poste,
+        posteCourt: b.poste.slice(0, 8),
+        caissier: { id: b.reservePar.id, nom: b.reservePar.name },
+        restants: 0,
+        blocs: 0,
+      };
+      p.restants += libres.get(b.id)?.length ?? 0;
+      p.blocs += 1;
+      postes.set(cle, p);
+    }
+    const lignes = [...postes.values()].sort((a, b) => a.caissier.nom.localeCompare(b.caissier.nom, "fr") || a.poste.localeCompare(b.poste));
+    resultat.anneesOuvertes.push({ annee, restants: lignes.reduce((s, p) => s + p.restants, 0), postes: lignes });
+  }
+  return resultat;
 }
 
 // Impayés

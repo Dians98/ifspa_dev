@@ -35,6 +35,7 @@ model User {
   etudiantsCrees     Etudiant[]           @relation("EtudiantCreePar")
   paiementsSaisis    Paiement[]           @relation("PaiementSaisiPar")
   paiementsAnnules   Paiement[]           @relation("PaiementAnnulePar")
+  paiementsVerifies  Paiement[]           @relation("PaiementVerifiePar")
   blocsReserves      BlocNumeros[]        @relation("BlocNumerosReservePar")
   admissionsCreees   OperationAdmission[] @relation("AdmissionCreePar")
   admissionsAnnulees OperationAdmission[] @relation("AdmissionAnnuleePar")
@@ -186,31 +187,31 @@ enum StatutEtudiant {
 }
 
 model Etudiant {
-  id              String         @id @default(cuid())
-  matricule       String         @unique // IF-2026-0001 — ne change jamais
-  nom             String
-  prenoms         String
-  sexe            Sexe
-  dateNaissance   DateTime       @db.Date
-  lieuNaissance   String
-  cin             String?
-  telephone       String?
-  email           String?
-  adresse         String?
-  photo           String?
+  id            String         @id @default(cuid())
+  matricule     String         @unique // IF-2026-0001 — ne change jamais
+  nom           String
+  prenoms       String
+  sexe          Sexe
+  dateNaissance DateTime       @db.Date
+  lieuNaissance String
+  cin           String?
+  telephone     String?
+  email         String?
+  adresse       String?
+  photo         String?
   // Nom, prénoms et matricule sans accents, en minuscules (normaliserRecherche) : recherche sans extension unaccent
-  recherche       String
-  filiereId       String
-  filiere         Filiere        @relation(fields: [filiereId], references: [id])
-  anneeEntreeId   String
-  anneeEntree     AnneeScolaire  @relation(fields: [anneeEntreeId], references: [id])
-  statut          StatutEtudiant @default(ACTIF)
-  dateSortie      DateTime?      @db.Date
-  motifSortie     String?
-  creeParId       String?
-  creePar         User?          @relation("EtudiantCreePar", fields: [creeParId], references: [id])
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  recherche     String
+  filiereId     String
+  filiere       Filiere        @relation(fields: [filiereId], references: [id])
+  anneeEntreeId String
+  anneeEntree   AnneeScolaire  @relation(fields: [anneeEntreeId], references: [id])
+  statut        StatutEtudiant @default(ACTIF)
+  dateSortie    DateTime?      @db.Date
+  motifSortie   String?
+  creeParId     String?
+  creePar       User?          @relation("EtudiantCreePar", fields: [creeParId], references: [id])
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   inscriptions    Inscription[]
   paiements       Paiement[]
@@ -295,32 +296,37 @@ enum OperateurMobile {
 }
 
 model Paiement {
-  id              String           @id @default(cuid())
-  numeroRecu      String           @unique // R-2026-00001
-  etudiantId      String
-  etudiant        Etudiant         @relation(fields: [etudiantId], references: [id])
-  date            DateTime         @default(now())
-  montant         Int // en ariary
-  mode            ModePaiement
-  operateur       OperateurMobile?
-  reference       String?
-  observation     String?
-  saisiParId      String
-  saisiPar        User             @relation("PaiementSaisiPar", fields: [saisiParId], references: [id])
+  id               String           @id @default(cuid())
+  numeroRecu       String           @unique // R-2026-00001
+  etudiantId       String
+  etudiant         Etudiant         @relation(fields: [etudiantId], references: [id])
+  date             DateTime         @default(now())
+  montant          Int // en ariary
+  mode             ModePaiement
+  operateur        OperateurMobile?
+  reference        String?
+  observation      String?
+  saisiParId       String
+  saisiPar         User             @relation("PaiementSaisiPar", fields: [saisiParId], references: [id])
   // Jamais supprimé physiquement : l'admin l'annule
-  annule          Boolean          @default(false)
-  annuleParId     String?
-  annulePar       User?            @relation("PaiementAnnulePar", fields: [annuleParId], references: [id])
-  dateAnnulation  DateTime?
-  motifAnnulation String?
+  annule           Boolean          @default(false)
+  annuleParId      String?
+  annulePar        User?            @relation("PaiementAnnulePar", fields: [annuleParId], references: [id])
+  dateAnnulation   DateTime?
+  motifAnnulation  String?
   // Encaissement hors ligne : identifiant généré sur le poste, un double envoi est sans effet
-  idClient        String?          @unique
+  idClient         String?          @unique
   // Échéance soldée ailleurs avant la synchronisation : l'admin annule ou régularise
-  aVerifier       Boolean          @default(false)
+  aVerifier        Boolean          @default(false)
+  // Pourquoi il est à vérifier (situation changée, surplus non imputé) ; montant peut alors dépasser la somme des lignes
+  noteVerification String?
+  verifieParId     String?
+  verifiePar       User?            @relation("PaiementVerifiePar", fields: [verifieParId], references: [id])
+  dateVerification DateTime?
   // Figés à l'émission pour réimprimer le reçu à l'identique : reste toutes années, et part en retard
-  resteApres      Int
-  retardApres     Int
-  createdAt       DateTime         @default(now())
+  resteApres       Int
+  retardApres      Int
+  createdAt        DateTime         @default(now())
 
   lignes PaiementLigne[]
 
@@ -350,12 +356,12 @@ model BlocNumeros {
 }
 
 model PaiementLigne {
-  id         String   @id @default(cuid())
-  paiementId String
-  paiement   Paiement @relation(fields: [paiementId], references: [id], onDelete: Cascade)
-  echeanceId String
-  echeance   Echeance @relation(fields: [echeanceId], references: [id])
-  montant    Int
+  id                 String   @id @default(cuid())
+  paiementId         String
+  paiement           Paiement @relation(fields: [paiementId], references: [id], onDelete: Cascade)
+  echeanceId         String
+  echeance           Echeance @relation(fields: [echeanceId], references: [id])
+  montant            Int
   // Reste dû sur l'échéance juste après ce paiement, figé pour réimprimer le reçu à l'identique
   resteEcheanceApres Int
 

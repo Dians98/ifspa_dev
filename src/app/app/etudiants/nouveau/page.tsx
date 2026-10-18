@@ -2,14 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { FormulaireCreationEtudiant } from "@/components/app/etudiants/formulaire-creation-etudiant";
-import { estAdministrateur } from "@/components/app/parametres/acces";
 import { TitrePage } from "@/components/app/titre-page";
+import { exigerSessionPage } from "@/server/acces";
 import { contexteInscription } from "@/server/lectures/etudiants";
 
 export const metadata: Metadata = { title: "Nouvel étudiant" };
 
 export default async function PageNouvelEtudiant() {
-  const [contexte, estAdmin] = await Promise.all([contexteInscription(), estAdministrateur()]);
+  const { admin: estAdmin } = await exigerSessionPage();
+  const contexte = await contexteInscription();
 
   return (
     <>

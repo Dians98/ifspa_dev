@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { CircleCheck, CircleAlert, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,10 +12,14 @@ import { Turnstile } from "./turnstile";
 
 const INITIAL: EtatContact = { statut: "initial" };
 
-function Erreur({ id, texte }: { id: string; texte?: string }) {
+function Erreur({ id, texte, alerte }: { id: string; texte?: string; alerte?: boolean }) {
   if (!texte) return null;
   return (
-    <p id={id} className="text-sm text-destructive">
+    <p
+      id={id}
+      className="text-sm text-destructive"
+      {...(alerte ? { role: "alert", tabIndex: -1, "data-focus-erreur": true } : {})}
+    >
       {texte}
     </p>
   );
@@ -25,6 +29,17 @@ export function FormulaireContact({ turnstileSiteKey }: { turnstileSiteKey?: str
   const [etat, action, envoiEnCours] = useActionState(envoyerMessageContact, INITIAL);
   const e = etat.erreurs ?? {};
   const v = etat.valeurs ?? {};
+  const formulaire = useRef<HTMLFormElement>(null);
+  const [captchaIndisponible, setCaptchaIndisponible] = useState(false);
+
+  // Après un refus, le focus va au premier champ en erreur, sinon au résumé.
+  useEffect(() => {
+    if (etat.statut !== "erreur") return;
+    const cible =
+      formulaire.current?.querySelector<HTMLElement>('[aria-invalid="true"]') ??
+      formulaire.current?.querySelector<HTMLElement>("[data-focus-erreur]");
+    cible?.focus();
+  }, [etat]);
 
   if (etat.statut === "succes") {
     return (
@@ -39,12 +54,12 @@ export function FormulaireContact({ turnstileSiteKey }: { turnstileSiteKey?: str
   }
 
   return (
-    <form action={action} noValidate className="rounded-2xl bg-white p-6 text-foreground shadow-xl sm:p-8">
+    <form ref={formulaire} action={action} noValidate className="rounded-2xl bg-white p-6 text-foreground shadow-xl sm:p-8">
       <h3 className="font-heading text-2xl font-semibold text-primary">Écrire au secrétariat</h3>
       <p className="mt-1 text-sm text-muted-foreground">Les champs marqués * sont obligatoires.</p>
 
       {etat.statut === "erreur" && etat.message && (
-        <p role="alert" className="mt-5 flex items-start gap-2 rounded-lg border border-destructive/30 bg-retard-pale px-3 py-2.5 text-sm text-destructive">
+        <p role="alert" tabIndex={-1} data-focus-erreur className="mt-5 flex items-start gap-2 rounded-lg border border-destructive/30 bg-retard-pale px-3 py-2.5 text-sm text-destructive">
           <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
           {etat.message}
         </p>
@@ -71,8 +86,11 @@ export function FormulaireContact({ turnstileSiteKey }: { turnstileSiteKey?: str
           <select
             id="c-objet"
             name="objet"
+            // key : React ne relit pas defaultValue d'un select déjà monté, l'objet choisi serait perdu après un refus.
+            key={v.objet ?? "defaut"}
             defaultValue={v.objet ?? OBJETS_CONTACT[0]}
             aria-invalid={!!e.objet}
+            aria-describedby={e.objet ? "c-objet-err" : undefined}
             className="h-11 rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
             {OBJETS_CONTACT.map((o) => (
@@ -90,8 +108,12 @@ export function FormulaireContact({ turnstileSiteKey }: { turnstileSiteKey?: str
         {/* Anti-robot Cloudflare Turnstile : invisible ou simple case à cocher */}
         {turnstileSiteKey && (
           <div className="grid gap-1.5 sm:col-span-2">
-            <Turnstile siteKey={turnstileSiteKey} reinitialiser={etat} />
-            <Erreur id="c-captcha-err" texte={e.captcha} />
+            <Turnstile
+              siteKey={turnstileSiteKey}
+              reinitialiser={etat}
+              onIndisponible={() => setCaptchaIndisponible(true)}
+            />
+            <Erreur id="c-captcha-err" texte={captchaIndisponible ? undefined : e.captcha} alerte />
           </div>
         )}
 

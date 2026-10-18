@@ -211,7 +211,12 @@ export const schemaNouvelUtilisateur = z.object({
     .trim()
     .min(2, "Indiquez le nom complet.")
     .max(80, "Nom trop long (80 caractères maximum)."),
-  email: z.string({ error: "Indiquez le courriel." }).trim().toLowerCase().pipe(z.email("Adresse e-mail invalide.")),
+  email: z
+    .string({ error: "Indiquez le courriel." })
+    .trim()
+    .toLowerCase()
+    .min(1, "Indiquez le courriel.")
+    .pipe(z.email("Adresse e-mail invalide.")),
   role: z.enum(ROLES, "Choisissez un rôle."),
 }, DONNEES_INVALIDES);
 

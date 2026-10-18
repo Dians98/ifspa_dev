@@ -13,9 +13,20 @@ export class ErreurPermission extends Error {
   }
 }
 
-/** Session vérifiée en base (une seule lecture par requête). */
+/** Compte désactivé : `banned` sans échéance, ou échéance pas encore atteinte. */
+export function estBanni(user: { banned?: boolean | null; banExpires?: Date | null }, maintenant: Date): boolean {
+  if (!user.banned) return false;
+  return !user.banExpires || user.banExpires.getTime() > maintenant.getTime();
+}
+
+/**
+ * Session relue en base à chaque requête (pas de `cookieCache` dans `auth.ts`), mémorisée pour la requête.
+ * Better Auth ne contrôle le bannissement qu'à la connexion : une session survivante d'un compte désactivé est refusée ici.
+ */
 export const getSession = cache(async (): Promise<Session | null> => {
-  return auth.api.getSession({ headers: await headers() });
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session || estBanni(session.user, new Date())) return null;
+  return session;
 });
 
 export function roleDe(session: Session): Role {

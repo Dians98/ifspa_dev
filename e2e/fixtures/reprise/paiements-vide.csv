@@ -1,0 +1,2 @@
+﻿N° étudiant *;Date *;Montant (Ar) *;Mode *;Opérateur;Référence;N° reçu papier
+Le N° de l'étudiant dans la feuille Étudiants.;JJ/MM/AAAA.;Nombre entier, sans espaces ni « Ar ».;Espèces ou Mobile Money.;Mobile Money seulement : MVola, Orange Money ou Airtel Money.;Mobile Money seulement : référence de la transaction.;En texte : numéro du reçu remis à l'époque, gardé pour mémoire.

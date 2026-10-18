@@ -64,7 +64,11 @@ export function EnteteFiche({ e, nouveau, admin }: { e: DossierEtudiant; nouveau
               Imprimer le relevé
             </BoutonImprimerPdf>
             <Button asChild variant="outline" className="max-md:h-11">
-              <a href={`${urlReleve}?telecharger=1`} aria-label="Télécharger le relevé d'écolage en PDF">
+              <a
+                href={`${urlReleve}?telecharger=1`}
+                download={`releve-${e.matricule}.pdf`}
+                aria-label="Télécharger le relevé d'écolage en PDF"
+              >
                 <Download aria-hidden />
                 Télécharger
               </a>
@@ -78,7 +82,7 @@ export function EnteteFiche({ e, nouveau, admin }: { e: DossierEtudiant; nouveau
           </Button>
           {admin && actif && (
             <div className="mt-1 border-t pt-3">
-              <DialogueSortie etudiantId={e.id} jour={e.jour} resteEnRetard={e.situation.resteEnRetard} />
+              <DialogueSortie etudiantId={e.id} jour={e.jour} echeances={e.echeancesSortie} />
             </div>
           )}
         </div>

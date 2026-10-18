@@ -118,6 +118,7 @@ function LigneUtilisateur({ utilisateur: u }: { utilisateur: UtilisateurParametr
         <div className="flex flex-wrap items-center gap-2 md:justify-end">
           {u.refus.changerRole === null && (
             <ConfirmationAction
+              rafraichirSiRefus
               titre={`Passer ${u.nom} en ${u.role === "admin" ? "secrétariat" : "administrateur"} ?`}
               description={
                 autreRole === "admin"
@@ -147,6 +148,7 @@ function LigneUtilisateur({ utilisateur: u }: { utilisateur: UtilisateurParametr
           {u.actif && u.refus.desactiver === null && (
             <ConfirmationAction
               destructif
+              rafraichirSiRefus
               titre={`Désactiver le compte de ${u.nom} ?`}
               description="Elle ou il ne pourra plus se connecter. Ses paiements restent attribués à son nom, et vous pourrez réactiver le compte à tout moment."
               libelleAction="Désactiver le compte"

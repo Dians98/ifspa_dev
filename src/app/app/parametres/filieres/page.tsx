@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { estAdministrateur } from "@/components/app/parametres/acces";
+import { AccesReserve } from "@/components/app/parametres/acces-reserve";
 import { ListeFilieres } from "@/components/app/parametres/liste-filieres";
+import { exigerSessionPage } from "@/server/acces";
 import { lireFilieres } from "@/server/lectures/parametres";
 
 export const metadata: Metadata = { title: "Filières · Paramètres" };
 
 export default async function PageFilieres() {
-  if (!(await estAdministrateur())) return null;
+  if (!(await exigerSessionPage()).admin) return <AccesReserve />;
   return <ListeFilieres filieres={await lireFilieres()} />;
 }

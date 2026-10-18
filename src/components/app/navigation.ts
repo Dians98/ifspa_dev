@@ -11,14 +11,14 @@ import {
 import type { Role } from "@/lib/roles";
 
 export type EntreeMenu = {
-  /** Identifiant stable (clés React, futurs états hors ligne). */
+  /** Identifiant stable (clés React). */
   id: string;
   libelle: string;
   href: string;
   icone: LucideIcon;
   /** Entrée masquée pour le rôle `user` (la vérification serveur reste obligatoire). */
   adminSeulement?: boolean;
-  /** Écran utilisable sans connexion. Les autres seront grisés hors ligne (à venir). */
+  /** Écran utilisable sans connexion ; les autres sont grisés hors ligne. */
   disponibleHorsLigne?: boolean;
 };
 

@@ -381,7 +381,7 @@ function ChampTarif({
         className={cn("tabular-nums md:text-right max-md:h-11", etroit ? "md:ml-auto md:w-20" : "md:ml-auto md:w-36")}
       />
       {erreur && (
-        <span id={`${id}-erreur`} className="mt-1 block text-xs text-destructive md:max-w-36 md:ml-auto">
+        <span id={`${id}-erreur`} className="mt-1 block text-xs whitespace-normal text-destructive md:ml-auto md:max-w-36 md:text-right">
           {erreur}
         </span>
       )}

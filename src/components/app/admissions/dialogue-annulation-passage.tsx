@@ -50,12 +50,12 @@ function effets(p: PassageAAnnuler): string[] {
   const creees = admis + redoublants;
   if (creees > 0) {
     liste.push(
-      `${creees} ${pluriel(creees, "inscription créée", "inscriptions créées")} en ${p.anneeCible}, avec leurs mensualités, ${pluriel(creees, "est supprimée", "sont supprimées")}.`,
+      `${creees} ${pluriel(creees, "inscription créée", "inscriptions créées")} en ${p.anneeCible}, ${pluriel(creees, "avec ses mensualités, est supprimée", "avec leurs mensualités, sont supprimées")}.`,
     );
   }
-  if (admis > 0) liste.push(`${admis} ${pluriel(admis, "admis reprend", "admis reprennent")} son inscription en cours en ${niveau}.`);
+  if (admis > 0) liste.push(`${admis} ${pluriel(admis, "admis reprend son", "admis reprennent leur")} inscription en cours en ${niveau}.`);
   if (redoublants > 0) {
-    liste.push(`${redoublants} ${pluriel(redoublants, "redoublant reprend", "redoublants reprennent")} son inscription en cours en ${niveau}.`);
+    liste.push(`${redoublants} ${pluriel(redoublants, "redoublant reprend son", "redoublants reprennent leur")} inscription en cours en ${niveau}.`);
   }
   if (diplomes > 0) liste.push(`${diplomes} ${pluriel(diplomes, "diplômé(e) reprend", "diplômé(e)s reprennent")} le statut « Actif ».`);
   if (abandons > 0) liste.push(`${abandons} ${pluriel(abandons, "abandon reprend", "abandons reprennent")} le statut « Actif ».`);

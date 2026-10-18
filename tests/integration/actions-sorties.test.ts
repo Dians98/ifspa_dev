@@ -78,7 +78,7 @@ describe("enregistrerSortie : rôle et validation", () => {
 
     const r = await sortir(etudiant.id, { type: "EXCLU", motif: "Nouveau motif" });
 
-    expect(r).toMatchObject({ statut: "erreur", message: expect.stringMatching(/n'est plus actif/) });
+    expect(r).toMatchObject({ statut: "erreur", message: expect.stringMatching(/n'est plus acti(f|ve)/) });
     expect(await db.etudiant.findUniqueOrThrow({ where: { id: etudiant.id } })).toMatchObject({ statut, motifSortie: "motif d'origine" });
     expect(await nonDues(etudiant.id)).toEqual([]);
   });

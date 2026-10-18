@@ -1,0 +1,5 @@
+﻿N° *;Nom *;Prénoms *;Sexe *;Date de naissance *;Lieu de naissance *;CIN;Téléphone;Adresse;Filière *;Année d'entrée *;Niveau 2026-2027 *;Redoublant;Droits en
+Numéro de ligne, unique. Sert à rattacher les paiements.;En majuscules ou non, il sera mis en majuscules.;;F ou M.;JJ/MM/AAAA.;;12 chiffres, en texte.;En texte, ex. 034 12 345 67.;;Code de la filière : IF, KI ou SF.;Année de la 1re rentrée à l'IFSPA, ex. 2024 pour 2024-2025. Elle figure dans le matricule.;1, 2 ou 3 : la classe suivie en 2026-2027.;oui ou non (non par défaut).;Droits d'inscription payés en 1, 2 ou 3 fois (1 par défaut).
+1;RAKOTOMALALA;Hanitra Mialy;F;14/03/2007;Toamasina;;034 12 345 67;Lot II A 12 Tanambao V;IF;2026;1;non;3
+2;RASOANAIVO;Fanja;F;02/11/2005;Fénérive-Est;501 011 012 345;032 98 765 43;Ankirihiry;KI;2025;2;non;1
+3;ANDRIAMAHEFA;Tojo Niaina;M;27/06/2004;Brickaville;;033 45 678 90;Morarano;IF;2024;2;oui;1

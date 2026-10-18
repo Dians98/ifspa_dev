@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { OngletFiche } from "./onglets";
 
 const DECLENCHEUR =
-  "h-11 flex-none rounded-t-md rounded-b-none px-4 text-sm font-medium text-muted-foreground data-active:font-semibold data-active:text-primary group-data-horizontal/tabs:after:bottom-0 group-data-horizontal/tabs:after:h-[3px] after:bg-rose max-md:min-w-24";
+  "h-11 flex-1 rounded-t-md rounded-b-none px-2 text-sm md:flex-none md:px-4 font-medium text-muted-foreground data-active:font-semibold data-active:text-primary group-data-horizontal/tabs:after:bottom-0 group-data-horizontal/tabs:after:h-[3px] after:bg-rose";
 
 /** Quatre onglets de la fiche ; l'onglet actif est souligné en rose. */
 export function OngletsFiche({

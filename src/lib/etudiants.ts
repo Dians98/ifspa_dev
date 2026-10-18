@@ -24,6 +24,31 @@ export const LIBELLE_STATUT_INSCRIPTION: Record<StatutInscription, string> = {
   EXCLU: "Exclu",
 };
 
+const STATUT_ETUDIANT_FEMININ: Record<StatutEtudiant, string> = {
+  ACTIF: "Active",
+  DIPLOME: "Diplômée",
+  ABANDON: "Abandon",
+  EXCLU: "Exclue",
+};
+
+const STATUT_INSCRIPTION_FEMININ: Record<StatutInscription, string> = {
+  EN_COURS: "En cours",
+  ADMIS: "Admise",
+  REDOUBLE: "Redouble",
+  DIPLOME: "Diplômée",
+  ABANDON: "Abandon",
+  EXCLU: "Exclue",
+};
+
+/** Statut de l'étudiant accordé selon son sexe ; masculin si le sexe est inconnu (ancienne copie du guichet). */
+export function libelleStatutEtudiant(statut: StatutEtudiant, sexe?: Sexe | null): string {
+  return sexe === "F" ? STATUT_ETUDIANT_FEMININ[statut] : LIBELLE_STATUT_ETUDIANT[statut];
+}
+
+export function libelleStatutInscription(statut: StatutInscription, sexe?: Sexe | null): string {
+  return sexe === "F" ? STATUT_INSCRIPTION_FEMININ[statut] : LIBELLE_STATUT_INSCRIPTION[statut];
+}
+
 export const LIBELLE_SEXE: Record<Sexe, string> = { M: "Masculin", F: "Féminin" };
 
 /** « 2e année », ou « 2e année (redoublant) ». */

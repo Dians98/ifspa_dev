@@ -3,7 +3,7 @@ import { getSessionCookie } from "better-auth/cookies";
 import { CHEMIN_CONNEXION } from "@/lib/roles";
 
 // Premier filtre, sur la seule présence du cookie de session (rapide, sans base).
-// La session est revérifiée en base par `requireSession` dans le layout de /app et dans chaque action.
+// La session est revérifiée en base dans chaque page (`exigerSessionPage`) et chaque action.
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const cookie = getSessionCookie(request);

@@ -1,9 +1,9 @@
 import "server-only";
 import { Document, Page, renderToBuffer, StyleSheet, Text, View } from "@react-pdf/renderer";
-import type { Sexe, StatutEtudiant } from "@/generated/prisma/enums";
+import type { Sexe } from "@/generated/prisma/enums";
 import { formaterJour } from "@/lib/dates";
 import type { StatutEcheance } from "@/lib/ecolage";
-import { LIBELLE_STATUT_ETUDIANT } from "@/lib/etudiants";
+import { libelleStatutEtudiant } from "@/lib/etudiants";
 import { libelleNiveau } from "@/lib/parametres";
 import { EnTete } from "@/pdf/EnTete";
 import { PiedDePage } from "@/pdf/PiedDePage";
@@ -13,15 +13,8 @@ import { arPdf, pourPdf } from "@/pdf/texte";
 import type { InscriptionFiche, PaiementFiche } from "@/server/lectures/etudiants";
 import type { Releve } from "@/server/lectures/paiements";
 
-const STATUT_FEMININ: Record<StatutEtudiant, string> = {
-  ACTIF: "Active",
-  DIPLOME: "Diplômée",
-  ABANDON: "Abandon",
-  EXCLU: "Exclue",
-};
-
-function statutEtudiant(statut: StatutEtudiant, sexe: Sexe): string {
-  return sexe === "F" ? STATUT_FEMININ[statut] : LIBELLE_STATUT_ETUDIANT[statut];
+function cetEtudiant(sexe: Sexe): string {
+  return sexe === "F" ? "cette étudiante" : "cet étudiant";
 }
 
 function redoublant(sexe: Sexe): string {
@@ -121,7 +114,7 @@ function Identite({ releve }: { releve: Releve }) {
   const champs: { etiquette: string; valeur: string }[] = [
     { etiquette: "Matricule", valeur: d.matricule },
     { etiquette: "Filière", valeur: d.filiere.nom },
-    { etiquette: "Statut", valeur: `${statutEtudiant(d.statut, d.sexe)}${sortie}` },
+    { etiquette: "Statut", valeur: `${libelleStatutEtudiant(d.statut, d.sexe)}${sortie}` },
   ];
   if (derniere) {
     champs.push({
@@ -235,7 +228,7 @@ function modePaiement(p: PaiementFiche): string {
   return p.operateurLibelle ?? p.modeLibelle;
 }
 
-function Paiements({ paiements }: { paiements: PaiementFiche[] }) {
+function Paiements({ paiements, sexe }: { paiements: PaiementFiche[]; sexe: Sexe }) {
   // La lecture les donne du plus récent au plus ancien ; un relevé se lit dans l'ordre chronologique.
   const chronologiques = [...paiements].reverse();
   const valides = paiements.filter((p) => !p.annule);
@@ -250,7 +243,7 @@ function Paiements({ paiements }: { paiements: PaiementFiche[] }) {
         <Text style={s.aDroite}>{paiements.length ? resume : ""}</Text>
       </View>
       {paiements.length === 0 ? (
-        <Text style={s.note}>Aucun paiement enregistré pour cet étudiant.</Text>
+        <Text style={s.note}>{`Aucun paiement enregistré pour ${cetEtudiant(sexe)}.`}</Text>
       ) : (
         <View>
           <View style={s.entete} wrap={false}>
@@ -301,12 +294,12 @@ export function DocumentReleve({ releve, editePar }: { releve: Releve; editePar?
         <EnTete etablissement={releve.etablissement} titre="RELEVÉ D'ÉCOLAGE" sousTitre={`Édité le ${releve.editeLe}`} />
         <Identite releve={releve} />
         {d.parcours.length === 0 ? (
-          <Text style={s.note}>Aucune inscription enregistrée pour cet étudiant.</Text>
+          <Text style={s.note}>{`Aucune inscription enregistrée pour ${cetEtudiant(d.sexe)}.`}</Text>
         ) : (
           d.parcours.map((i) => <AnneeScolaire key={i.id} inscription={i} sexe={d.sexe} jour={d.jour} />)
         )}
         <Recapitulatif releve={releve} />
-        <Paiements paiements={d.paiements} />
+        <Paiements paiements={d.paiements} sexe={d.sexe} />
         <PiedDePage editeLe={releve.editeLe} editePar={editePar} />
       </Page>
     </Document>
@@ -315,6 +308,6 @@ export function DocumentReleve({ releve, editePar }: { releve: Releve; editePar?
 
 /** PDF du relevé ; `editePar` : nom de l'utilisateur qui l'imprime, affiché en pied de page. */
 export async function rendreReleve(releve: Releve, editePar?: string | null): Promise<Buffer> {
-  enregistrerPolices();
+  await enregistrerPolices();
   return renderToBuffer(<DocumentReleve releve={releve} editePar={editePar} />);
 }

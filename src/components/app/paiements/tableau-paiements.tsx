@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Printer } from "lucide-react";
+import { Printer, TriangleAlert } from "lucide-react";
 import {
   CelluleAdaptative,
   ColonneAdaptative,
@@ -15,12 +15,14 @@ import { formaterAriary } from "@/lib/montant";
 import { cn } from "@/lib/utils";
 import type { LignePaiement } from "@/server/lectures/paiements";
 import { DialogueAnnulationPaiement } from "./dialogue-annulation";
+import { DialogueVerificationPaiement } from "./dialogue-verification";
+import { InfoVerification } from "./info-verification";
 
 function libelleMode(p: LignePaiement): string {
   return p.mode === "MOBILE_MONEY" ? `Mobile Money${p.operateurLibelle ? ` · ${p.operateurLibelle}` : ""}` : p.modeLibelle;
 }
 
-/** Historique : une ligne par reçu, annulés compris (barrés et marqués). Annuler n'apparaît que pour l'administrateur. */
+/** Historique : une ligne par reçu, annulés compris (barrés et marqués). Annuler et vérifier n'apparaissent que pour l'administrateur. */
 export function TableauPaiements({ lignes, peutAnnuler }: { lignes: LignePaiement[]; peutAnnuler: boolean }) {
   return (
     <TableauAdaptatif>
@@ -70,16 +72,27 @@ export function TableauPaiements({ lignes, peutAnnuler }: { lignes: LignePaiemen
               {p.annulation ? (
                 <>
                   <Badge className="bg-retard-pale text-retard">Annulé</Badge>
-                  <span className="mt-1 block max-w-48 text-xs text-muted-foreground">
+                  <span className="mt-1 block max-w-48 text-xs text-muted-foreground wrap-anywhere">
                     {p.annulation.motif} — par {p.annulation.par} le {p.annulation.date}
                   </span>
                 </>
               ) : (
                 <span className="flex flex-wrap gap-1">
                   <Badge className="bg-paye-pale text-paye">Valide</Badge>
-                  {p.aVerifier && <Badge className="bg-attention-pale text-attention">À vérifier</Badge>}
+                  {p.aVerifier && (
+                    <Badge className="bg-attention-pale text-attention">
+                      <TriangleAlert aria-hidden />À vérifier
+                    </Badge>
+                  )}
                 </span>
               )}
+              <InfoVerification
+                aVerifier={p.aVerifier}
+                annule={p.annule}
+                noteVerification={p.noteVerification}
+                verification={p.verification}
+              />
+              {p.observation && <p className="mt-1 max-w-64 text-xs text-muted-foreground">{p.observation}</p>}
             </CelluleAdaptative>
             <CelluleAdaptative pleine>
               <div className="flex flex-wrap justify-end gap-2 max-md:justify-start">
@@ -89,6 +102,26 @@ export function TableauPaiements({ lignes, peutAnnuler }: { lignes: LignePaiemen
                     Réimprimer<span className="sr-only"> le reçu {p.numeroRecu}</span>
                   </Link>
                 </Button>
+                {peutAnnuler && p.aVerifier && !p.annule && (
+                  <DialogueVerificationPaiement
+                    paiement={{
+                      id: p.id,
+                      numeroRecu: p.numeroRecu,
+                      date: p.date,
+                      heure: p.heure,
+                      montant: p.montant,
+                      modeLibelle: libelleMode(p),
+                      etudiant: `${p.etudiant.nom} ${p.etudiant.prenoms}`,
+                      matricule: p.etudiant.matricule,
+                      note: p.noteVerification,
+                    }}
+                    declencheur={
+                      <Button variant="outline" size="sm" className="max-md:h-11 max-md:px-4 max-md:text-sm">
+                        Marquer comme vérifié<span className="sr-only"> le reçu {p.numeroRecu}</span>
+                      </Button>
+                    }
+                  />
+                )}
                 {peutAnnuler && !p.annule && (
                   <DialogueAnnulationPaiement
                     paiement={{

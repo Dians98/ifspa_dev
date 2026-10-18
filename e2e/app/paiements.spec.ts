@@ -17,7 +17,7 @@ async function encaisserTout(page: Page, etudiant: EtudiantTest): Promise<string
 
 async function retrouverDansPaiements(page: Page, numero: string) {
   await page.goto("/app/paiements");
-  await page.getByRole("searchbox", { name: "Rechercher un reçu ou un étudiant" }).fill(numero);
+  await page.getByRole("searchbox", { name: "Rechercher un reçu, un étudiant, une note ou un n° de reçu papier" }).fill(numero);
   // La recherche met l'adresse à jour après une courte pause : un clic avant écraserait la navigation.
   await expect(page).toHaveURL(/q=/);
   await expect(page.getByRole("link", { name: numero }).first()).toBeVisible();

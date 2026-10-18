@@ -210,7 +210,7 @@ describe("lireEtudiants : filtres, tri et pagination", () => {
       libelleNiveau: "1re année",
       anneeScolaire: "2026-2027",
       statut: "ACTIF",
-      libelleStatut: "Actif",
+      libelleStatut: "Active",
       resteDu: 900_000,
       resteEnRetard: 180_000,
       moisEnRetard: 1,

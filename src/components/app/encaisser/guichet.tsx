@@ -12,14 +12,18 @@ import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEtatHorsLigne } from "@/hooks/use-etat-hors-ligne";
 import type { ModePaiement, OperateurMobile } from "@/generated/prisma/enums";
 import { montantPourCases, repartirPaiement, type Repartition } from "@/lib/ecolage";
 import { LIBELLE_OPERATEUR, type DonneesRecu } from "@/lib/encaissement";
 import { formaterAriary, formaterNombre, lireMontant } from "@/lib/montant";
 import { cn } from "@/lib/utils";
+import { encaisserHorsLigne, situationLocale } from "@/lib/hors-ligne/guichet-local";
+import { nouvelIdentifiant } from "@/lib/hors-ligne/identifiant";
 import { chargerSituationGuichet, encaisser } from "@/server/actions/paiements";
-import type { EcheanceGuichet, ResultatGuichet, SituationGuichet } from "@/server/lectures/paiements";
+import type { EcheanceGuichet, ResultatGuichet, SituationGuichet } from "@/lib/encaissement-hors-ligne";
 import { BadgesSituation } from "./badge-situation";
+import { BandeauConnexion } from "./bandeau-connexion";
 import { ListeEcheances, type ImputationCase } from "./liste-echeances";
 import { RechercheEtudiant } from "./recherche-etudiant";
 
@@ -29,25 +33,24 @@ const MESSAGE_RESEAU_ENCAISSEMENT =
 
 const OPERATEURS = Object.keys(LIBELLE_OPERATEUR) as OperateurMobile[];
 
-/** `crypto.randomUUID` n'existe qu'en contexte sécurisé : repli pour un poste ouvert en HTTP. */
-function nouvelIdClient(): string {
-  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
-  const o = crypto.getRandomValues(new Uint8Array(16));
-  o[6] = (o[6] & 0x0f) | 0x40;
-  o[8] = (o[8] & 0x3f) | 0x80;
-  const h = Array.from(o, (b) => b.toString(16).padStart(2, "0")).join("");
-  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
-}
-
 type Bandeau = { paiementId: string | null; titre: string; detail: string };
 
+const MESSAGE_RESEAU_COUPE =
+  "La connexion est coupée : ce paiement n'est peut-être pas arrivé au serveur. L'écran passe en mode hors ligne : appuyez de nouveau sur « Encaisser » sans changer la saisie, il ne sera compté qu'une fois.";
+
+export type Utilisateur = { id: string; nom: string };
+
 type Props = {
+  utilisateur: Utilisateur;
   derniersServis: ResultatGuichet[];
   situationInitiale: SituationGuichet | null;
   etudiantIntrouvable: boolean;
 };
 
-export function Guichet({ derniersServis, situationInitiale, etudiantIntrouvable }: Props) {
+export function Guichet({ utilisateur, derniersServis, situationInitiale, etudiantIntrouvable }: Props) {
+  // Un seul appel : chaque appel lancerait sa propre synchronisation.
+  const hl = useEtatHorsLigne(utilisateur.id);
+  const horsLigne = hl.etat === "hors-ligne";
   const [situation, setSituation] = useState<SituationGuichet | null>(situationInitiale);
   const [versionForm, setVersionForm] = useState(0);
   const [chargement, setChargement] = useState<string | null>(null);
@@ -62,9 +65,13 @@ export function Guichet({ derniersServis, situationInitiale, etudiantIntrouvable
     setChargement(id);
     setErreur(null);
     try {
-      const s = await chargerSituationGuichet(id);
+      const s = horsLigne ? await situationLocale(id) : await chargerSituationGuichet(id);
       if (!s) {
-        setErreur("Cet étudiant n'existe plus. Recherchez-le de nouveau.");
+        setErreur(
+          horsLigne
+            ? "Cet étudiant n'est pas dans la liste de ce poste. Recherchez-le de nouveau."
+            : "Cet étudiant n'existe plus. Recherchez-le de nouveau.",
+        );
         setSituation(null);
         return;
       }
@@ -73,7 +80,7 @@ export function Guichet({ derniersServis, situationInitiale, etudiantIntrouvable
       setAvertissement(message);
       if (!message) setBandeau(null);
     } catch {
-      setErreur(MESSAGE_CHARGEMENT);
+      setErreur(horsLigne ? "La liste de ce poste n'a pas pu être lue. Rechargez la page." : MESSAGE_CHARGEMENT);
     } finally {
       setChargement(null);
     }
@@ -92,10 +99,13 @@ export function Guichet({ derniersServis, situationInitiale, etudiantIntrouvable
       });
     });
     void imprimerTicket();
+    // Encaissé en ligne : la copie du poste doit le connaître avant une éventuelle coupure.
+    if (donnees.paiementId) void hl.synchroniserMaintenant();
   }
 
   return (
     <div className="grid gap-4">
+      <BandeauConnexion hl={hl} />
       <div role="status">
         {bandeau && (
           <div className="rounded-xl border border-paye/30 bg-paye-pale p-4">
@@ -135,7 +145,7 @@ export function Guichet({ derniersServis, situationInitiale, etudiantIntrouvable
             <ResumeEtudiant situation={situation} onChanger={() => setSituation(null)} />
           ) : (
             <div className="mt-4">
-              <RechercheEtudiant derniers={derniersServis} onChoisir={(e) => void ouvrir(e.id)} desactive={chargement !== null} />
+              <RechercheEtudiant derniers={derniersServis} horsLigne={horsLigne} onChoisir={(e) => void ouvrir(e.id)} desactive={chargement !== null} />
               {chargement && (
                 <div role="status" className="mt-4 grid gap-2">
                   <span className="sr-only">Chargement de la situation de l&apos;étudiant…</span>
@@ -178,6 +188,8 @@ export function Guichet({ derniersServis, situationInitiale, etudiantIntrouvable
           <FormulaireEncaissement
             key={`${situation.etudiant.id}-${versionForm}`}
             situation={situation}
+            horsLigne={horsLigne}
+            utilisateur={utilisateur}
             onSucces={apresSucces}
             onSituationChangee={(message) => void ouvrir(situation.etudiant.id, message)}
           />
@@ -263,16 +275,25 @@ function nomPourPhrase(e: EcheanceGuichet, plusieursAnnees: boolean): string {
 
 function FormulaireEncaissement({
   situation,
+  horsLigne,
+  utilisateur,
   onSucces,
   onSituationChangee,
 }: {
   situation: SituationGuichet;
+  horsLigne: boolean;
+  utilisateur: Utilisateur;
   onSucces: (donnees: DonneesRecu, message: string) => void;
   onSituationChangee: (message: string) => void;
 }) {
   const { echeances, annees } = situation;
-  // Identifiant du paiement : même valeur à chaque nouvel essai, pour qu'un renvoi ne l'enregistre pas deux fois.
-  const [idClient] = useState(nouvelIdClient);
+  // Identifiant du paiement : gardé tant que la saisie est la même, pour qu'un renvoi ne l'enregistre pas deux fois ;
+  // une saisie modifiée est un autre paiement, avec un nouvel identifiant.
+  const essai = useRef<{ saisie: string; idClient: string } | null>(null);
+  function idClientPour(saisie: string): string {
+    if (essai.current?.saisie !== saisie) essai.current = { saisie, idClient: nouvelIdentifiant() };
+    return essai.current.idClient;
+  }
   const [montantTexte, setMontantTexte] = useState(() => {
     const k = situation.preselection.length;
     return k > 0 ? formaterNombre(montantPourCases(echeances, k)) : "";
@@ -351,7 +372,30 @@ function FormulaireEncaissement({
     setEnCours(true);
     setErreurs({});
     setMessageErreur(null);
+    const op = mobileMoney ? operateur : null;
+    const ref = mobileMoney ? reference.trim() : null;
+    const idClient = idClientPour(JSON.stringify([montantValide, mode, op, ref]));
     try {
+      if (horsLigne) {
+        const r = await encaisserHorsLigne({
+          etudiantId: situation.etudiant.id,
+          montant: montantValide,
+          mode,
+          operateur: mobileMoney ? operateur : null,
+          reference: mobileMoney ? reference.trim() : null,
+          observation: note?.trim() ? note.trim() : null,
+          // Même identifiant que l'essai en ligne : s'il avait abouti avant la coupure, le serveur ne le compte qu'une fois.
+          idClient,
+          utilisateur,
+        });
+        if (r.ok) {
+          onSucces(
+            r.recu,
+            `Ticket ${r.numeroRecu} remis. Paiement gardé sur ce poste, il sera envoyé à la prochaine synchronisation.`,
+          );
+        } else setMessageErreur(r.erreur);
+        return;
+      }
       const etat = await encaisser({
         etudiantId: situation.etudiant.id,
         montant: montantValide,
@@ -378,7 +422,7 @@ function FormulaireEncaissement({
         else if (etat.erreurs?.reference) referenceRef.current?.focus();
       });
     } catch {
-      setMessageErreur(MESSAGE_RESEAU_ENCAISSEMENT);
+      setMessageErreur(!navigator.onLine ? MESSAGE_RESEAU_COUPE : MESSAGE_RESEAU_ENCAISSEMENT);
     } finally {
       setEnCours(false);
     }
@@ -548,6 +592,11 @@ function FormulaireEncaissement({
           </p>
         )}
         {recap && <p className="mb-2 text-sm font-semibold">{recap}</p>}
+        {horsLigne && (
+          <p className="mb-2 text-sm text-attention">
+            Hors ligne : le ticket porte son numéro définitif, le paiement part au serveur au retour d&apos;Internet.
+          </p>
+        )}
         <Button
           type="submit"
           disabled={!!raison || enCours}

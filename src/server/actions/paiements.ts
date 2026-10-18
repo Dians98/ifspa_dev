@@ -2,21 +2,20 @@
 
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { anneeCivile, jourMadagascar } from "@/lib/dates";
-import { repartirPaiement, resteDuTotal, restesApres } from "@/lib/ecolage";
+import { dateHeureMadagascar } from "@/lib/dates";
 import {
-  MESSAGE_SITUATION_CHANGEE,
+  schemaVerificationPaiement,
+  type EntreeVerificationPaiement,
   schemaAnnulationPaiement,
   schemaEncaissement,
   type DonneesRecu,
+  type Encaissement,
   type EntreeAnnulationPaiement,
   type EntreeEncaissement,
 } from "@/lib/encaissement";
-import { echec, echecCode, echecValidation, succes, type EtatAction, type EtatErreur, type EtatSucces } from "@/lib/etat-action";
-import { cleCompteurRecu, formaterNumeroRecu } from "@/lib/matricule";
+import { echec, echecCode, echecValidation, echecValidationGlobale, succes, type EtatAction, type EtatErreur, type EtatSucces } from "@/lib/etat-action";
 import { exigerAdmin, exigerSession } from "@/server/acces";
-import { prochainNumero } from "@/server/compteur";
-import { echeancesEtudiant, OPTIONS_TRANSACTION, verrouillerEtudiant } from "@/server/ecolage";
+import { OPTIONS_TRANSACTION, verrouillerEtudiant } from "@/server/ecolage";
 import { revaliderPagesEcolage } from "@/server/ecolage-revalidation";
 import { indexEnConflit } from "@/server/erreurs";
 import {
@@ -27,8 +26,8 @@ import {
   type ResultatGuichet,
   type SituationGuichet,
 } from "@/server/lectures/paiements";
+import { controleDeja, enregistrerPaiement, SELECT_PAIEMENT_EXISTANT, type ResultatEnregistrement } from "@/server/paiements";
 
-const ETUDIANT_INTROUVABLE = "Cet étudiant n'existe plus. Rechargez la page.";
 const PAIEMENT_INTROUVABLE = "Ce paiement n'existe plus. Rechargez la page.";
 
 const CHAMPS_SAISIS_GUICHET = ["montant", "mode", "operateur", "reference", "observation"];
@@ -41,12 +40,11 @@ function echecValidationSaisie(error: Parameters<typeof echecValidation>[0], cha
 }
 
 /** Double clic ou renvoi : le paiement de cet `idClient` existe déjà, on rend son reçu sans rien créer. */
-async function recuExistant(idClient: string, etudiantId: string): Promise<EtatSucces<DonneesRecu> | EtatErreur | null> {
-  const p = await db.paiement.findUnique({ where: { idClient }, select: { id: true, etudiantId: true, numeroRecu: true } });
+async function recuExistant(d: Encaissement): Promise<EtatSucces<DonneesRecu> | EtatErreur | null> {
+  const p = await db.paiement.findUnique({ where: { idClient: d.idClient }, select: SELECT_PAIEMENT_EXISTANT });
   if (!p) return null;
-  if (p.etudiantId !== etudiantId) {
-    return echec("Cet identifiant de paiement a déjà servi pour un autre étudiant. Rechargez la page puis réessayez.");
-  }
+  const controle = controleDeja(p, d);
+  if (controle.statut === "refus") return controle.erreur;
   const recu = await lireRecu(p.id);
   if (!recu) return echec(PAIEMENT_INTROUVABLE);
   return succes(`Paiement déjà enregistré : reçu ${p.numeroRecu}.`, recu);
@@ -63,72 +61,31 @@ export async function encaisser(entree: EntreeEncaissement): Promise<EtatAction<
   if (!lu.success) return echecValidationSaisie(lu.error, CHAMPS_SAISIS_GUICHET);
   const d = lu.data;
 
-  const deja = await recuExistant(d.idClient, d.etudiantId);
+  const deja = await recuExistant(d);
   if (deja) return deja;
 
-  const instant = new Date();
-  const jour = jourMadagascar(instant);
-
-  let etat: EtatAction<{ id: string }> | "deja";
+  let r: ResultatEnregistrement;
   try {
-    etat = await db.$transaction(async (tx): Promise<EtatAction<{ id: string }> | "deja"> => {
-      if (!(await verrouillerEtudiant(tx, d.etudiantId))) return echecCode("INTROUVABLE", ETUDIANT_INTROUVABLE);
-      // Relu sous verrou : un second envoi simultané attendait le premier.
-      if (await tx.paiement.findUnique({ where: { idClient: d.idClient }, select: { id: true } })) return "deja";
-
-      const nonSoldees = (await echeancesEtudiant(tx, d.etudiantId))
-        .map((e) => ({ ...e, reste: Math.max(0, e.montantDu - e.paye) }))
-        .filter((e) => e.reste > 0);
-      if (resteDuTotal(nonSoldees) !== d.resteDuAffiche) return echecCode("SITUATION_CHANGEE", MESSAGE_SITUATION_CHANGEE);
-
-      const repartition = repartirPaiement(nonSoldees, d.montant);
-      if (!repartition.ok) return echec(repartition.erreur, { montant: repartition.erreur });
-      const { resteApres, retardApres } = restesApres(nonSoldees, repartition.lignes, jour);
-
-      const annee = anneeCivile(jour);
-      const numero = formaterNumeroRecu(annee, await prochainNumero(tx, cleCompteurRecu(annee)));
-      const paiement = await tx.paiement.create({
-        data: {
-          numeroRecu: numero,
-          etudiantId: d.etudiantId,
-          date: instant,
-          montant: d.montant,
-          mode: d.mode,
-          operateur: d.operateur,
-          reference: d.reference,
-          observation: d.observation,
-          saisiParId: session.user.id,
-          idClient: d.idClient,
-          resteApres,
-          retardApres,
-          lignes: {
-            create: repartition.lignes.map((l) => ({
-              echeanceId: l.echeanceId,
-              montant: l.montant,
-              resteEcheanceApres: l.resteEcheance,
-            })),
-          },
-        },
-        select: { id: true },
-      });
-      return succes(`Paiement enregistré : reçu ${numero}.`, { id: paiement.id });
-    }, OPTIONS_TRANSACTION);
+    r = await db.$transaction(
+      (tx) => enregistrerPaiement(tx, { ...d, saisiParId: session.user.id, instant: new Date() }, "en-ligne"),
+      OPTIONS_TRANSACTION,
+    );
   } catch (e) {
     if (indexEnConflit(e)?.includes("idClient")) {
-      return (await recuExistant(d.idClient, d.etudiantId)) ?? echec(PAIEMENT_INTROUVABLE);
+      return (await recuExistant(d)) ?? echec(PAIEMENT_INTROUVABLE);
     }
     if (e instanceof RangeError) return echec(e.message);
     throw e;
   }
 
-  if (etat === "deja") return (await recuExistant(d.idClient, d.etudiantId)) ?? echec(PAIEMENT_INTROUVABLE);
-  if (etat.statut === "erreur") return etat;
+  if (r.statut === "deja") return (await recuExistant(d)) ?? echec(PAIEMENT_INTROUVABLE);
+  if (r.statut === "refus") return r.erreur;
   revaliderPagesEcolage();
   // Lu après le commit : dans la transaction, Prisma lancerait les relations du reçu en parallèle sur la même connexion.
   // Même lecture qu'à la réimpression, donc ticket identique ; une erreur ici n'est pas un refus, le paiement existe.
-  const recu = await lireRecu(etat.donnees.id);
+  const recu = await lireRecu(r.paiementId);
   if (!recu) throw new Error("Reçu introuvable juste après sa création.");
-  return succes(etat.message, recu);
+  return succes(`Paiement enregistré : reçu ${r.numeroRecu}.`, recu);
 }
 
 /** Admin seulement. Jamais de suppression : le paiement reste dans l'historique, marqué annulé. */
@@ -157,7 +114,44 @@ export async function annulerPaiement(entree: EntreeAnnulationPaiement): Promise
     return succes(`Reçu ${p.numeroRecu} annulé : les échéances qu'il payait sont de nouveau dues.`);
   }, OPTIONS_TRANSACTION);
 
-  if (etat.statut === "succes") revaliderPagesEcolage();
+  // Refus compris : « déjà annulé » veut dire que la page affichée est périmée.
+  revaliderPagesEcolage();
+  return etat;
+}
+
+/**
+ * Admin seulement. Clôt un paiement « à vérifier » (hors ligne) sans rien changer à ses montants ;
+ * la note reste lisible. Un trop-perçu se règle hors application, ou en annulant le reçu.
+ */
+export async function marquerVerifie(entree: EntreeVerificationPaiement): Promise<EtatAction> {
+  const { session, refus } = await exigerAdmin();
+  if (refus) return refus;
+
+  const lu = schemaVerificationPaiement.safeParse(entree);
+  if (!lu.success) return echecValidationGlobale(lu.error);
+  const { paiementId } = lu.data;
+
+  const etat = await db.$transaction(async (tx): Promise<EtatAction> => {
+    const [p] = await tx.$queryRaw<{ numeroRecu: string; annule: boolean; aVerifier: boolean; dateVerification: Date | null }[]>`
+      SELECT "numeroRecu", annule, "aVerifier", "dateVerification" FROM paiement WHERE id = ${paiementId} FOR UPDATE`;
+    if (!p) return echecCode("INTROUVABLE", PAIEMENT_INTROUVABLE);
+    if (p.annule) return echec(`Le reçu ${p.numeroRecu} est annulé : il n'y a plus rien à vérifier.`);
+    if (!p.aVerifier) {
+      return echec(
+        p.dateVerification
+          ? `Le reçu ${p.numeroRecu} a déjà été vérifié le ${dateHeureMadagascar(p.dateVerification).date}.`
+          : `Le reçu ${p.numeroRecu} n'est pas à vérifier.`,
+      );
+    }
+    await tx.paiement.update({
+      where: { id: paiementId },
+      data: { aVerifier: false, verifieParId: session.user.id, dateVerification: new Date() },
+    });
+    return succes(`Reçu ${p.numeroRecu} marqué vérifié.`);
+  }, OPTIONS_TRANSACTION);
+
+  // Refus compris : « déjà annulé », « déjà vérifié » ou introuvable veulent dire que la page affichée est périmée.
+  revaliderPagesEcolage();
   return etat;
 }
 

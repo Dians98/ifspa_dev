@@ -351,6 +351,17 @@ describe("schémas de saisie", () => {
     expect(schemaNouvelUtilisateur.safeParse({ nom: "Rasoa", email: "rasoa@ifspa.mg", role: "superadmin" }).success).toBe(false);
   });
 
+  it("utilisateur : courriel vide ou d'espaces demande de l'indiquer, courriel mal formé est signalé invalide", () => {
+    const messageEmail = (email: unknown) => {
+      const r = schemaNouvelUtilisateur.safeParse({ nom: "Rasoa Hanta", email, role: "user" });
+      return r.error?.issues.filter((i) => i.path[0] === "email").map((i) => i.message);
+    };
+    expect(messageEmail("")).toEqual(["Indiquez le courriel."]);
+    expect(messageEmail("   ")).toEqual(["Indiquez le courriel."]);
+    expect(messageEmail("abc")).toEqual(["Adresse e-mail invalide."]);
+    expect(messageEmail(undefined)).toEqual(["Indiquez le courriel."]);
+  });
+
   describe("aucun message d'erreur en anglais", () => {
     const anglais = /\b(invalid|expected|received|required|too (small|big)|must|string|number|boolean|array|object|input|option|undefined|null)\b/i;
     const cas: [string, z.ZodType, unknown][] = [

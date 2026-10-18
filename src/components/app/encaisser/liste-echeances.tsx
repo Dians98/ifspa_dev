@@ -2,7 +2,7 @@ import { Check, Minus } from "lucide-react";
 import { BadgeStatutEcheance } from "@/components/app/badge-statut-echeance";
 import { formaterAriary } from "@/lib/montant";
 import { cn } from "@/lib/utils";
-import type { SituationGuichet } from "@/server/lectures/paiements";
+import type { SituationGuichet } from "@/lib/encaissement-hors-ligne";
 
 /** Part de cette échéance couverte par le montant saisi : `entiere` la solde, `partielle` n'en paie qu'une partie. */
 export type ImputationCase = { montant: number; resteApres: number };

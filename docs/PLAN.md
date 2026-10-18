@@ -286,7 +286,7 @@ L'administrateur de l'institut ajuste ensuite lui-même dans Paramètres. Les é
 - [x] Reçu au format ticket thermique 80 mm (58 mm en option), sans QR code
 - [x] Droits d'inscription en 1, 2 ou 3 tranches
 - [x] Paiement partiel : montant reçu libre, acompte sur l'échéance suivante, statut « partiel »
-- [ ] Encaissement hors ligne (écran Encaisser seul, rien à installer) : page en cache, copie locale légère (IndexedDB), file d'attente, blocs de numéros de reçu, synchronisation automatique et manuelle
+- [x] Encaissement hors ligne (écran Encaisser seul, rien à installer) : page en cache, copie locale légère (IndexedDB), file d'attente, blocs de numéros de reçu, synchronisation automatique et manuelle
 - [x] Relevé d'écolage PDF A4, impression directe
 - [x] Annulation d'un paiement par l'admin, filigrane ANNULÉ
 - [x] Page Impayés et export Excel
@@ -299,14 +299,25 @@ L'administrateur de l'institut ajuste ensuite lui-même dans Paramètres. Les é
 ### Phase 6 — Dashboard ✅
 - [x] Trois cartes d'indicateurs, tableau par filière et par niveau, 10 derniers paiements (sans graphiques, sans « plus gros impayés »)
 
-### Phase 7 — Reprise des données Excel
-Script `scripts/import-excel.ts`, lancé par le développeur (pas un écran de l'application) avec `pnpm import fichier.xlsx`, et la librairie `exceljs`. En production, il tourne une seule fois, au démarrage, contre la base cPanel.
-   - Il lit le fichier Excel actuel. Les colonnes seront adaptées une fois le fichier vu.
-   - Il crée les étudiants, puis les inscriptions et les échéances, puis les paiements.
-   - Les étudiants déjà en place reçoivent un matricule attribué par ordre d'inscription.
-   - Un mode `--dry-run` produit un rapport (lignes importées, lignes rejetées avec la raison) sans rien écrire en base.
-   - Il peut être relancé sans créer de doublons : on détecte les étudiants déjà importés par nom, prénoms et date de naissance.
-   - Prérequis : déposer le fichier Excel dans `C:\wamp64\www\ifspa\data\`.
+### Phase 7 — Reprise des données (écran d'import, admin)
+- [x] Écran d'import `/app/parametres/import` (modèle téléchargeable, rapport avant écriture, import en une transaction, relance sans doublon), recetté (UC15) le 17/10/2026
+- [ ] Reprise avec le vrai fichier de l'institut, d'abord sur la recette (colonnes à ajuster si besoin)
+- [ ] Mesurer la durée d'un import à la limite (2 000 étudiants, 10 000 paiements) sur cPanel : la transaction est limitée à 120 s
+
+Décision du 17/10/2026 : **un écran dans Paramètres** (`/app/parametres/import`, admin seulement) plutôt qu'un script lancé par le développeur. L'institut importe lui-même, sans accès au serveur.
+- **Format imposé** : modèle `docs/modele-import/modele-import-ifspa.xlsx`, téléchargeable depuis l'écran (définition des colonnes dans `src/lib/import-modele.ts`, régénéré par `pnpm tsx scripts/modele-import.ts`). L'institut recopie son Excel actuel dans ce modèle.
+  - Feuille **Étudiants** : une ligne par étudiant inscrit en 2026-2027 (N°, nom, prénoms, sexe, date et lieu de naissance, CIN, téléphone, adresse, filière, année d'entrée, niveau 2026-2027, redoublant, droits en 1/2/3 fois).
+  - Feuille **Paiements** : une ligne par paiement déjà reçu en 2026-2027 (N° étudiant, date, montant, mode, opérateur, référence, n° de reçu papier).
+- **Fichiers acceptés** : le `.xlsx` du modèle (recommandé), ou deux CSV (`etudiants.csv`, `paiements.csv`, UTF-8, séparateur `;`). Lecture xlsx : librairie à choisir (`write-excel-file` n'écrit que).
+- **Parcours** : 1. Télécharger le modèle ; 2. Déposer le fichier ; 3. **Rapport sans rien écrire** (lignes acceptées, refusées avec la raison et le n° de ligne, doublons déjà en base, totaux) ; 4. « Importer n étudiants et n paiements », une seule confirmation ; 5. Résumé (matricules attribués).
+- **Règles** :
+  - une seule transaction ; un fichier avec une erreur bloquante n'importe rien ;
+  - matricule attribué par année d'entrée puis dans l'ordre des N°, via le `Compteur` ;
+  - inscription sur l'année courante au niveau indiqué, échéances générées d'après les tarifs (import refusé si un tarif manque) ;
+  - paiements répartis comme au guichet (le plus ancien d'abord), refusés au-delà du reste dû ; n° de reçu papier gardé en observation ;
+  - relançable sans doublons : étudiant reconnu par nom, prénoms et date de naissance ;
+  - pas d'annulation d'un import (un paiement ne se supprime pas) : le rapport préalable sert à éviter les erreurs ; un paiement importé à tort s'annule comme les autres.
+- **Points ouverts** : numéro des reçus de reprise (`R-2026-…` ou numérotation propre) ; impayés des années antérieures à reprendre ou non (il faudrait alors leurs inscriptions et leurs tarifs) ; colonnes à ajuster une fois le fichier Excel actuel de l'institut vu.
 
 ### Phase 8 — Déploiement cPanel
 - [ ] Vérifier la version de Node proposée par « Setup Node.js App » : au moins 20.9, idéalement 22
@@ -317,7 +328,8 @@ Script `scripts/import-excel.ts`, lancé par le développeur (pas un écran de l
 - [ ] Envoyer par SSH ou SFTP le dossier `.next/standalone`, `.next/static` et `public/`
 - [ ] Configurer « Setup Node.js App » : fichier de démarrage `server.js`, et variables d'environnement `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (vrai domaine), `TURNSTILE_SECRET_KEY`, `SMTP2GO_API_KEY`, `EMAIL_EXPEDITEUR` et `CONTACT_DESTINATAIRE`
 - [ ] Lancer `npx prisma migrate deploy` en SSH, puis le seed une seule fois
-- [ ] HTTPS via AutoSSL ; sauvegardes via les outils de cPanel
+- [ ] HTTPS via AutoSSL ; sauvegardes via les outils de cPanel. **HTTPS obligatoire pour l'encaissement hors ligne** : le service worker n'existe qu'en contexte sécurisé, un poste ouvert en `http://` n'aura jamais le hors ligne.
+- [ ] Postes du guichet : ouvrir `/app/encaisser` en ligne une première fois après chaque déploiement, et mettre un marque-page sur `/app/encaisser` (après une coupure de courant sans Internet, `/` et `/connexion` ne s'ouvrent pas).
 - [ ] **Une seule adresse officielle** : cPanel > Domaines > « Forcer la redirection HTTPS » activé ; choisir avec ou sans `www` (la même que `NEXT_PUBLIC_APP_URL`) et rediriger l'autre en 301 (cPanel > Redirections, ou `.htaccess`). Sinon Google voit deux sites en double.
 - [ ] Contrôler en ligne : `https://<domaine>/robots.txt` et `/sitemap.xml` répondent et contiennent le vrai domaine (pas `localhost` : sinon `NEXT_PUBLIC_APP_URL` manquait au build) ; le code source de la page d'accueil porte la bonne URL canonique.
 - [ ] En-têtes de sécurité (`Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options`) dans `next.config.ts` (`headers()`), vérifiés en ligne.

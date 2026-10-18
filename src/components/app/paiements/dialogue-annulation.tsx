@@ -69,7 +69,12 @@ function FormulaireAnnulation({ paiement, fermer }: { paiement: PaiementAAnnuler
         if (etat.statut === "succes") {
           toast.success(etat.message);
           fermer();
-        } else setErreurGenerale(appliquerErreursServeur(form, etat, ["motif"] as const));
+        } else {
+          const generale = appliquerErreursServeur(form, etat, ["motif"] as const);
+          setErreurGenerale(generale);
+          // La ligne se rafraîchit et peut retirer cette fenêtre (reçu déjà annulé) : le refus doit survivre.
+          if (generale) toast.error(generale);
+        }
       } catch {
         setErreurGenerale(MESSAGE_RESEAU);
       }
@@ -78,7 +83,7 @@ function FormulaireAnnulation({ paiement, fermer }: { paiement: PaiementAAnnuler
   );
 
   return (
-    <form onSubmit={soumettre} noValidate className="grid gap-4">
+    <form onSubmit={soumettre} noValidate className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
       <DialogHeader>
         <DialogTitle className="text-lg">Annuler le reçu {paiement.numeroRecu}</DialogTitle>
         <DialogDescription>À utiliser pour une erreur de saisie, un doublon ou un paiement rejeté.</DialogDescription>
@@ -111,6 +116,7 @@ function FormulaireAnnulation({ paiement, fermer }: { paiement: PaiementAAnnuler
           {...form.register("motif")}
           placeholder="Ex. doublon de saisie avec le reçu R-2026-00016"
           rows={3}
+          className="max-h-40 min-w-0 max-w-full break-all"
         />
       </ChampFormulaire>
 

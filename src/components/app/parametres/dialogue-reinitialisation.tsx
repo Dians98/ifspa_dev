@@ -29,6 +29,7 @@ export function DialogueReinitialisation({
 }) {
   const [ouvert, setOuvert] = useState(false);
   const [motDePasse, setMotDePasse] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -37,6 +38,7 @@ export function DialogueReinitialisation({
     setOuvert(valeur);
     if (!valeur) {
       setMotDePasse(null);
+      setMessage(null);
       setErreur(null);
     }
   }
@@ -46,8 +48,10 @@ export function DialogueReinitialisation({
     setErreur(null);
     try {
       const etat = await reinitialiserMotDePasse({ userId });
-      if (etat.statut === "succes") setMotDePasse(etat.donnees.motDePasse);
-      else setErreur(etat.message);
+      if (etat.statut === "succes") {
+        setMotDePasse(etat.donnees.motDePasse);
+        setMessage(etat.message);
+      } else setErreur(etat.message);
     } catch {
       setErreur(MESSAGE_RESEAU);
     } finally {
@@ -69,6 +73,7 @@ export function DialogueReinitialisation({
             titre={`Nouveau mot de passe pour ${nom}`}
             description="L'ancien mot de passe ne fonctionne plus. Remettez-lui celui-ci."
             motDePasse={motDePasse}
+            message={message ?? undefined}
           />
         ) : (
           <div className="grid gap-4">

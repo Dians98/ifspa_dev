@@ -4,11 +4,13 @@ import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { FormulaireModificationEtudiant } from "@/components/app/etudiants/formulaire-modification-etudiant";
 import { TitrePage } from "@/components/app/titre-page";
+import { exigerSessionPage } from "@/server/acces";
 import { lireFicheEtudiant } from "@/server/lectures/etudiants";
 
 export const metadata: Metadata = { title: "Modifier un étudiant" };
 
 export default async function PageModifierEtudiant({ params }: { params: Promise<{ id: string }> }) {
+  await exigerSessionPage();
   const { id } = await params;
   const e = await lireFicheEtudiant(id);
   if (!e) notFound();
@@ -33,7 +35,7 @@ export default async function PageModifierEtudiant({ params }: { params: Promise
           dateNaissance: e.dateNaissance,
           lieuNaissance: e.lieuNaissance,
           cin: e.cin ?? "",
-          telephone: e.telephone ?? "",
+          telephone: e.telephoneAffiche ?? "",
           email: e.email ?? "",
           adresse: e.adresse ?? "",
         }}

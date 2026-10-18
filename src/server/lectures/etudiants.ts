@@ -21,17 +21,18 @@ import {
   controleTranchesModifiables,
   formaterTelephone,
   LIBELLE_SEXE,
-  LIBELLE_STATUT_ETUDIANT,
-  LIBELLE_STATUT_INSCRIPTION,
   libelleNiveauInscription,
+  libelleStatutEtudiant,
+  libelleStatutInscription,
   motsRecherche,
 } from "@/lib/etudiants";
 import { cleCompteurMatricule, formaterMatricule } from "@/lib/matricule";
+import type { EcheanceAvantSortie } from "@/lib/sorties";
 import { DUREE_MAX, libelleNiveau, NOMS_MOIS, periodeAnnee, totalAnnuel } from "@/lib/parametres";
 import { echeancesEtudiant, sqlDerniereInscription, sqlMotsRecherche, sqlRestes } from "@/server/ecolage";
 import { aplatir, booleenOpt, entierOpt, idOpt, pageOpt, pagination, texteOpt, type Pagination, type ParamsRecherche } from "@/server/lectures/filtres";
 
-// Lectures sans contrôle de rôle : le layout de /app appelle `requireSession()`. Le jour est injectable pour les tests.
+// Lectures sans contrôle de rôle : chaque page appelle `exigerSessionPage()` avant de lire. Le jour est injectable pour les tests.
 
 export const TAILLE_PAGE_ETUDIANTS = 25;
 
@@ -80,6 +81,7 @@ type LigneSqlEtudiant = {
   matricule: string;
   nom: string;
   prenoms: string;
+  sexe: Sexe;
   statut: StatutEtudiant;
   filiereCode: string;
   filiereNom: string;
@@ -131,7 +133,7 @@ export async function lireEtudiants(
   const page = Math.min(f.page, pages.pages);
 
   const lignes = await db.$queryRaw<LigneSqlEtudiant[]>`
-    SELECT e.id, e.matricule, e.nom, e.prenoms, e.statut::text AS statut,
+    SELECT e.id, e.matricule, e.nom, e.prenoms, e.sexe::text AS sexe, e.statut::text AS statut,
       f.code AS "filiereCode", f.nom AS "filiereNom", ins.niveau, ins.redoublement, ins."anneeLibelle",
       COALESCE(r."resteEnRetard", 0)::int AS "resteEnRetard",
       COALESCE(r."moisEnRetard", 0)::int AS "moisEnRetard",
@@ -154,7 +156,7 @@ export async function lireEtudiants(
       libelleNiveau: l.niveau === null ? null : libelleNiveauInscription(l.niveau, l.redoublement ?? false),
       anneeScolaire: l.anneeLibelle,
       statut: l.statut,
-      libelleStatut: LIBELLE_STATUT_ETUDIANT[l.statut],
+      libelleStatut: libelleStatutEtudiant(l.statut, l.sexe),
       resteEnRetard: l.resteEnRetard,
       moisEnRetard: l.moisEnRetard,
       resteDu: l.resteDu,
@@ -226,6 +228,10 @@ export type PaiementFiche = {
   annule: boolean;
   annulation: { date: string; par: string; motif: string } | null;
   aVerifier: boolean;
+  /** Pourquoi il est à vérifier (hors ligne : situation changée, surplus, ticket remplacé, heure du poste). */
+  noteVerification: string | null;
+  /** Marqué vérifié par l'admin ; la note reste lisible. */
+  verification: { date: string; par: string } | null;
 };
 
 export type DossierEtudiant = {
@@ -259,6 +265,8 @@ export type DossierEtudiant = {
   totalEncaisse: number;
   /** Du plus récent au plus ancien, annulés compris. */
   paiements: PaiementFiche[];
+  /** Pour l'aperçu de la fenêtre de sortie (`apercuSortie`) ; vide si l'étudiant est déjà sorti. */
+  echeancesSortie: EcheanceAvantSortie[];
   jour: Jour;
 };
 
@@ -277,6 +285,9 @@ export function paiementAffiche(p: {
   motifAnnulation: string | null;
   saisiPar: { name: string };
   annulePar: { name: string } | null;
+  noteVerification: string | null;
+  dateVerification: Date | null;
+  verifiePar: { name: string } | null;
 }): PaiementFiche {
   const { date, heure } = dateHeureMadagascar(p.date);
   return {
@@ -302,6 +313,11 @@ export function paiementAffiche(p: {
         }
       : null,
     aVerifier: p.aVerifier,
+    noteVerification: p.noteVerification,
+    verification:
+      p.dateVerification && p.verifiePar
+        ? { date: dateHeureMadagascar(p.dateVerification).date, par: p.verifiePar.name }
+        : null,
   };
 }
 
@@ -320,6 +336,9 @@ export const SELECT_PAIEMENT_AFFICHE = {
   motifAnnulation: true,
   saisiPar: { select: { name: true } },
   annulePar: { select: { name: true } },
+  noteVerification: true,
+  dateVerification: true,
+  verifiePar: { select: { name: true } },
 } as const satisfies Prisma.PaiementSelect;
 
 function totauxSeuls(t: TotauxEcolage | undefined): TotauxEcolage {
@@ -402,7 +421,7 @@ export async function lireDossierEtudiant(id: string, jour: Jour): Promise<Dossi
       libelleNiveau: libelleNiveauInscription(i.niveau, i.redoublement),
       redoublement: i.redoublement,
       statut: i.statut,
-      libelleStatut: LIBELLE_STATUT_INSCRIPTION[i.statut],
+      libelleStatut: libelleStatutInscription(i.statut, e.sexe),
       droitsEnTranches: i.droitsEnTranches,
       tranchesModifiables: refusTranches === null,
       refusTranches,
@@ -415,7 +434,8 @@ export async function lireDossierEtudiant(id: string, jour: Jour): Promise<Dossi
             id: x.id,
             libelle: x.libelle,
             type: x.type,
-            tranche: x.tranche,
+            // Droits en une fois : pas de numéro de tranche à afficher.
+            tranche: i.droitsEnTranches > 1 ? x.tranche : null,
             mois: jourDeDate(x.mois),
             montantDu: x.montantDu,
             paye: x.paye,
@@ -448,7 +468,7 @@ export async function lireDossierEtudiant(id: string, jour: Jour): Promise<Dossi
     filiere: e.filiere,
     anneeEntree: e.anneeEntree.libelle,
     statut: e.statut,
-    libelleStatut: LIBELLE_STATUT_ETUDIANT[e.statut],
+    libelleStatut: libelleStatutEtudiant(e.statut, e.sexe),
     sortie:
       e.statut === "ACTIF"
         ? null
@@ -458,6 +478,17 @@ export async function lireDossierEtudiant(id: string, jour: Jour): Promise<Dossi
     situation: totauxSeuls(sit),
     totalEncaisse: e.paiements.reduce((s, p) => (p.annule ? s : s + p.montant), 0),
     paiements: e.paiements.map(paiementAffiche),
+    echeancesSortie:
+      e.statut === "ACTIF"
+        ? echeances.map((x) => ({
+            id: x.id,
+            mois: jourDeDate(x.mois),
+            montantDu: x.montantDu,
+            paye: x.paye,
+            nonDueSortie: x.nonDueSortie,
+            lignesNonAnnulees: x.lignesNonAnnulees,
+          }))
+        : [],
     jour,
   };
 }

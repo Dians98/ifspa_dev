@@ -16,7 +16,7 @@ export function MotifsRefus({ motifs }: { motifs: string[] }) {
           <Info aria-hidden />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80">
+      <PopoverContent align="end" collisionPadding={16} className="w-80 max-w-[calc(100vw-2rem)]">
         {uniques.map((m) => (
           <p key={m}>{m}</p>
         ))}

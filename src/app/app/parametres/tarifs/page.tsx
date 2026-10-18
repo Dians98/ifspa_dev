@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
-import { estAdministrateur } from "@/components/app/parametres/acces";
+import { AccesReserve } from "@/components/app/parametres/acces-reserve";
 import { GrilleTarifs } from "@/components/app/parametres/grille-tarifs";
+import { exigerSessionPage } from "@/server/acces";
 import { lireGrilleTarifs } from "@/server/lectures/parametres";
 
 export const metadata: Metadata = { title: "Tarifs · Paramètres" };
 
 export default async function PageTarifs({ searchParams }: { searchParams: Promise<{ annee?: string | string[] }> }) {
-  if (!(await estAdministrateur())) return null;
+  if (!(await exigerSessionPage()).admin) return <AccesReserve />;
   const { annee } = await searchParams;
   const grille = await lireGrilleTarifs(typeof annee === "string" ? annee : undefined);
 

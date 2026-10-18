@@ -3,9 +3,10 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Loader2, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { dateCopieLocale, rechercherLocalement } from "@/lib/hors-ligne/guichet-local";
 import { cn } from "@/lib/utils";
 import { chercherAuGuichet } from "@/server/actions/paiements";
-import type { ResultatGuichet } from "@/server/lectures/paiements";
+import type { ResultatGuichet } from "@/lib/encaissement-hors-ligne";
 import { BadgesSituation } from "./badge-situation";
 
 const MIN_CARACTERES = 2;
@@ -13,13 +14,18 @@ const DELAI_MS = 200;
 
 type Etat = { terme: string; liste: ResultatGuichet[]; erreur: boolean };
 
-/** Recherche au clavier : flèches, Entrée pour choisir, Échap pour effacer. Sans saisie, les derniers servis. */
+/**
+ * Recherche au clavier : flèches, Entrée pour choisir, Échap pour effacer. Sans saisie, les derniers servis.
+ * Hors ligne, elle lit la liste du poste et les derniers servis (données du serveur) disparaissent.
+ */
 export function RechercheEtudiant({
   derniers,
+  horsLigne = false,
   onChoisir,
   desactive,
 }: {
   derniers: ResultatGuichet[];
+  horsLigne?: boolean;
   onChoisir: (etudiant: ResultatGuichet) => void;
   desactive?: boolean;
 }) {
@@ -28,22 +34,35 @@ export function RechercheEtudiant({
   const [saisie, setSaisie] = useState("");
   const [etat, setEtat] = useState<Etat | null>(null);
   const [actifBrut, setActif] = useState(-1);
+  // null tant que la lecture n'est pas faite ; false : le poste n'a jamais synchronisé.
+  const [listeLocale, setListeLocale] = useState<boolean | null>(null);
 
   const terme = saisie.trim();
   const recherche = terme.length >= MIN_CARACTERES;
   const enAttente = recherche && etat?.terme !== terme;
-  const liste = !recherche ? derniers : etat?.terme === terme ? etat.liste : [];
+  const liste = !recherche ? (horsLigne ? [] : derniers) : etat?.terme === terme ? etat.liste : [];
   const erreur = recherche && etat?.terme === terme && etat.erreur;
   const actif = Math.min(actifBrut, liste.length - 1);
 
   useEffect(() => champ.current?.focus(), []);
 
   useEffect(() => {
+    if (!horsLigne) return;
+    let annule = false;
+    dateCopieLocale()
+      .then((d) => !annule && setListeLocale(d !== null))
+      .catch(() => !annule && setListeLocale(false));
+    return () => {
+      annule = true;
+    };
+  }, [horsLigne]);
+
+  useEffect(() => {
     if (terme.length < MIN_CARACTERES) return;
     let annule = false;
     const minuteur = setTimeout(async () => {
       try {
-        const resultats = await chercherAuGuichet(terme);
+        const resultats = horsLigne ? await rechercherLocalement(terme) : await chercherAuGuichet(terme);
         if (!annule) setEtat({ terme, liste: resultats, erreur: false });
       } catch {
         if (!annule) setEtat({ terme, liste: [], erreur: true });
@@ -53,7 +72,7 @@ export function RechercheEtudiant({
       annule = true;
       clearTimeout(minuteur);
     };
-  }, [terme]);
+  }, [terme, horsLigne]);
 
   function surSaisie(valeur: string) {
     setSaisie(valeur);
@@ -77,7 +96,7 @@ export function RechercheEtudiant({
     }
   }
 
-  let titre = "Derniers servis";
+  let titre = horsLigne ? "Recherche dans la liste de ce poste" : "Derniers servis";
   if (recherche) {
     if (enAttente) titre = "Recherche en cours…";
     else if (erreur) titre = "Recherche impossible";
@@ -120,7 +139,9 @@ export function RechercheEtudiant({
 
       {erreur && (
         <p role="alert" className="rounded-lg border border-destructive/30 bg-retard-pale px-3 py-2 text-sm text-destructive">
-          La recherche a échoué. Vérifiez la connexion Internet, puis tapez de nouveau.
+          {horsLigne
+            ? "La liste de ce poste n'a pas pu être lue. Rechargez la page."
+            : "La recherche a échoué. Vérifiez la connexion Internet, puis tapez de nouveau."}
         </p>
       )}
 
@@ -151,10 +172,18 @@ export function RechercheEtudiant({
         ))}
       </ul>
 
-      {!recherche && derniers.length === 0 && terme.length === 0 && (
+      {horsLigne && listeLocale === false && (
+        <p role="alert" className="rounded-lg border border-attention/40 bg-attention-pale px-3 py-2 text-sm">
+          Ce poste n&apos;a pas encore la liste des étudiants : connectez-le une fois à Internet.
+        </p>
+      )}
+      {!recherche && derniers.length === 0 && terme.length === 0 && !horsLigne && (
         <p className="py-3 text-sm text-muted-foreground">
           Les étudiants que vous venez d&apos;encaisser apparaîtront ici. Pour commencer, tapez un nom ou un matricule.
         </p>
+      )}
+      {horsLigne && !recherche && terme.length === 0 && listeLocale !== false && (
+        <p className="py-3 text-sm text-muted-foreground">Tapez un nom ou un matricule pour chercher dans la liste de ce poste.</p>
       )}
       {recherche && !enAttente && !erreur && liste.length === 0 && (
         <p className="py-2 text-sm text-muted-foreground">

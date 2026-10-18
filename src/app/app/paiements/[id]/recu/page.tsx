@@ -6,11 +6,13 @@ import { TitrePage } from "@/components/app/titre-page";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { formaterAriary } from "@/lib/montant";
+import { exigerSessionPage } from "@/server/acces";
 import { lireRecu } from "@/server/lectures/paiements";
 
 export const metadata: Metadata = { title: "Reçu de paiement" };
 
 export default async function PageRecu({ params }: { params: Promise<{ id: string }> }) {
+  await exigerSessionPage();
   const { id } = await params;
   const recu = await lireRecu(id);
 
