@@ -703,7 +703,6 @@ describe("chargerSituationGuichet", () => {
       ["Octobre 2026", true, "retard"],
       ["Novembre 2026", false, "a_venir"],
     ]);
-    expect(s.preselection).toEqual([s.echeances[0].id, s.echeances[1].id]);
     expect(s.annees).toHaveLength(1);
     expect(s.annees[0]).toMatchObject({ libelle: "2026-2027", niveau: "1re année", reste: 900_000, resteEnRetard: 180_000 });
   });

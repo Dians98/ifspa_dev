@@ -100,7 +100,7 @@ Les permissions sont vérifiées **côté serveur** dans chaque Server Action (`
   - boutons **Encaisser**, **Imprimer la fiche**, et **Sortie** (admin).
 - **Encaisser** (UX simplifiée à la demande du client ; maquette `prototype/encaissement.html`). On coche des mois, et le montant reçu reste modifiable (paiement partiel). Une seule colonne en 4 gestes, **sans fenêtre de confirmation** :
   1. **Quel étudiant ?** Grande recherche (nom, prénoms, matricule, accents ignorés) avec la liste « Derniers servis ».
-  2. **Que paie-t-il ?** **Toutes** les échéances non soldées s'affichent en cases, années précédentes comprises, regroupées par année scolaire. Celles **en retard sont cochées par défaut** ; celles du mois en cours, encore « à venir », ne le sont pas. Le cochage se fait dans l'ordre, puisque les plus anciennes sont soldées d'abord. Le champ **« Montant reçu »** est prérempli avec la somme des cases cochées et **reste modifiable** (paiement partiel) : s'il dépasse les cases cochées, le surplus va en acompte sur l'échéance suivante et l'écran le dit (« 20 000 Ar d'acompte sur avril, il restera 60 000 Ar ») ; s'il est inférieur, la dernière échéance n'est payée qu'en partie. Refusé s'il dépasse le reste dû total de l'étudiant.
+  2. **Que paie-t-il ?** **Toutes** les échéances non soldées s'affichent en cases, années précédentes comprises, regroupées par année scolaire. **Aucune n'est cochée à l'ouverture** (demande de Diano du 26/10/2026) : la secrétaire coche les mois payés ou tape le montant reçu. Le cochage se fait dans l'ordre, puisque les plus anciennes sont soldées d'abord. Le champ **« Montant reçu »**, vide à l'ouverture, suit la somme des cases cochées et **reste modifiable** (paiement partiel) : s'il dépasse les cases cochées, le surplus va en acompte sur l'échéance suivante et l'écran le dit (« 20 000 Ar d'acompte sur avril, il restera 60 000 Ar ») ; s'il est inférieur, la dernière échéance n'est payée qu'en partie. Refusé s'il dépasse le reste dû total de l'étudiant.
   3. **Comment ?** Espèces ou Mobile Money. L'opérateur et la référence ne sont demandés que pour le Mobile Money.
   4. **Un seul bouton**, qui dit ce qu'il fait : « Encaisser 160 000 Ar et imprimer le reçu ». Le ticket s'imprime et l'écran se remet à zéro pour le parent suivant.
 - **Encaissement hors ligne** (demande du client, **uniquement l'écran Encaisser**) : maquette `prototype/encaissement.html?hors-ligne=1`, captures `06d` et `m06d`.
@@ -166,7 +166,7 @@ Les PDF sont générés côté serveur avec `@react-pdf/renderer`. Le bouton **I
 - **Format ticket : petite imprimante thermique de reçus, rouleau 80 mm** (option 58 mm), monochrome. **Pas d'A4 ni d'A5.**
   - Une seule colonne, un logo en niveaux de gris, des séparateurs en tirets.
   - Pas de zones signature ni cachet.
-  - Un double pour l'institut en option.
+  - Toujours imprimé avec un double pour l'institut (mention « DOUBLE »), sans option à cocher (demande de Diano du 25/10/2026).
   - Impression : `@page { size: 80mm auto; margin: 0 }`.
   - Maquette : `prototype/recu.html`.
 

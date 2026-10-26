@@ -17,7 +17,7 @@ const E = ETUDIANTS.fanja;
 const LARGEUR_80 = 302.4;
 const LARGEUR_58 = 219.2;
 
-test("UC06-08 : le ticket en 80 mm, en 58 mm et avec le double de l'institut", async ({ page }) => {
+test("UC06-08 : le ticket en 80 mm, en 58 mm, toujours avec le double de l'institut", async ({ page }) => {
   test.setTimeout(120_000);
 
   await test.step("1. Encaisser 180 000 Ar : ticket 80 mm par défaut, monochrome, sans QR code", async () => {
@@ -29,7 +29,9 @@ test("UC06-08 : le ticket en 80 mm, en 58 mm et avec le double de l'institut", a
     const { numero } = await recuEnregistre(page);
     await page.emulateMedia({ media: "print" });
     const tickets = page.getByRole("article", { name: new RegExp(`^Reçu ${numero}`) });
-    await expect(tickets).toHaveCount(1);
+    await expect(tickets).toHaveCount(2);
+    await expect(tickets.nth(1)).toContainText("DOUBLE");
+    await expect(tickets.nth(0)).not.toContainText("DOUBLE");
     const ticket = tickets.first();
     const largeur = (await ticket.boundingBox())?.width ?? 0;
     expect(Math.abs(largeur - LARGEUR_80)).toBeLessThan(3);
@@ -46,12 +48,13 @@ test("UC06-08 : le ticket en 80 mm, en 58 mm et avec le double de l'institut", a
     expect(couleurs).toEqual(["rgb(0, 0, 0)"]);
     await expect(ticket).toContainText("Merci. Conservez ce reçu.");
     await capture(page, DOSSIER, "UC06-08-01-ticket-80mm", ticket);
+    await capture(page, DOSSIER, "UC06-08-01-ticket-80mm-double", tickets.nth(1));
     await finImpression(page);
   });
 
-  await test.step("2. Choisir « Rouleau 58 mm » et « Imprimer aussi un double pour l'institut »", async () => {
+  await test.step("2. Choisir « Rouleau 58 mm » : plus de case pour le double, il sort toujours", async () => {
+    await expect(page.getByRole("checkbox", { name: "Imprimer aussi un double pour l'institut" })).toHaveCount(0);
     await page.getByRole("radio", { name: "Rouleau 58 mm" }).check();
-    await page.getByRole("checkbox", { name: "Imprimer aussi un double pour l'institut" }).check();
     await expect(page.getByRole("radio", { name: "Rouleau 58 mm" })).toBeChecked();
     await capture(page, DOSSIER, "UC06-08-02-options");
   });
@@ -85,7 +88,6 @@ test("UC06-08 : le ticket en 80 mm, en 58 mm et avec le double de l'institut", a
 
   await test.step("5. Remettre les options par défaut du poste", async () => {
     await page.getByRole("radio", { name: "Rouleau 80 mm" }).check();
-    await page.getByRole("checkbox", { name: "Imprimer aussi un double pour l'institut" }).uncheck();
     await expect(page.getByRole("radio", { name: "Rouleau 80 mm" })).toBeChecked();
   });
 });

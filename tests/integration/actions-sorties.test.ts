@@ -356,7 +356,7 @@ describe("échéances non dues : exclues de tous les calculs", () => {
     expect(s).toMatchObject({ resteDuTotal: 260_000, resteEnRetard: 260_000, refus: null });
     expect(s.etudiant).toMatchObject({ statut: "ABANDON", sorti: true, resteDu: 260_000 });
     expect(s.anneeEnCours).toMatchObject({ libelle: "2026-2027", du: 260_000, paye: 0, reste: 260_000 });
-    expect(s.preselection).toHaveLength(3);
+    expect(s.echeances.every((x) => x.statut === "retard")).toBe(true);
     const trouves = await paiements.chercherAuGuichet("sortant");
     expect(trouves).toMatchObject([{ id: etudiant.id, sorti: true, resteDu: 260_000 }]);
   });

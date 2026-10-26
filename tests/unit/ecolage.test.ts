@@ -6,7 +6,6 @@ import {
   genererEcheances,
   libelleEcheance,
   montantPourCases,
-  preselection,
   repartirPaiement,
   restesApres,
   situation,
@@ -446,7 +445,7 @@ describe("repartirPaiement", () => {
   });
 });
 
-describe("restesApres, preselection, montantPourCases", () => {
+describe("restesApres, montantPourCases", () => {
   const nonSoldees = [
     { id: "oct", reste: 80_000, mois: mois(2026, 10) },
     { id: "nov", reste: 80_000, mois: mois(2026, 11) },
@@ -467,16 +466,6 @@ describe("restesApres, preselection, montantPourCases", () => {
 
   it("restesApres : rien d'imputé, tout le reste est inchangé", () => {
     expect(restesApres(nonSoldees, [], "2026-12-10")).toEqual({ resteApres: 240_000, retardApres: 160_000 });
-  });
-
-  it("preselection : les échéances en retard seulement, pas le mois en cours", () => {
-    expect(preselection(nonSoldees, "2026-12-10")).toEqual(["oct", "nov"]);
-    expect(preselection(nonSoldees, "2026-10-31")).toEqual([]);
-    expect(preselection(nonSoldees, "2026-11-01")).toEqual(["oct"]);
-  });
-
-  it("preselection : ignore une échéance échue au reste nul", () => {
-    expect(preselection([{ id: "oct", reste: 0, mois: mois(2026, 10) }], "2026-12-10")).toEqual([]);
   });
 
   it("montantPourCases : cumul des k premières cases dans l'ordre de solde", () => {

@@ -294,10 +294,8 @@ function FormulaireEncaissement({
     if (essai.current?.saisie !== saisie) essai.current = { saisie, idClient: nouvelIdentifiant() };
     return essai.current.idClient;
   }
-  const [montantTexte, setMontantTexte] = useState(() => {
-    const k = situation.preselection.length;
-    return k > 0 ? formaterNombre(montantPourCases(echeances, k)) : "";
-  });
+  // Rien de coché à l'ouverture (demande de Diano du 26/10/2026) : la secrétaire coche les mois ou tape le montant reçu.
+  const [montantTexte, setMontantTexte] = useState("");
   const [mode, setMode] = useState<ModePaiement>("ESPECES");
   const [operateur, setOperateur] = useState<OperateurMobile | null>(null);
   const [reference, setReference] = useState("");

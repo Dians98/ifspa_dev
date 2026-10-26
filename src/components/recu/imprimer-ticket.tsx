@@ -9,7 +9,6 @@ import { Ticket, type LargeurTicket } from "./ticket";
 // la feuille de style d'impression (globals.css) cache tout le reste.
 
 const CLE_LARGEUR = "ifspa-ticket-largeur";
-const CLE_DOUBLE = "ifspa-ticket-double";
 const EVENEMENT = "ifspa-options-ticket";
 const ID_ZONE = "zone-impression-ticket";
 const ID_STYLE = "style-page-ticket";
@@ -48,33 +47,26 @@ export function lireLargeur(): LargeurTicket {
   return lire(CLE_LARGEUR) === "58" ? 58 : 80;
 }
 
-export function lireDouble(): boolean {
-  return lire(CLE_DOUBLE) === "1";
-}
-
-/** Largeur du rouleau et double pour l'institut, mémorisés par poste. */
+/** Largeur du rouleau, mémorisée par poste. */
 export function useOptionsTicket() {
   const largeur = useSyncExternalStore(abonner, lireLargeur, () => 80 as LargeurTicket);
-  const double = useSyncExternalStore(abonner, lireDouble, () => false);
   return {
     largeur,
-    double,
     changerLargeur: (l: LargeurTicket) => ecrire(CLE_LARGEUR, String(l)),
-    changerDouble: (d: boolean) => ecrire(CLE_DOUBLE, d ? "1" : "0"),
   };
 }
 
 const sansAbonnement = () => () => {};
 
-/** Portail du ticket à imprimer (et de son double). N'existe qu'une fois la page hydratée. */
+/** Portail du ticket à imprimer et de son double pour l'institut, toujours imprimé. N'existe qu'une fois la page hydratée. */
 export function ZoneImpressionTicket({ donnees }: { donnees: DonneesRecu | null }) {
   const monte = useSyncExternalStore(sansAbonnement, () => true, () => false);
-  const { largeur, double } = useOptionsTicket();
+  const { largeur } = useOptionsTicket();
   if (!monte || !donnees) return null;
   return createPortal(
     <div id={ID_ZONE} className="zone-impression">
       <Ticket donnees={donnees} largeur={largeur} />
-      {double && <Ticket donnees={donnees} largeur={largeur} double />}
+      <Ticket donnees={donnees} largeur={largeur} double />
     </div>,
     document.body,
   );

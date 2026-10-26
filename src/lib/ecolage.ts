@@ -336,11 +336,6 @@ export function restesApres(
   return { resteApres, retardApres };
 }
 
-/** Cases cochées par défaut dans Encaisser : les échéances en retard seulement, pas celles du mois en cours. */
-export function preselection(nonSoldees: readonly EcheanceAPayerDatee[], jour: Jour): string[] {
-  return nonSoldees.filter((e) => e.reste > 0 && estEchue(e.mois, jour)).map((e) => e.id);
-}
-
 /** Montant prérempli pour les `k` premières cases (le cochage se fait dans l'ordre de solde). */
 export function montantPourCases(nonSoldees: readonly EcheanceAPayer[], k: number): number {
   if (!estEntier(k) || k < 0 || k > nonSoldees.length) {

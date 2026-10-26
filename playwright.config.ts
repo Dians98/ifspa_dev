@@ -55,7 +55,7 @@ export default defineConfig({
   webServer: sansApp
     ? undefined
     : {
-        command: "npm run dev",
+        command: "pnpm dev",
         url: URL_APP,
         reuseExistingServer: true,
         timeout: 120_000,

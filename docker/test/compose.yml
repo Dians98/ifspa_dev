@@ -1,0 +1,54 @@
+# Environnement de test complet, isolé du dev (autre projet, aucun port publié) : pnpm test:docker
+name: ifspa-tests
+
+services:
+  db:
+    image: postgres:${POSTGRES_VERSION:-17}-alpine
+    environment:
+      POSTGRES_USER: ifspa
+      POSTGRES_PASSWORD: ifspa_dev
+      POSTGRES_DB: ifspa_e2e
+      TZ: Indian/Antananarivo
+      PGTZ: Indian/Antananarivo
+    # Base en mémoire : elle repart vide à chaque passage et ne laisse aucun volume.
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ifspa -d ifspa_e2e"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  tests:
+    build:
+      context: ../..
+      dockerfile: docker/test/Dockerfile
+      args:
+        NODE_VERSION: ${NODE_VERSION:-22}
+    depends_on:
+      db:
+        condition: service_healthy
+    # Réseau partagé avec la base : elle répond sur localhost, seule adresse admise par les protections des tests.
+    network_mode: service:db
+    # Chromium plante avec les 64 Mo de /dev/shm par défaut.
+    shm_size: 1gb
+    environment:
+      ETAPES: ${ETAPES:-lint,vitest,build,typecheck,e2e,e2e-build}
+      DATABASE_URL: postgresql://ifspa:ifspa_dev@localhost:5432/ifspa_e2e?schema=public
+      DATABASE_URL_TEST: postgresql://ifspa:ifspa_dev@localhost:5432/ifspa_test?schema=public
+      BETTER_AUTH_SECRET: secret-des-tests-docker-jamais-en-production-0123456789
+      BETTER_AUTH_URL: http://localhost:3100
+      NEXT_PUBLIC_APP_URL: http://localhost:3100
+      SEED_ADMIN_EMAIL: admin@ifspa.mg
+      SEED_ADMIN_PASSWORD: ChangezMoi2026!
+      SEED_ADMIN_NAME: Administrateur IFSPA
+      SEED_USER_EMAIL: secretariat@ifspa.mg
+      SEED_USER_PASSWORD: Secretariat2026!
+      SEED_USER_NAME: Secrétariat IFSPA
+      SMTP2GO_API_KEY: ""
+      EMAIL_EXPEDITEUR: IFSPA <site@ifspa.mg>
+      CONTACT_DESTINATAIRE: secretariat@ifspa.mg
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ""
+      TURNSTILE_SECRET_KEY: ""
+    volumes:
+      - ../../test-results/docker:/resultats

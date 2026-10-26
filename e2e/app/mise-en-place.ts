@@ -28,7 +28,7 @@ async function avecBase<T>(travail: (c: Client) => Promise<T>): Promise<T> {
 
 /**
  * Étudiant actif avec 4 mensualités de 80 000 Ar de janvier à avril 2020 : toutes échues, donc toutes
- * cochées d'office au guichet, quelle que soit la date du jour. Rattaché à l'année courante du seed.
+ * en retard au guichet, quelle que soit la date du jour. Rattaché à l'année courante du seed.
  */
 export async function creerEtudiantTest(): Promise<EtudiantTest> {
   const suffixe = `${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`.toUpperCase();

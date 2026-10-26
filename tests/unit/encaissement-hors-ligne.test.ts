@@ -230,7 +230,7 @@ describe("construireSituationGuichet", () => {
     const s = construireSituationGuichet(e, e.echeances, jour);
 
     expect(s.refus).toMatch(/Rien à encaisser/);
-    expect(s).toMatchObject({ resteDuTotal: 0, resteEnRetard: 0, echeances: [], annees: [], preselection: [] });
+    expect(s).toMatchObject({ resteDuTotal: 0, resteEnRetard: 0, echeances: [], annees: [] });
     expect(s.anneeEnCours).toMatchObject({ du: 900_000, paye: 900_000, reste: 0 });
   });
 
@@ -244,13 +244,13 @@ describe("construireSituationGuichet", () => {
     expect(s.refus).not.toBeNull();
   });
 
-  it("présélectionne les échéances en retard et marque un sorti", () => {
+  it("marque les échéances en retard et un sorti", () => {
     const e = etudiant({ statut: "EXCLU" });
 
     const s = construireSituationGuichet(e, e.echeances, jour);
 
     expect(s.etudiant).toMatchObject({ sorti: true, libelleStatut: expect.any(String) });
-    expect(s.preselection).toEqual(["2026-1", "2026-2"]);
+    expect(s.echeances.filter((x) => x.statut === "retard").map((x) => x.id)).toEqual(["2026-1", "2026-2"]);
     expect(s).toMatchObject({ resteDuTotal: 900_000, resteEnRetard: 180_000 });
   });
 

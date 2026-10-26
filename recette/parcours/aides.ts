@@ -213,10 +213,10 @@ export async function numeroDuTicket(page: Page): Promise<string> {
 
 export const impressions = (page: Page) => page.evaluate(() => (window as unknown as { __impressions: number }).__impressions);
 
-/** Montre ce qui sort de l'imprimante : le ticket seul, en média « impression ». */
+/** Montre ce qui sort de l'imprimante : le ticket (sans son double, toujours imprimé après lui), en média « impression ». */
 export async function ticketImprime(page: Page, numero: string): Promise<Locator> {
   await page.emulateMedia({ media: "print" });
-  const ticket = page.getByRole("article", { name: new RegExp(`^Reçu ${numero}`) });
+  const ticket = page.getByRole("article", { name: new RegExp(`^Reçu ${numero}(, annulé)?$`) });
   await expect(ticket).toBeVisible();
   return ticket;
 }

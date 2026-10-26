@@ -279,16 +279,15 @@ describe("lireImpayes", () => {
 });
 
 describe("situationGuichet à une date injectée", () => {
-  it("octobre ni échu ni présélectionné le 31/10 ; échu et présélectionné le 1er novembre", async () => {
+  it("octobre pas encore échu le 31/10 ; échu et en retard le 1er novembre", async () => {
     const e = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF);
 
     const veille = (await situationGuichet(e.etudiant.id, "2026-10-31"))!;
     const lendemain = (await situationGuichet(e.etudiant.id, "2026-11-01"))!;
 
-    expect(veille).toMatchObject({ resteEnRetard: 0, preselection: [], etudiant: { resteEnRetard: 0, resteDu: 900_000 } });
+    expect(veille).toMatchObject({ resteEnRetard: 0, etudiant: { resteEnRetard: 0, resteDu: 900_000 } });
     expect(veille.echeances.slice(0, 2).map((x) => x.statut)).toEqual(["a_venir", "a_venir"]);
     expect(lendemain.resteEnRetard).toBe(180_000);
-    expect(lendemain.preselection).toEqual(lendemain.echeances.slice(0, 2).map((x) => x.id));
     expect(lendemain.echeances.slice(0, 2).map((x) => x.statut)).toEqual(["retard", "retard"]);
   });
 

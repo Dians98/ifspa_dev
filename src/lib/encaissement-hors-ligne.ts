@@ -4,7 +4,6 @@ import { anneeCivile, dateDuJour, jourMadagascar, lireJour, type Jour } from "@/
 import {
   LIBELLE_STATUT_ECHEANCE,
   libelleEcheance,
-  preselection,
   repartirPaiement,
   resteDuTotal,
   restesApres,
@@ -81,8 +80,6 @@ export type SituationGuichet = {
   annees: { anneeDebut: number; libelle: string; niveau: string | null; reste: number; resteEnRetard: number; echeances: EcheanceGuichet[] }[];
   /** Mêmes échéances, à plat, dans l'ordre de solde : base de `montantPourCases` et `repartirPaiement`. */
   echeances: EcheanceGuichet[];
-  /** Cases cochées par défaut : les échéances en retard. */
-  preselection: string[];
   /** À renvoyer tel quel dans `encaisser({ resteDuAffiche })`. */
   resteDuTotal: number;
   resteEnRetard: number;
@@ -258,7 +255,6 @@ export function construireSituationGuichet(
     refus: total === 0 ? "Rien à encaisser : toutes les échéances de cet étudiant sont soldées." : null,
     annees,
     echeances: lignes,
-    preselection: preselection(nonSoldees, jour),
     resteDuTotal: total,
     resteEnRetard: retard,
     anneeEnCours: derniere

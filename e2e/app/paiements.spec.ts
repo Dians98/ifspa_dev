@@ -2,11 +2,12 @@ import type { Page } from "@playwright/test";
 import { COMPTES } from "./comptes";
 import { expect, test, type EtudiantTest } from "./mise-en-place";
 
-/** Encaisse tout ce qui est en retard (cases cochées d'office) et renvoie le numéro du reçu. */
+/** Encaisse les quatre mois en retard (cocher le dernier coche les précédents) et renvoie le numéro du reçu. */
 async function encaisserTout(page: Page, etudiant: EtudiantTest): Promise<string> {
   await page.goto(`/app/encaisser?etudiant=${etudiant.id}`);
   // Le focus sur le montant n'est posé qu'à l'hydratation : avant, le clic serait perdu.
   await expect(page.getByLabel("Montant reçu")).toBeFocused();
+  await page.getByRole("button", { name: new RegExp(etudiant.echeances[etudiant.echeances.length - 1]) }).click();
   await page.getByRole("button", { name: /^Encaisser .* et imprimer le reçu$/ }).click();
   const confirmation = page.getByRole("status").filter({ hasText: "Paiement enregistré" });
   await expect(confirmation).toBeVisible();

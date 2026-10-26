@@ -1,0 +1,41 @@
+# Environnement de test complet (docker/test/) à chaque push et pull request : lint, Vitest, build, typecheck, E2E.
+name: Tests
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Environnement de test Docker
+        run: docker compose -f docker/test/compose.yml run --rm --build tests
+
+      - name: Arrêt de l'environnement
+        if: always()
+        run: docker compose -f docker/test/compose.yml down --remove-orphans
+
+      - name: Bilan
+        if: always()
+        run: |
+          if [ -f test-results/docker/bilan.txt ]; then
+            { echo '```'; cat test-results/docker/bilan.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Rapports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultats-tests
+          path: test-results/docker/
+          retention-days: 14

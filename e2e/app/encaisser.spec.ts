@@ -20,10 +20,13 @@ test.describe("Encaisser — secrétariat", () => {
   test("encaisser deux mois, imprimer puis retrouver le reçu", async ({ page, etudiant }) => {
     await ouvrirGuichet(page, etudiant.id);
 
-    // Les quatre mois en retard sont cochés d'office ; on garde les deux premiers.
-    await expect(page.getByRole("button", { name: new RegExp(etudiant.echeances[3]) })).toHaveAttribute("aria-pressed", "true");
-    await page.getByRole("button", { name: new RegExp(etudiant.echeances[2]) }).click();
+    // Rien n'est coché à l'ouverture ; cocher le 2e mois coche aussi le 1er (ordre de solde).
+    await expect(page.getByLabel("Montant reçu")).toHaveValue("");
+    await expect(page.getByRole("button", { name: new RegExp(etudiant.echeances[0]) })).toHaveAttribute("aria-pressed", "false");
+    await page.getByRole("button", { name: new RegExp(etudiant.echeances[1]) }).click();
     await expect(page.getByLabel("Montant reçu")).toHaveValue(/^160\s000$/);
+    await expect(page.getByRole("button", { name: new RegExp(etudiant.echeances[0]) })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: new RegExp(etudiant.echeances[2]) })).toHaveAttribute("aria-pressed", "false");
 
     const encaisser = page.getByRole("button", { name: /^Encaisser 160\s000\sAr et imprimer le reçu$/ });
     await expect(encaisser).toBeEnabled();
@@ -59,6 +62,7 @@ test.describe("Encaisser — secrétariat", () => {
       .filter({ hasText: "Paiement enregistré" })
       .getByRole("link", { name: "Voir le reçu" })
       .click();
+    await page.waitForURL(/\/app\/paiements\/.+\/recu$/);
     const ticket = page.getByRole("article", { name: /^Reçu R-/ });
     await expect(ticket).toContainText(/Acompte · reste dû 60\s000\sAr/);
     await expect(ticket).toContainText("cent mille ariary");
@@ -67,6 +71,8 @@ test.describe("Encaisser — secrétariat", () => {
   test("Mobile Money : opérateur et référence sont exigés avant d'encaisser", async ({ page, etudiant }) => {
     await ouvrirGuichet(page, etudiant.id);
     const encaisser = page.getByRole("button", { name: BOUTON_ENCAISSER });
+    // Rien n'est prérempli : un montant valide d'abord, pour que seuls l'opérateur et la référence bloquent.
+    await page.getByLabel("Montant reçu").fill("80000");
 
     await page.getByRole("radio", { name: "Mobile Money" }).check();
     await expect(encaisser).toBeDisabled();

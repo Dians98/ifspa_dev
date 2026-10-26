@@ -58,7 +58,8 @@ test.describe("Encaisser hors ligne — secrétariat", () => {
     await recherche.press("Enter");
     await expect(page.getByText(/Reste à payer :\s*320\s000\sAr/)).toBeVisible();
 
-    await page.getByRole("button", { name: new RegExp(etudiant.echeances[2]) }).click();
+    // Rien n'est coché à l'ouverture : cocher le 2e mois coche aussi le 1er (ordre de solde).
+    await page.getByRole("button", { name: new RegExp(etudiant.echeances[1]) }).click();
     await page.getByRole("button", { name: /^Encaisser 160\s000\sAr et imprimer le reçu$/ }).click();
 
     const succes = page.getByRole("status").filter({ hasText: /Ticket R-\d{4}-\d{5} remis/ });
@@ -92,6 +93,7 @@ test.describe("Encaisser hors ligne — secrétariat", () => {
     await recherche.fill(etudiant.nom);
     await expect(page.getByRole("option", { name: new RegExp(etudiant.nom) })).toBeVisible();
     await recherche.press("Enter");
+    await page.getByRole("button", { name: new RegExp(etudiant.echeances[3]) }).click();
     await page.getByRole("button", { name: /^Encaisser 320\s000\sAr et imprimer le reçu$/ }).click();
     const succes = page.getByRole("status").filter({ hasText: /Ticket R-\d{4}-\d{5} remis/ });
     const numeroRecu = (await succes.textContent())?.match(/R-\d{4}-\d{5}/)?.[0] ?? "";
@@ -101,6 +103,7 @@ test.describe("Encaisser hors ligne — secrétariat", () => {
     const guichet = await autrePoste.newPage();
     await guichet.goto(`/app/encaisser?etudiant=${etudiant.id}`);
     await expect(guichet.getByLabel("Montant reçu")).toBeFocused();
+    await guichet.getByRole("button", { name: new RegExp(etudiant.echeances[3]) }).click();
     await guichet.getByRole("button", { name: /^Encaisser 320\s000\sAr et imprimer le reçu$/ }).click();
     await expect(guichet.getByRole("status").filter({ hasText: "Paiement enregistré" })).toBeVisible();
     await autrePoste.close();

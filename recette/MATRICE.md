@@ -3,6 +3,7 @@
 Mise à jour : 18/10/2026 (UC14 déroulé, après UC12, UC02, UC01, UC11, UC05 et UC03 ; avant : UC13, UC06, UC15, UC07, UC04, UC10, UC08 et UC09 le 17/10).
 Résultats : ✅ réussi, ❌ échec (étape signalée), non démontré (pas de preuve à l'écran), couvert par Vitest (fichier cité), non couvert (scénario à écrire), non implémenté.
 La préparation des données communes est décrite dans [scenarios/00-PREPARATION.md](scenarios/00-PREPARATION.md).
+Parcours continu de bout en bout (9 actes, du paramétrage à la clôture), sans entrer dans les refus : [PARCOURS-A-Z.md](PARCOURS-A-Z.md), rejoué ✅ le 25/10/2026 ([rapport](rapports/RAPPORT_2026-10-25_PARCOURS-AZ.md)). UC06-08 rejoué ✅ le même jour : le double de l'institut sort toujours, la case a disparu.
 
 ## 1. Par règle
 
