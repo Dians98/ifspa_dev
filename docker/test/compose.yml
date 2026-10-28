@@ -20,6 +20,8 @@ services:
       retries: 30
 
   tests:
+    # Nom fixe : la CI construit l'image avec son cache, puis compose la réutilise.
+    image: ifspa-tests-tests:latest
     build:
       context: ../..
       dockerfile: docker/test/Dockerfile
