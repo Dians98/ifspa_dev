@@ -1,0 +1,89 @@
+# Push sur main : tests, build Linux, puis installation sur cPanel (https://ifspa.mg), sans SSH.
+# L'archive est déposée par l'API cPanel ; le cron du serveur (docker/prod/deployer.sh) l'installe et écrit son verdict.
+# À configurer dans GitHub (Settings du dépôt) :
+#   - secret CPANEL_API_TOKEN : jeton créé dans cPanel > Manage API Tokens ;
+#   - variables NEXT_PUBLIC_TURNSTILE_SITE_KEY (clé publique Turnstile) et DEPLOIEMENT_ACTIF = true ;
+#   - environnement « production », avec Diano en « Required reviewers » pour valider chaque mise en ligne.
+name: Déploiement production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploiement-production
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    uses: ./.github/workflows/tests.yml
+
+  production:
+    needs: tests
+    # Évite un déploiement depuis un dépôt qui ne porte pas les secrets de production.
+    if: vars.DEPLOIEMENT_ACTIF == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://ifspa.mg
+    timeout-minutes: 40
+    env:
+      CPANEL: https://hala.gasyweb.com:2083
+      DEPOT: /home/ifspamg/ifspa-deploy
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build de production (Linux)
+        run: |
+          docker build -f docker/prod/Dockerfile \
+            --build-arg NEXT_PUBLIC_APP_URL=https://ifspa.mg \
+            --build-arg NEXT_PUBLIC_TURNSTILE_SITE_KEY="${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}" \
+            --target export --output type=local,dest=dist/production .
+          VERSION="$(date -u +%Y%m%d-%H%M)-${GITHUB_SHA::7}"
+          mv dist/production/ifspa-production.zip "dist/production/$VERSION.zip"
+          touch "dist/production/$VERSION.ready"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Dépôt sur cPanel
+        env:
+          JETON: ${{ secrets.CPANEL_API_TOKEN }}
+        run: |
+          deposer() {
+            reponse=$(curl -sS --fail-with-body -m 600 -H "Authorization: cpanel ifspamg:$JETON" \
+              -F "dir=$DEPOT/incoming" -F "overwrite=1" -F "file-1=@$1" "$CPANEL/execute/Fileman/upload_files")
+            echo "$reponse" | grep -q '"status":1' || { echo "Dépôt de $1 refusé : $reponse"; exit 1; }
+          }
+          # L'archive d'abord : le serveur n'installe qu'une fois le .ready présent.
+          deposer "dist/production/$VERSION.zip"
+          deposer "dist/production/$VERSION.ready"
+
+      - name: Installation par le serveur
+        env:
+          JETON: ${{ secrets.CPANEL_API_TOKEN }}
+        run: |
+          lire() {
+            curl -sS -m 60 -H "Authorization: cpanel ifspamg:$JETON" \
+              "$CPANEL/execute/Fileman/get_file_content?dir=$DEPOT/status&file=$VERSION.$1" \
+              | python3 -c 'import json,sys; d=json.load(sys.stdin); print((d.get("data") or {}).get("content","").strip())'
+          }
+          # Cron chaque minute, puis sauvegarde, migrations et contrôle du site : 15 minutes au plus.
+          for i in $(seq 1 60); do
+            sleep 15
+            statut=$(lire statut || true)
+            case "$statut" in
+              OK|ECHEC|ECHEC_RETABLI) break ;;
+            esac
+          done
+          echo "::group::Journal du serveur"; lire log; echo "::endgroup::"
+          echo "Statut : ${statut:-aucune réponse du serveur}"
+          echo "### Déploiement $VERSION : ${statut:-aucune réponse}" >> "$GITHUB_STEP_SUMMARY"
+          [ "$statut" = OK ]
+
+      - name: Contrôle en ligne
+        run: |
+          for page in / /connexion /robots.txt; do
+            code=$(curl -s -o /dev/null -m 60 -w '%{http_code}' "https://ifspa.mg$page")
+            echo "$page -> $code"
+            [ "$code" = 200 ] || exit 1
+          done

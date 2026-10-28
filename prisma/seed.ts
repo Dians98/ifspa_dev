@@ -66,6 +66,9 @@ async function seedReferentiels() {
   }
   console.log("✓ Filières : IF, SF");
 
+  // Production : l'institut crée lui-même son année et ses vrais tarifs (décision du 27/10/2026).
+  if (process.env.SEED_SANS_ANNEE === "1") return;
+
   const annee = await db.anneeScolaire.upsert({
     where: { anneeDebut: 2026 },
     update: {},

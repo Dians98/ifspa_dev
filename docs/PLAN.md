@@ -320,19 +320,19 @@ Décision du 17/10/2026 : **un écran dans Paramètres** (`/app/parametres/impor
 - **Points ouverts** : numéro des reçus de reprise (`R-2026-…` ou numérotation propre) ; impayés des années antérieures à reprendre ou non (il faudrait alors leurs inscriptions et leurs tarifs) ; colonnes à ajuster une fois le fichier Excel actuel de l'institut vu.
 
 ### Phase 8 — Déploiement cPanel
-- [ ] Vérifier la version de Node proposée par « Setup Node.js App » : au moins 20.9, idéalement 22
-- [ ] Créer la base PostgreSQL et son utilisateur dans cPanel
-- [ ] Ajouter `output: "standalone"` dans `next.config.ts` ; faire le build en local sur le PC de dev
+- [x] Node 22.23.4 dans « Setup Node.js App » (28/10/2026). PostgreSQL du serveur : **10** ; code rendu compatible (`hashtext`), suite testée avec `pnpm test:docker vitest --postgres 10`
+- [x] Base `ifspamg_app`, utilisateur `ifspamg_web` (28/10/2026)
+- [x] `output: "standalone"` ; build fait **sous Linux** dans Docker : `docker/prod/Dockerfile`, archive `dist/production/ifspa-production.zip`
   - ⚠️ **Variables `NEXT_PUBLIC_*` figées au build** : Next.js les inscrit dans le code au moment de `pnpm build`. Elles doivent donc être dans le `.env` du PC de dev **avec leurs valeurs de production** avant le build (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `NEXT_PUBLIC_APP_URL` avec le vrai domaine). Les définir seulement dans cPanel ne sert à rien ; en changer une impose de refaire le build et de le renvoyer.
   - Les autres variables (secrètes ou non) sont lues au démarrage du serveur : elles se mettent dans « Setup Node.js App » (voir plus bas), jamais dans le build envoyé.
-- [ ] Envoyer par SSH ou SFTP le dossier `.next/standalone`, `.next/static` et `public/`
-- [ ] Configurer « Setup Node.js App » : fichier de démarrage `server.js`, et variables d'environnement `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (vrai domaine), `TURNSTILE_SECRET_KEY`, `SMTP2GO_API_KEY`, `EMAIL_EXPEDITEUR` et `CONTACT_DESTINATAIRE`
-- [ ] Lancer `npx prisma migrate deploy` en SSH, puis le seed une seule fois
+- [x] Envoi sans SSH (port fermé chez GasyWeb, ticket à ouvrir) : archive découpée en morceaux de 9 Mo, déposés par le gestionnaire de fichiers, recollés et décompressés (`unzip`) dans `~/ifspa-app` via le Terminal cPanel
+- [x] « Setup Node.js App » : `ifspa-app`, `server.js`, mode Production ; secrets dans `~/ifspa-app/.env.production` (chmod 600), lu par Next au démarrage. **Reste : `SMTP2GO_API_KEY`, `EMAIL_EXPEDITEUR`, `CONTACT_DESTINATAIRE`** (absents du .env de dev)
+- [x] Base initiale (migrations + admin + filières, sans année : `SEED_SANS_ANNEE=1`) construite sur un PostgreSQL 10 local puis importée par `psql` dans le Terminal cPanel
 - [ ] HTTPS via AutoSSL ; sauvegardes via les outils de cPanel. **HTTPS obligatoire pour l'encaissement hors ligne** : le service worker n'existe qu'en contexte sécurisé, un poste ouvert en `http://` n'aura jamais le hors ligne.
 - [ ] Postes du guichet : ouvrir `/app/encaisser` en ligne une première fois après chaque déploiement, et mettre un marque-page sur `/app/encaisser` (après une coupure de courant sans Internet, `/` et `/connexion` ne s'ouvrent pas).
-- [ ] **Une seule adresse officielle** : cPanel > Domaines > « Forcer la redirection HTTPS » activé ; choisir avec ou sans `www` (la même que `NEXT_PUBLIC_APP_URL`) et rediriger l'autre en 301 (cPanel > Redirections, ou `.htaccess`). Sinon Google voit deux sites en double.
-- [ ] Contrôler en ligne : `https://<domaine>/robots.txt` et `/sitemap.xml` répondent et contiennent le vrai domaine (pas `localhost` : sinon `NEXT_PUBLIC_APP_URL` manquait au build) ; le code source de la page d'accueil porte la bonne URL canonique.
-- [ ] En-têtes de sécurité (`Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options`) dans `next.config.ts` (`headers()`), vérifiés en ligne.
+- [x] Une seule adresse `https://ifspa.mg` : « Forcer HTTPS » refusé par cPanel (AutoSSL inactif, certificat Let's Encrypt), donc redirection 301 http et www en tête de `public_html/.htaccess` (sauvegarde `.htaccess.avant-redirection`), `/.well-known/` exclu
+- [x] Contrôler en ligne : `https://<domaine>/robots.txt` et `/sitemap.xml` répondent et contiennent le vrai domaine (pas `localhost` : sinon `NEXT_PUBLIC_APP_URL` manquait au build) ; le code source de la page d'accueil porte la bonne URL canonique.
+- [x] En-têtes de sécurité (`Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options`) dans `next.config.ts` (`headers()`), vérifiés en ligne.
 
 ### Phase 9 — Référencement Google (après la mise en ligne)
 Le site n'apparaît pas tout seul ni tout de suite : il faut le déclarer à Google, puis compter **quelques jours à quelques semaines** pour l'indexation. Rien n'est à payer. Le code est déjà prêt (titre, description, canonique, Open Graph, `robots.txt`, `sitemap.xml`, données structurées, `noindex` sur `/connexion` et `/app`).

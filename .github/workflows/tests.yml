@@ -3,9 +3,11 @@ name: Tests
 
 on:
   push:
-    branches: [dev, main]
+    branches: [dev]
   pull_request:
   workflow_dispatch:
+  # Sur main, les tests passent par deploiement.yml, avant la mise en production.
+  workflow_call:
 
 concurrency:
   group: tests-${{ github.ref }}
@@ -20,6 +22,9 @@ jobs:
 
       - name: Environnement de test Docker
         run: docker compose -f docker/test/compose.yml run --rm --build tests
+        env:
+          # Version du PostgreSQL de cPanel (production).
+          POSTGRES_VERSION: "10"
 
       - name: Arrêt de l'environnement
         if: always()

@@ -66,8 +66,10 @@ async function blocsDe(client: Client, poste: string, userId: string, annee: num
  */
 // Deux demandes simultanées du même poste liraient le même nombre de libres et dépasseraient plafond ou seuil.
 // Verrou de transaction, réentrant : `rechargerBlocsPoste` le prend avant de lire, `reserverBlocRecus` le reprend.
+// `hashtext` (32 bits) et non `hashtextextended`, absente avant PostgreSQL 11 (celui de cPanel est en 10) :
+// une collision ne fait qu'attendre un autre poste, jamais doubler un numéro.
 async function verrouillerBlocsPoste(tx: Prisma.TransactionClient, poste: string, userId: string, annee: number) {
-  await tx.$queryRaw`SELECT 1 AS ok FROM pg_advisory_xact_lock(hashtextextended(${`BLOC:${poste}:${userId}:${cleCompteurRecu(annee)}`}, 0))`;
+  await tx.$queryRaw`SELECT 1 AS ok FROM pg_advisory_xact_lock(hashtext(${`BLOC:${poste}:${userId}:${cleCompteurRecu(annee)}`}::text))`;
 }
 
 export async function reserverBlocRecus(

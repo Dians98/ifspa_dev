@@ -47,6 +47,9 @@ next-env.d.ts
 # Données locales (import Excel, photos sources) : données personnelles, jamais versionnées
 /data/
 
+# Archives de production (pnpm build dans docker/prod)
+/dist/
+
 
 # Playwright (tests de bout en bout)
 /test-results/
