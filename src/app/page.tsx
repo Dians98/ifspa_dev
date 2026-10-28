@@ -128,18 +128,18 @@ export default async function Accueil() {
           <div aria-hidden className="ouverture-voile absolute inset-0 -z-10 bg-[rgb(12_24_40)] opacity-0" />
           <div className="ouverture-texte mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
             <div className="max-w-2xl text-white">
-              <h1 className="text-4xl font-bold leading-[1.08] tracking-tight sm:text-5xl lg:text-6xl">
+              <h1 className="arrivee text-4xl font-bold leading-[1.08] tracking-tight sm:text-5xl lg:text-6xl">
                 Se former aux métiers paramédicaux à Toamasina
               </h1>
-              <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/85">
+              <p className="arrivee mt-6 max-w-xl text-lg leading-relaxed text-white/85 [--rang:1]">
                 L&apos;{ETABLISSEMENT.nom} est un établissement supérieur privé autorisé depuis 2011, qui forme en deux
                 filières : Infirmier(e)s et Sage-femmes.
               </p>
-              <div className="mt-10 flex flex-wrap gap-3">
-                <Button asChild size="lg" className="h-12 bg-rose-fonce px-6 text-white hover:bg-rose-fonce/90">
+              <div className="arrivee mt-10 flex flex-wrap gap-3 [--rang:2]">
+                <Button asChild size="lg" className="group/cta h-12 bg-rose-fonce px-6 text-white hover:bg-rose-fonce/90">
                   <a href="#filieres">
                     Découvrir les filières
-                    <ArrowRight />
+                    <ArrowRight className="transition-transform duration-200 ease-out group-hover/cta:translate-x-1 motion-reduce:transition-none" />
                   </a>
                 </Button>
                 <Button
@@ -174,8 +174,8 @@ export default async function Accueil() {
         <section id="institut" className="scroll-mt-20">
           <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 py-20 sm:px-6 md:grid-cols-2 lg:gap-20 lg:px-8 lg:py-28">
             <div>
-              <h2 className="text-3xl font-bold tracking-tight text-primary after:mt-4 after:block after:h-1 after:w-12 after:rounded-full after:bg-rose after:content-[''] sm:text-4xl">
-                Un institut de formation au service de la santé en Atsinanana
+              <h2 className="titre-section text-3xl font-bold tracking-tight text-primary after:mt-4 after:block after:h-1 after:w-12 after:rounded-full after:bg-rose after:content-[''] sm:text-4xl">
+                Un institut de formation au service de la santé dans la région d&apos;Atsinanana
               </h2>
               <div className="mt-6 space-y-4 text-lg leading-relaxed text-muted-foreground">
                 <p>
@@ -199,7 +199,7 @@ export default async function Accueil() {
         <section id="filieres" className="scroll-mt-20 border-t border-rose/20 bg-rose-pale/60">
           <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
             <div className="max-w-2xl">
-              <h2 className="text-3xl font-bold tracking-tight text-primary after:mt-4 after:block after:h-1 after:w-12 after:rounded-full after:bg-rose after:content-[''] sm:text-4xl">Nos filières</h2>
+              <h2 className="titre-section text-3xl font-bold tracking-tight text-primary after:mt-4 after:block after:h-1 after:w-12 after:rounded-full after:bg-rose after:content-[''] sm:text-4xl">Nos filières</h2>
               <p className="mt-4 text-lg text-muted-foreground">
                 Deux formations paramédicales, du premier jour jusqu&apos;au diplôme.
               </p>
@@ -239,7 +239,7 @@ export default async function Accueil() {
         <section id="galerie" className="scroll-mt-20 border-t pb-20 lg:pb-28">
           <div className="mx-auto max-w-7xl px-4 pt-20 sm:px-6 lg:px-8 lg:pt-28">
             <div className="mb-10 max-w-2xl">
-              <h2 className="text-3xl font-bold tracking-tight text-primary after:mt-4 after:block after:h-1 after:w-12 after:rounded-full after:bg-rose after:content-[''] sm:text-4xl">
+              <h2 className="titre-section text-3xl font-bold tracking-tight text-primary after:mt-4 after:block after:h-1 after:w-12 after:rounded-full after:bg-rose after:content-[''] sm:text-4xl">
                 Galerie
               </h2>
               <p className="mt-4 text-lg text-muted-foreground">
@@ -254,13 +254,13 @@ export default async function Accueil() {
         <section id="agrements" className="scroll-mt-20 border-t">
           <div className="mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.6fr] lg:gap-20 lg:px-8 lg:py-28">
             <div>
-              <h2 className="text-3xl font-bold tracking-tight text-primary after:mt-4 after:block after:h-1 after:w-12 after:rounded-full after:bg-rose after:content-[''] sm:text-4xl">Agréments officiels</h2>
+              <h2 className="titre-section text-3xl font-bold tracking-tight text-primary after:mt-4 after:block after:h-1 after:w-12 after:rounded-full after:bg-rose after:content-[''] sm:text-4xl">Agréments officiels</h2>
               <p className="mt-4 text-lg text-muted-foreground">
                 L&apos;ouverture de l&apos;institut et la formation qu&apos;il dispense reposent sur des actes du ministère de
                 l&apos;Enseignement supérieur et de la Recherche scientifique.
               </p>
             </div>
-            <ol className="divide-y border-y">
+            <ol className="sequence divide-y border-y">
               {ARRETES.map((a) => (
                 <li key={a.reference} className="grid gap-1 py-5 sm:grid-cols-[4.5rem_1fr] sm:gap-6">
                   <span className="tabular font-heading text-2xl font-semibold text-rose-fonce">{a.annee}</span>
@@ -278,7 +278,7 @@ export default async function Accueil() {
         <section id="contact" className="scroll-mt-20 border-t bg-primary text-primary-foreground">
           <div className="mx-auto grid max-w-7xl items-start gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.15fr] lg:gap-16 lg:px-8 lg:py-24">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight after:mt-4 after:block after:h-1 after:w-12 after:rounded-full after:bg-rose after:content-[''] sm:text-4xl">
+            <h2 className="titre-section text-3xl font-bold tracking-tight after:mt-4 after:block after:h-1 after:w-12 after:rounded-full after:bg-rose after:content-[''] sm:text-4xl">
               Nous contacter
             </h2>
             <p className="mt-4 max-w-xl text-lg text-primary-foreground/80">

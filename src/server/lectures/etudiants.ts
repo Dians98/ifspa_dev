@@ -251,6 +251,7 @@ export type DossierEtudiant = {
   telephoneAffiche: string | null;
   email: string | null;
   adresse: string | null;
+  tuteur: { nom: string; telephone: string | null; telephoneAffiche: string | null; profession: string | null } | null;
   filiere: { id: string; code: string; nom: string; dureeAnnees: number };
   anneeEntree: string;
   statut: StatutEtudiant;
@@ -369,6 +370,9 @@ export async function lireDossierEtudiant(id: string, jour: Jour): Promise<Dossi
       telephone: true,
       email: true,
       adresse: true,
+      tuteurNom: true,
+      tuteurTelephone: true,
+      tuteurProfession: true,
       statut: true,
       dateSortie: true,
       motifSortie: true,
@@ -465,6 +469,14 @@ export async function lireDossierEtudiant(id: string, jour: Jour): Promise<Dossi
     telephoneAffiche: e.telephone ? formaterTelephone(e.telephone) : null,
     email: e.email,
     adresse: e.adresse,
+    tuteur: e.tuteurNom
+      ? {
+          nom: e.tuteurNom,
+          telephone: e.tuteurTelephone,
+          telephoneAffiche: e.tuteurTelephone ? formaterTelephone(e.tuteurTelephone) : null,
+          profession: e.tuteurProfession,
+        }
+      : null,
     filiere: e.filiere,
     anneeEntree: e.anneeEntree.libelle,
     statut: e.statut,

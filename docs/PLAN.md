@@ -48,7 +48,7 @@ Source officielle : `LOGO ET ARRËTEE IFSPA.pdf` (logo et arrêtés : ouverture 
 - **Filiere** : `code` (ex. `IF`, `SF`, unique, 2 à 3 lettres), `nom`, `dureeAnnees`, `actif`
 - **AnneeScolaire** : `libelle` (`2026-2027`), `anneeDebut` (2026), `dateDebut`, `dateFin`, `moisDebutEcolage` (10 = octobre), `estCourante`, `cloturee`
 - **Tarif** : `filiereId`, `anneeScolaireId`, `niveau`, `droitsInscription`, `montantMensuel`, `nombreMois`. Unicité sur (filière, année scolaire, niveau).
-- **Etudiant** : `matricule` (unique), `nom`, `prenoms`, `sexe`, `dateNaissance`, `lieuNaissance`, `cin?`, `telephone`, `email?`, `adresse`, `photo?` (pas de tuteur : notion retirée à la demande du client), `filiereId`, `anneeEntreeId`, `statut` (`ACTIF` | `DIPLOME` | `ABANDON` | `EXCLU`), `dateSortie?`, `motifSortie?`
+- **Etudiant** : `matricule` (unique), `nom`, `prenoms`, `sexe`, `dateNaissance`, `lieuNaissance`, `cin?`, `telephone`, `email?`, `adresse`, `tuteurNom?`, `tuteurTelephone?`, `tuteurProfession?` (tuteur facultatif, un par étudiant : retiré le 30/09/2026, rétabli le 28/10/2026 avec la profession ; nom exigé dès que son téléphone ou sa profession est saisi), `photo?`, `filiereId`, `anneeEntreeId`, `statut` (`ACTIF` | `DIPLOME` | `ABANDON` | `EXCLU`), `dateSortie?`, `motifSortie?`
 - **Inscription** (une par étudiant et par année scolaire) : `etudiantId`, `anneeScolaireId`, `niveau`, `redoublement` (bool), `droitsEnTranches` (1, 2 ou 3), `statut` (`EN_COURS` | `ADMIS` | `REDOUBLE` | `DIPLOME` | `ABANDON`), `operationAdmissionId?`
 - **Echeance** : générée à l'inscription à partir du Tarif. Le montant est copié au moment de la génération, pour qu'un changement de tarif ne modifie pas le passé. Champs : `inscriptionId`, `type` (`DROITS` | `MENSUALITE`), `tranche?` (1 à 3 pour les droits), `mois` (date du 1er du mois d'exigibilité), `montantDu`.
   - **Droits d'inscription en 1, 2 ou 3 fois** (demande du client) : choix fait à l'inscription (`Inscription.droitsEnTranches`, 1 par défaut). Tranches égales arrondies au millier, le reste sur la 1re (ex. 100 000 en 3 fois = 34 000 + 33 000 + 33 000). Exigibles : 1re tranche en octobre (à l'inscription), 2e en novembre, 3e en décembre. Au passage en année supérieure, le choix de l'année précédente est repris ; il reste modifiable sur la fiche tant qu'aucune tranche n'est payée.
@@ -92,7 +92,7 @@ Les permissions sont vérifiées **côté serveur** dans chaque Server Action (`
 - **Dashboard** (voir ci-dessous)
 - **Étudiants** : liste avec recherche (nom ou matricule) et filtres (filière, niveau, année, statut, « en retard »). Bouton **Nouvel étudiant**.
 - **Fiche étudiant** (`/app/etudiants/[id]`) :
-  - identité et contact de l'étudiant (pas de tuteur) ;
+  - identité et contact de l'étudiant, tuteur facultatif (nom, téléphone, profession) ;
   - filière et matricule ;
   - **parcours** : une ligne par année scolaire (niveau, admis ou redoublant) ;
   - **situation de l'écolage** : grille mois par mois pour chaque année (payé, partiel, en retard, à venir), total dû, total payé, reste ;

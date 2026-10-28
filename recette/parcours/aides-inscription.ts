@@ -115,7 +115,7 @@ export async function remplirIdentite(page: Page, e: Inscrit) {
   await page.getByRole("radio", { name: e.sexe }).click();
   await page.getByLabel("Date de naissance").fill(e.naissance);
   await page.getByLabel("Lieu de naissance").fill(e.lieu);
-  await page.getByLabel("Téléphone").fill(e.telephone);
+  await page.getByLabel("Téléphone", { exact: true }).fill(e.telephone);
   await page.getByLabel("Adresse").fill(e.adresse);
 }
 

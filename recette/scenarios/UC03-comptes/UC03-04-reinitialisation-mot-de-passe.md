@@ -35,7 +35,7 @@ RAVELOSON Soa, du secrétariat, a perdu son mot de passe. L'administrateur lui e
 
 ## Ce que ce scénario ne couvre pas
 
-- Réinitialiser **son propre** mot de passe : aucun bouton, la pastille d'information l'explique (voir [UC03-05](UC03-05-garde-fous.md)) ; il n'existe pas d'écran « Changer mon mot de passe » (décision provisoire n° 9).
+- Réinitialiser **son propre** mot de passe : pas de bouton « Réinitialiser » sur sa ligne, mais « Changer mon mot de passe » (mot de passe actuel, nouveau, confirmation), aussi accessible par l'icône de clé du menu utilisateur (voir [UC03-05](UC03-05-garde-fous.md)).
 - Pas de changement forcé du mot de passe provisoire à la première connexion (décision provisoire n° 5).
 - Refus serveur par le secrétariat : couvert par Vitest, `tests/unit/actions-parametres-refus.test.ts` (« reinitialiserMotDePasse renvoie le refus… »). Le cas « sessions non fermées » (« …mais ses sessions ouvertes n'ont pas pu être fermées. ») n'est pas provocable à l'écran.
 - Ordinateur seulement.

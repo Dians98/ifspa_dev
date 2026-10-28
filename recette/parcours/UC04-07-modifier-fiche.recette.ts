@@ -23,7 +23,7 @@ test("UC04-07 : corriger le téléphone et l'adresse, matricule et filière rest
     await page.getByRole("link", { name: "Modifier" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Modifier l'étudiant" })).toBeVisible();
     await expect(page.getByLabel("Nom", { exact: true })).toHaveValue("RASOANAIVO");
-    await expect(page.getByLabel("Téléphone")).toHaveValue("0340000002");
+    await expect(page.getByLabel("Téléphone", { exact: true })).toHaveValue("0340000002");
     await expect(page.getByText("Informations verrouillées")).toBeVisible();
     await expect(page.getByText("IF-2026-0002", { exact: true })).toBeVisible();
     await expect(page.getByText("Année d'entrée")).toBeVisible();
@@ -33,7 +33,7 @@ test("UC04-07 : corriger le téléphone et l'adresse, matricule et filière rest
   });
 
   await test.step("3. Téléphone vidé : l'enregistrement est refusé", async () => {
-    await page.getByLabel("Téléphone").fill("");
+    await page.getByLabel("Téléphone", { exact: true }).fill("");
     await page.getByRole("button", { name: "Enregistrer les modifications" }).click();
     await expect(page.getByText("Indiquez le numéro de téléphone.", { exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { level: 1, name: "Modifier l'étudiant" })).toBeVisible();
@@ -41,7 +41,7 @@ test("UC04-07 : corriger le téléphone et l'adresse, matricule et filière rest
   });
 
   await test.step("4. Nouveau téléphone et nouvelle adresse : « Fiche enregistrée. »", async () => {
-    await page.getByLabel("Téléphone").fill("034 00 000 22");
+    await page.getByLabel("Téléphone", { exact: true }).fill("034 00 000 22");
     await page.getByLabel("Adresse").fill("Lot 45 bis, Ampasimazava, Toamasina");
     await page.getByRole("button", { name: "Enregistrer les modifications" }).click();
     await expect(page.getByText("Fiche enregistrée.")).toBeVisible();

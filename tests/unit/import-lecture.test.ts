@@ -293,7 +293,7 @@ describe("lecture de la feuille Étudiants", () => {
     const lu = lireReprise({ etudiants: tableau, paiements: null });
 
     expect(lu.messages).toHaveLength(1);
-    expect(lu.messages[0]).toMatchObject({ gravite: "avertissement", colonne: "O" });
+    expect(lu.messages[0]).toMatchObject({ gravite: "avertissement", colonne: "R" });
     expect(lu.messages[0].texte).toMatch(/colonne sans en-tête, ignorée/);
   });
 
@@ -305,7 +305,7 @@ describe("lecture de la feuille Étudiants", () => {
 
     const bloquantes = erreurs(lu.messages);
     expect(bloquantes).toHaveLength(1);
-    expect(bloquantes[0].texte).toMatch(/la colonne « Nom » apparaît deux fois \(colonnes B et O\)/);
+    expect(bloquantes[0].texte).toMatch(/la colonne « Nom » apparaît deux fois \(colonnes B et R\)/);
     expect(lu.etudiants.lignes[0].cellules.nom).toEqual({ type: "texte", texte: "RAKOTO" });
   });
 

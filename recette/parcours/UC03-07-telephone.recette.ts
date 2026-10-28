@@ -70,13 +70,13 @@ test("UC03-07 : gérer les comptes depuis un téléphone", async ({ page }) => {
     await vue(page, "UC03-07-09-desactive");
   });
 
-  await test.step("6. Sa propre carte : « Vous » et la pastille d'information, aucune action", async () => {
+  await test.step("6. Sa propre carte : « Vous » et seulement « Changer mon mot de passe »", async () => {
     const moi = ligne(page, "admin@ifspa.mg");
     await moi.scrollIntoViewIfNeeded();
     await expect(moi).toContainText("Vous");
     await expect(moi.getByRole("button", { name: /Changer le rôle|Réinitialiser|Désactiver/ })).toHaveCount(0);
-    await moi.getByRole("button", { name: "Pourquoi certaines actions ne sont pas proposées" }).click();
-    await expect(page.getByText("Vous ne pouvez pas désactiver votre propre compte.")).toBeVisible();
+    await expect(moi.getByRole("button", { name: "Pourquoi certaines actions ne sont pas proposées" })).toHaveCount(0);
+    await expect(moi.getByRole("button", { name: "Changer mon mot de passe" })).toBeVisible();
     await vue(page, "UC03-07-10-propre-carte");
   });
 });

@@ -22,6 +22,9 @@ export const CHAMPS_IDENTITE = [
   "telephone",
   "email",
   "adresse",
+  "tuteurNom",
+  "tuteurTelephone",
+  "tuteurProfession",
 ] as const;
 
 /** Case à cocher radio présentée en bouton : cible large, état lisible sans la couleur seule. */
@@ -176,6 +179,44 @@ export function ChampsIdentite({ prefixe }: { prefixe: string }) {
           className="max-md:h-11"
         />
       </ChampFormulaire>
+
+      <FieldSet className="grid gap-4 border-t pt-4 md:col-span-2 md:grid-cols-2">
+        <FieldLegend className="md:col-span-2">Tuteur (facultatif)</FieldLegend>
+        <ChampFormulaire id={id("tuteur-nom")} libelle="Nom du tuteur" erreur={errors.tuteurNom?.message}>
+          <Input
+            {...attributsChamp(id("tuteur-nom"), { erreur: errors.tuteurNom?.message })}
+            {...register("tuteurNom")}
+            autoComplete="off"
+            className="max-md:h-11"
+          />
+        </ChampFormulaire>
+
+        <ChampFormulaire
+          id={id("tuteur-telephone")}
+          libelle="Téléphone du tuteur"
+          aide="Numéro malgache, par exemple 033 12 345 67."
+          erreur={errors.tuteurTelephone?.message}
+        >
+          <Input
+            {...attributsChamp(id("tuteur-telephone"), { aide: true, erreur: errors.tuteurTelephone?.message })}
+            {...register("tuteurTelephone")}
+            type="tel"
+            inputMode="tel"
+            autoComplete="off"
+            className="max-md:h-11"
+          />
+        </ChampFormulaire>
+
+        <ChampFormulaire id={id("tuteur-profession")} libelle="Profession du tuteur" erreur={errors.tuteurProfession?.message}>
+          <Input
+            {...attributsChamp(id("tuteur-profession"), { erreur: errors.tuteurProfession?.message })}
+            {...register("tuteurProfession")}
+            placeholder="Ex. : Commerçant"
+            autoComplete="off"
+            className="max-md:h-11"
+          />
+        </ChampFormulaire>
+      </FieldSet>
     </FieldGroup>
   );
 }

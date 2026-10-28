@@ -23,7 +23,7 @@ test.describe("Étudiants — secrétariat", () => {
     await page.getByRole("radio", { name: "Féminin" }).click();
     await page.getByLabel("Date de naissance").fill("2005-03-14");
     await page.getByLabel("Lieu de naissance").fill("Toamasina");
-    await page.getByLabel("Téléphone").fill("034 12 345 67");
+    await page.getByLabel("Téléphone", { exact: true }).fill("034 12 345 67");
     await page.getByLabel("Adresse").fill("Lot 12, Tanambao V, Toamasina");
 
     await page.getByRole("radio", { name: /Infirmier/ }).click();
@@ -62,12 +62,31 @@ test.describe("Étudiants — secrétariat", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Modifier l'étudiant" })).toBeVisible();
     await expect(page.getByLabel("Nom", { exact: true })).toHaveValue(nom);
 
-    await page.getByLabel("Téléphone").fill("033 98 765 43");
+    await page.getByLabel("Téléphone", { exact: true }).fill("033 98 765 43");
     await page.getByRole("button", { name: "Enregistrer les modifications" }).click();
 
     await page.waitForURL(new RegExp(`${urlFiche}$`));
     await page.getByRole("tab", { name: "Identité" }).click();
     await expect(page.getByText("033 98 765 43")).toBeVisible();
+  });
+
+  test("ajouter un tuteur : son nom est exigé dès qu'un téléphone est saisi", async ({ page }) => {
+    await page.goto(urlFiche);
+    await page.getByRole("link", { name: "Modifier" }).click();
+
+    await page.getByLabel("Téléphone du tuteur").fill("032 11 222 33");
+    await page.getByRole("button", { name: "Enregistrer les modifications" }).click();
+    await expect(page.getByLabel("Nom du tuteur")).toHaveAttribute("aria-invalid", "true");
+
+    await page.getByLabel("Nom du tuteur").fill("RAKOTO Jean");
+    await page.getByLabel("Profession du tuteur").fill("Commerçant");
+    await page.getByRole("button", { name: "Enregistrer les modifications" }).click();
+
+    await page.waitForURL(new RegExp(`${urlFiche}$`));
+    await page.getByRole("tab", { name: "Identité" }).click();
+    const tuteur = page.getByRole("definition").filter({ hasText: "RAKOTO Jean" });
+    await expect(tuteur).toContainText("Commerçant");
+    await expect(tuteur.getByRole("link", { name: "032 11 222 33" })).toBeVisible();
   });
 
   test("passer les droits de 3 fois à 1 fois, puis à 3 fois", async ({ page }) => {

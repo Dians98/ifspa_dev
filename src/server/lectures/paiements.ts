@@ -488,6 +488,7 @@ export type LigneImpaye = {
   libelleNiveau: string | null;
   telephone: string | null;
   telephoneAffiche: string | null;
+  tuteur: { nom: string; telephoneAffiche: string | null; profession: string | null } | null;
   moisEnRetard: number;
   resteEnRetard: number;
   /** Reste dû toutes années, échéances à venir comprises. */
@@ -511,6 +512,9 @@ type LigneSqlImpaye = {
   nom: string;
   prenoms: string;
   telephone: string | null;
+  tuteurNom: string | null;
+  tuteurTelephone: string | null;
+  tuteurProfession: string | null;
   filiereCode: string;
   filiereNom: string;
   niveau: number | null;
@@ -540,6 +544,7 @@ export async function lireImpayes(
   const [lignes, filieres] = await Promise.all([
     db.$queryRaw<LigneSqlImpaye[]>`
       SELECT e.id, e.matricule, e.nom, e.prenoms, e.telephone,
+        e."tuteurNom", e."tuteurTelephone", e."tuteurProfession",
         f.code AS "filiereCode", f.nom AS "filiereNom", ins.niveau, ins.redoublement,
         r."resteEnRetard", r."moisEnRetard", r."resteDu", r."anneesEnRetard",
         dp.date AS "dernierDate", dp.montant AS "dernierMontant"
@@ -567,6 +572,13 @@ export async function lireImpayes(
       libelleNiveau: l.niveau === null ? null : libelleNiveauInscription(l.niveau, l.redoublement ?? false),
       telephone: l.telephone,
       telephoneAffiche: l.telephone ? formaterTelephone(l.telephone) : null,
+      tuteur: l.tuteurNom
+        ? {
+            nom: l.tuteurNom,
+            telephoneAffiche: l.tuteurTelephone ? formaterTelephone(l.tuteurTelephone) : null,
+            profession: l.tuteurProfession,
+          }
+        : null,
       moisEnRetard: l.moisEnRetard,
       resteEnRetard: l.resteEnRetard,
       resteDu: l.resteDu,

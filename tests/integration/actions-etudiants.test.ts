@@ -311,6 +311,43 @@ describe("creerEtudiant : doublon", () => {
   });
 });
 
+describe("tuteur", () => {
+  it("enregistré à la création, affiché sur la fiche, retiré à la modification", async () => {
+    const { id } = reussi(
+      await actions.creerEtudiant(
+        saisieEtudiant(m.ifs.id, { tuteurNom: "RAKOTO Jean", tuteurTelephone: "033 12 345 67", tuteurProfession: "Commerçant" }),
+      ),
+    );
+
+    expect(await db.etudiant.findUniqueOrThrow({ where: { id } })).toMatchObject({
+      tuteurNom: "RAKOTO Jean",
+      tuteurTelephone: "0331234567",
+      tuteurProfession: "Commerçant",
+    });
+    expect((await lireFicheEtudiant(id, "2026-11-15"))?.tuteur).toEqual({
+      nom: "RAKOTO Jean",
+      telephone: "0331234567",
+      telephoneAffiche: "033 12 345 67",
+      profession: "Commerçant",
+    });
+
+    reussi(await actions.modifierEtudiant({ id, ...saisieEtudiant(m.ifs.id, { tuteurNom: "", tuteurTelephone: "", tuteurProfession: "" }) }));
+    expect(await db.etudiant.findUniqueOrThrow({ where: { id } })).toMatchObject({
+      tuteurNom: null,
+      tuteurTelephone: null,
+      tuteurProfession: null,
+    });
+    expect((await lireFicheEtudiant(id, "2026-11-15"))?.tuteur).toBeNull();
+  });
+
+  it("téléphone du tuteur sans son nom : refusé sur le champ du nom, rien d’écrit", async () => {
+    const r = await actions.creerEtudiant(saisieEtudiant(m.ifs.id, { tuteurTelephone: "033 12 345 67" }));
+
+    expect(r).toMatchObject({ statut: "erreur", erreurs: { tuteurNom: expect.any(String) } });
+    expect(await db.etudiant.count()).toBe(0);
+  });
+});
+
 describe("modifierEtudiant", () => {
   it("modifie l'identité sans toucher au matricule, à la filière ni à l'année d'entrée", async () => {
     const { id } = reussi(await actions.creerEtudiant(saisieEtudiant(m.ifs.id)));

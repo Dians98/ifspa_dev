@@ -32,6 +32,22 @@ export function IdentiteFiche({ e }: { e: DossierEtudiant }) {
       ),
     ],
     ["Adresse", e.adresse ?? NON_RENSEIGNE],
+    [
+      "Tuteur",
+      e.tuteur ? (
+        <>
+          {e.tuteur.nom}
+          {e.tuteur.profession && <span className="block font-normal text-muted-foreground">{e.tuteur.profession}</span>}
+          {e.tuteur.telephone && (
+            <a href={`tel:${e.tuteur.telephone}`} className="block text-primary underline underline-offset-2">
+              {e.tuteur.telephoneAffiche}
+            </a>
+          )}
+        </>
+      ) : (
+        NON_RENSEIGNE
+      ),
+    ],
     ["Année d'entrée", e.anneeEntree],
     ["Inscrit par", e.creePar ?? NON_RENSEIGNE],
   ];

@@ -188,7 +188,7 @@ describe("validerEtudiants", () => {
     expect(v.valides).toEqual([
       {
         ligne: 2, numero: "7", nom: "RAKOTO", prenoms: "Jean", sexe: "M", dateNaissance: "2004-05-10", lieuNaissance: "Toamasina",
-        cin: "501011012345", telephone: "0341234567", adresse: "Tanambao V", filiere: "IF", anneeEntree: 2026, niveau: 1,
+        cin: "501011012345", telephone: "0341234567", adresse: "Tanambao V", tuteurNom: null, tuteurTelephone: null, tuteurProfession: null, filiere: "IF", anneeEntree: 2026, niveau: 1,
         redoublant: true, droitsEnTranches: 3,
       },
     ]);
@@ -396,5 +396,34 @@ describe("validerPaiements", () => {
 
     expect(v.refusees).toEqual([{ ligne: 2, numero: "1" }]);
     expect(erreurs(v)).toEqual([expect.stringMatching(/colonne « Montant \(Ar\) » \(« 0 »\) : le montant doit être supérieur à 0/)]);
+  });
+});
+
+describe("validerEtudiants : tuteur", () => {
+  it("lit nom, téléphone (0 initial rendu) et profession du tuteur", () => {
+    const v = etudiants([{ tuteurNom: " RAKOTO  Jean ", tuteurTelephone: 331234567, tuteurProfession: "Commerçant" }]);
+
+    expect(v.messages).toEqual([]);
+    expect(v.valides[0]).toMatchObject({ tuteurNom: "RAKOTO Jean", tuteurTelephone: "0331234567", tuteurProfession: "Commerçant" });
+  });
+
+  it("colonnes du tuteur absentes ou vides : null, la ligne passe", () => {
+    const v = etudiants([{ tuteurNom: null, tuteurTelephone: null, tuteurProfession: null }]);
+
+    expect(v.valides[0]).toMatchObject({ tuteurNom: null, tuteurTelephone: null, tuteurProfession: null });
+  });
+
+  it("téléphone ou profession sans nom : ligne refusée sur la colonne « Tuteur »", () => {
+    const v = etudiants([{ tuteurProfession: "Commerçant" }]);
+
+    expect(v.valides).toEqual([]);
+    expect(v.refusees).toEqual([{ ligne: 2, numero: "1" }]);
+    expect(erreurs(v)).toEqual([expect.stringMatching(/colonne « Tuteur ».*nom du tuteur manquant/)]);
+  });
+
+  it("téléphone du tuteur invalide : refusé sur sa colonne", () => {
+    const v = etudiants([{ tuteurNom: "RAKOTO Jean", tuteurTelephone: "12345" }]);
+
+    expect(erreurs(v)).toEqual([expect.stringMatching(/colonne « Téléphone tuteur » \(« 12345 »\) : numéro malgache attendu/)]);
   });
 });

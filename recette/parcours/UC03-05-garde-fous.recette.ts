@@ -11,7 +11,7 @@ test("UC03-05 : garde-fous, soi-même et comptes modifiés entre-temps", async (
   const w2 = await fenetreAdmin(browser, { width: 1440, height: 1300 });
 
   try {
-    await test.step("1. Sur sa propre ligne, l'administrateur n'a aucune action : « Vous » et une pastille d'information", async () => {
+    await test.step("1. Sur sa propre ligne, l'administrateur n'a que « Changer mon mot de passe » : ni rôle, ni réinitialisation, ni désactivation", async () => {
       await ouvrirListe(w1.page);
       const moi = ligne(w1.page, "admin@ifspa.mg");
       await expect(moi).toContainText("Vous");
@@ -20,13 +20,15 @@ test("UC03-05 : garde-fous, soi-même et comptes modifiés entre-temps", async (
       await capture(w1.page, DOSSIER, "UC03-05-01-propre-ligne");
     });
 
-    await test.step("2. La pastille explique pourquoi : rôle, mot de passe et désactivation de son propre compte sont refusés", async () => {
-      await ligne(w1.page, "admin@ifspa.mg").getByRole("button", { name: "Pourquoi certaines actions ne sont pas proposées" }).click();
-      const info = w1.page.getByRole("dialog");
-      await expect(info.getByText("Vous ne pouvez pas changer votre propre rôle.")).toBeVisible();
-      await expect(info.getByText("Vous ne pouvez pas réinitialiser votre propre mot de passe ici : demandez-le à un autre administrateur.")).toBeVisible();
-      await expect(info.getByText("Vous ne pouvez pas désactiver votre propre compte.")).toBeVisible();
-      await capture(w1.page, DOSSIER, "UC03-05-02-motifs");
+    await test.step("2. « Changer mon mot de passe » ouvre la fenêtre : mot de passe actuel, nouveau, confirmation", async () => {
+      const moi = ligne(w1.page, "admin@ifspa.mg");
+      await expect(moi.getByRole("button", { name: "Pourquoi certaines actions ne sont pas proposées" })).toHaveCount(0);
+      await moi.getByRole("button", { name: "Changer mon mot de passe" }).click();
+      const fenetre = w1.page.getByRole("dialog", { name: "Changer mon mot de passe" });
+      await expect(fenetre.getByLabel("Mot de passe actuel")).toBeVisible();
+      await expect(fenetre.getByLabel("Nouveau mot de passe", { exact: true })).toBeVisible();
+      await expect(fenetre.getByLabel("Confirmer le nouveau mot de passe")).toBeVisible();
+      await capture(w1.page, DOSSIER, "UC03-05-02-changer-mon-mot-de-passe");
       await w1.page.keyboard.press("Escape");
     });
 

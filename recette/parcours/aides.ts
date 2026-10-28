@@ -116,7 +116,7 @@ export async function inscrire(page: Page, e: EtudiantRecette, avantEnvoi?: () =
   await page.getByRole("radio", { name: e.sexe }).click();
   await page.getByLabel("Date de naissance").fill(e.naissance);
   await page.getByLabel("Lieu de naissance").fill(e.lieu);
-  await page.getByLabel("Téléphone").fill(e.telephone);
+  await page.getByLabel("Téléphone", { exact: true }).fill(e.telephone);
   await page.getByLabel("Adresse").fill(e.adresse);
   await page.getByRole("radio", { name: NOM_FILIERE[e.filiere] }).click();
   await expect(page.getByText("Matricule (indicatif)")).toBeVisible();

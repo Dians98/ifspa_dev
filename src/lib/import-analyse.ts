@@ -349,7 +349,7 @@ function canonique(annee: { id: string; libelle: string }, etudiants: EtudiantPl
     if (e.statut === "nouveau" && d && e.tarif) {
       lignes.push([
         "nouveau", e.ligne, e.numero, d.nom, d.prenoms, d.sexe, d.dateNaissance, d.lieuNaissance, d.cin, d.telephone, d.adresse,
-        e.filiereId, e.anneeEntreeId, d.anneeEntree, d.niveau, d.redoublant, d.droitsEnTranches,
+        d.tuteurNom, d.tuteurTelephone, d.tuteurProfession, e.filiereId, e.anneeEntreeId, d.anneeEntree, d.niveau, d.redoublant, d.droitsEnTranches,
         e.tarif.droitsInscription, e.tarif.montantMensuel, e.tarif.nombreMois,
       ]);
     } else if (e.statut === "existant" && e.existant) {

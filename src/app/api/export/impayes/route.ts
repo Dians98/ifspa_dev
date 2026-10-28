@@ -28,6 +28,9 @@ export async function GET(request: Request) {
       { header: { value: "Filière", ...entete }, width: 18, cell: (l) => l.filiere.nom },
       { header: { value: "Niveau", ...entete }, width: 22, cell: (l) => l.libelleNiveau ?? "" },
       { header: { value: "Téléphone", ...entete }, width: 16, cell: (l) => l.telephoneAffiche ?? "" },
+      { header: { value: "Tuteur", ...entete }, width: 22, cell: (l) => l.tuteur?.nom ?? "" },
+      { header: { value: "Téléphone tuteur", ...entete }, width: 16, cell: (l) => l.tuteur?.telephoneAffiche ?? "" },
+      { header: { value: "Profession tuteur", ...entete }, width: 18, cell: (l) => l.tuteur?.profession ?? "" },
       { header: { value: "Mois en retard", ...entete }, width: 15, cell: (l) => ({ value: l.moisEnRetard, type: Number }) },
       {
         header: { value: "Reste en retard (Ar)", ...entete },

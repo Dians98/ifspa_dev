@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { ARRETES, DEVISE, ETABLISSEMENT } from "@/lib/etablissement";
+import { DEVISE, ETABLISSEMENT } from "@/lib/etablissement";
 import logo from "../../../public/brand/logo-ifspa.png";
 
 type Coordonnees = {
@@ -82,7 +82,7 @@ export function PiedDePage({ coord }: { coord: Coordonnees }) {
       </div>
 
       <div className="border-t">
-        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-6 text-sm text-muted-foreground sm:px-6 md:flex-row md:justify-between lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 py-6 text-center text-sm text-muted-foreground sm:px-6 lg:px-8">
           <p>
             © {new Date().getFullYear()} {ETABLISSEMENT.sigle} — Conçu et réalisé par {" "}
             <a
@@ -94,8 +94,7 @@ export function PiedDePage({ coord }: { coord: Coordonnees }) {
               Diano ANDRIANTSALAMA
               <span className="sr-only"> (nouvel onglet)</span>
             </a>
-          </p>
-          <p className="tabular">Établissement autorisé par arrêté {ARRETES[0].reference}</p>
+          </p>
         </div>
       </div>
     </footer>

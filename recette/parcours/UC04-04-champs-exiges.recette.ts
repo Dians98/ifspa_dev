@@ -47,7 +47,7 @@ test("UC04-04 : champs exigés et saisies refusées, rien n'est créé", async (
   });
 
   await test.step("3. Numéro de téléphone mal formé", async () => {
-    await page.getByLabel("Téléphone").fill("034 12");
+    await page.getByLabel("Téléphone", { exact: true }).fill("034 12");
     await page.getByLabel("Adresse").fill(solofo.adresse);
     await inscrire.click();
     await expect(
@@ -58,7 +58,7 @@ test("UC04-04 : champs exigés et saisies refusées, rien n'est créé", async (
   });
 
   await test.step("4. Date de naissance dans le futur", async () => {
-    await page.getByLabel("Téléphone").fill(solofo.telephone);
+    await page.getByLabel("Téléphone", { exact: true }).fill(solofo.telephone);
     await page.getByLabel("Date de naissance").fill("2030-01-01");
     await inscrire.click();
     await expect(page.getByText("La date de naissance doit être passée.", { exact: true })).toBeVisible();

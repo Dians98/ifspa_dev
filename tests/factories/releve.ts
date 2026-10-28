@@ -52,6 +52,7 @@ export function fabriquerReleve(options: { sexe?: Sexe; paiements?: PaiementFich
       telephoneAffiche: null,
       email: null,
       adresse: null,
+      tuteur: null,
       filiere: { id: "f1", code: "IF", nom: "Infirmier(e)s", dureeAnnees: 3 },
       anneeEntree: "2026-2027",
       statut: "ACTIF",

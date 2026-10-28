@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, LogOut } from "lucide-react";
+import { KeyRound, Loader2, LogOut } from "lucide-react";
 import { toast } from "sonner";
+import { DialogueMotDePasse } from "@/components/app/dialogue-mot-de-passe";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -69,6 +70,21 @@ export function MenuUtilisateur({ utilisateurId, nom, role }: { utilisateurId: s
           <span className="block truncate text-sm font-semibold text-sidebar-primary">{nom}</span>
           <span className="block truncate text-xs text-sidebar-foreground/80">{LIBELLE_ROLE[role]}</span>
         </p>
+        <DialogueMotDePasse
+          declencheur={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              disabled={!enLigne}
+              aria-label="Changer mon mot de passe"
+              title={enLigne ? "Changer mon mot de passe" : "Changement du mot de passe impossible hors ligne"}
+              className="size-9 shrink-0 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:size-8"
+            >
+              <KeyRound aria-hidden />
+            </Button>
+          }
+        />
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

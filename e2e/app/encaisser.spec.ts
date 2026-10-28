@@ -108,7 +108,7 @@ test.describe("Encaisser — secrétariat", () => {
 
     await expect(page.getByText(/Reste à payer :\s*320\s000\sAr/)).toBeVisible();
     await expect(page.getByText(etudiant.nomComplet).first()).toBeVisible();
-    await page.getByRole("button", { name: /Changer/ }).click();
+    await page.getByRole("button", { name: "Changer d'étudiant" }).click();
     await expect(page.getByRole("combobox", { name: /Rechercher l'étudiant/ })).toBeVisible();
   });
 });

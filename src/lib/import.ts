@@ -32,6 +32,10 @@ export type EtudiantImport = {
   /** « 0341234567 » */
   telephone: string | null;
   adresse: string | null;
+  tuteurNom: string | null;
+  /** « 0331234567 » */
+  tuteurTelephone: string | null;
+  tuteurProfession: string | null;
   /** Code en majuscules, existence vérifiée par l'analyse. */
   filiere: string;
   anneeEntree: number;
@@ -71,6 +75,8 @@ const NOM_MAX = 80;
 const PRENOMS_MAX = 120;
 const LIEU_MAX = 80;
 const ADRESSE_MAX = 200;
+const TUTEUR_NOM_MAX = 120;
+const PROFESSION_MAX = 80;
 const NUMERO_MAX = 20;
 const REFERENCE_MAX = 60;
 const RECU_PAPIER_MAX = 40;
@@ -321,6 +327,9 @@ export function validerEtudiants(feuille: FeuilleLue<CleEtudiant>, cadre: CadreV
     const cin = v.lire("cin", lireCin);
     const telephone = v.lire("telephone", lireTelephone);
     const adresse = v.lire("adresse", (c) => lireTexte(c, ADRESSE_MAX, "Adresse"));
+    const tuteurNom = v.lire("tuteurNom", (c) => lireTexte(c, TUTEUR_NOM_MAX, "Nom du tuteur"));
+    const tuteurTelephone = v.lire("tuteurTelephone", lireTelephone);
+    const tuteurProfession = v.lire("tuteurProfession", (c) => lireTexte(c, PROFESSION_MAX, "Profession"));
     const filiere = v.lire("filiere", (c) => lireTexte(c, 10, "Code"), true);
     const anneeEntree = v.lire("anneeEntree", lireAnneeEntree, true);
     const niveau = v.lire("niveau", lireNiveau, true);
@@ -331,6 +340,9 @@ export function validerEtudiants(feuille: FeuilleLue<CleEtudiant>, cadre: CadreV
       const refus = controleDateNaissance(dateDuJour(dateNaissance), cadre.jour) ?? (dateNaissance < "1900-01-01" ? "date de naissance invalide." : null);
       if (refus) v.refuser("dateNaissance", refus.charAt(0).toLowerCase() + refus.slice(1));
     }
+    if (tuteurNom === "" && ((tuteurTelephone ?? null) !== null || (tuteurProfession ?? "") !== "")) {
+      v.refuser("tuteurNom", "nom du tuteur manquant alors que son téléphone ou sa profession est rempli.");
+    }
     if (nom !== undefined && prenoms !== undefined && dateNaissance !== undefined && EXEMPLES.has(cleIdentite({ nom, prenoms, dateNaissance }))) {
       v.refuser("nom", "ligne d'exemple du modèle : remplacez-la par vos données ou supprimez-la.");
     }
@@ -339,6 +351,7 @@ export function validerEtudiants(feuille: FeuilleLue<CleEtudiant>, cadre: CadreV
       !v.erreur &&
       numero !== undefined && nom !== undefined && prenoms !== undefined && sexe !== undefined && dateNaissance !== undefined &&
       lieuNaissance !== undefined && cin !== undefined && telephone !== undefined && adresse !== undefined && filiere !== undefined &&
+      tuteurNom !== undefined && tuteurTelephone !== undefined && tuteurProfession !== undefined &&
       anneeEntree !== undefined && niveau !== undefined && redoublant !== undefined && droitsEnTranches !== undefined;
     lus.push({
       ligne: l.ligne,
@@ -355,6 +368,9 @@ export function validerEtudiants(feuille: FeuilleLue<CleEtudiant>, cadre: CadreV
             cin,
             telephone,
             adresse: adresse === "" ? null : adresse,
+            tuteurNom: tuteurNom === "" ? null : tuteurNom,
+            tuteurTelephone,
+            tuteurProfession: tuteurProfession === "" ? null : tuteurProfession,
             filiere: filiere.toUpperCase(),
             anneeEntree,
             niveau,

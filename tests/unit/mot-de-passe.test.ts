@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { ALPHABET_MOT_DE_PASSE, genererMotDePasse } from "@/lib/mot-de-passe";
+import {
+  ALPHABET_MOT_DE_PASSE,
+  genererMotDePasse,
+  LONGUEUR_MIN_MOT_DE_PASSE,
+  schemaChangementMotDePasse,
+} from "@/lib/mot-de-passe";
 
 describe("genererMotDePasse", () => {
   it("produit trois groupes de quatre caractères séparés par des tirets", () => {
@@ -27,5 +32,35 @@ describe("genererMotDePasse", () => {
   it("tire des mots de passe différents d'un appel à l'autre", () => {
     const tires = new Set(Array.from({ length: 100 }, () => genererMotDePasse()));
     expect(tires.size).toBe(100);
+  });
+});
+
+describe("schemaChangementMotDePasse", () => {
+  const valide = { actuel: "Ancien-2026", nouveau: "Nouveau-2026", confirmation: "Nouveau-2026" };
+  const erreurs = (entree: typeof valide) => {
+    const r = schemaChangementMotDePasse.safeParse(entree);
+    return r.success ? {} : Object.fromEntries(r.error.issues.map((i) => [i.path.join("."), i.message]));
+  };
+
+  it("accepte un nouveau mot de passe confirmé et différent de l'actuel", () => {
+    expect(schemaChangementMotDePasse.safeParse(valide).success).toBe(true);
+  });
+
+  it("exige le mot de passe actuel", () => {
+    expect(erreurs({ ...valide, actuel: "" })).toHaveProperty("actuel");
+  });
+
+  it(`refuse un nouveau mot de passe de moins de ${LONGUEUR_MIN_MOT_DE_PASSE} caractères`, () => {
+    expect(erreurs({ ...valide, nouveau: "Court1", confirmation: "Court1" })).toHaveProperty("nouveau");
+  });
+
+  it("refuse une confirmation différente, signalée sur le champ de confirmation", () => {
+    expect(erreurs({ ...valide, confirmation: "Nouveau-2027" })).toEqual({
+      confirmation: "Les deux saisies ne sont pas identiques.",
+    });
+  });
+
+  it("refuse un nouveau mot de passe identique à l'actuel", () => {
+    expect(erreurs({ actuel: "Meme-2026", nouveau: "Meme-2026", confirmation: "Meme-2026" })).toHaveProperty("nouveau");
   });
 });

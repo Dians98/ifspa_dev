@@ -18,6 +18,9 @@ export type CleEtudiant =
   | "cin"
   | "telephone"
   | "adresse"
+  | "tuteurNom"
+  | "tuteurTelephone"
+  | "tuteurProfession"
   | "filiere"
   | "anneeEntree"
   | "niveau"
@@ -52,6 +55,9 @@ export const COLONNES_ETUDIANTS: readonly ColonneImport<CleEtudiant>[] = [
   { cle: "cin", entete: "CIN", obligatoire: false, aide: "12 chiffres, en texte.", largeur: 16, alias: ["n cin", "no cin"], texte: true },
   { cle: "telephone", entete: "Téléphone", obligatoire: false, aide: "En texte, ex. 034 12 345 67.", largeur: 15, alias: ["tel", "telephone"], texte: true },
   { cle: "adresse", entete: "Adresse", obligatoire: false, aide: "", largeur: 24 },
+  { cle: "tuteurNom", entete: "Tuteur", obligatoire: false, aide: "Nom du tuteur, facultatif. Obligatoire si son téléphone ou sa profession est rempli.", largeur: 22, alias: ["nom tuteur", "nom du tuteur"] },
+  { cle: "tuteurTelephone", entete: "Téléphone tuteur", obligatoire: false, aide: "En texte, ex. 033 12 345 67.", largeur: 16, alias: ["tel tuteur", "telephone du tuteur"], texte: true },
+  { cle: "tuteurProfession", entete: "Profession tuteur", obligatoire: false, aide: "", largeur: 18, alias: ["profession", "profession du tuteur"] },
   { cle: "filiere", entete: "Filière", obligatoire: true, aide: "Code de la filière.", largeur: 8, alias: ["code filiere"] },
   { cle: "anneeEntree", entete: "Année d'entrée", obligatoire: true, aide: "Année de la 1re rentrée à l'IFSPA, ex. 2024 pour 2024-2025. Elle figure dans le matricule.", largeur: 14, alias: ["annee entree"] },
   { cle: "niveau", entete: "Niveau", obligatoire: true, aide: "1, 2 ou 3 : la classe suivie cette année.", largeur: 16, prefixe: true },
@@ -169,16 +175,19 @@ export function exemplesEtudiants(p: ParametresModele): LigneModele<CleEtudiant>
     {
       numero: "1", nom: a.nom, prenoms: a.prenoms, sexe: "F", dateNaissance: naissance(a.dateNaissance),
       lieuNaissance: "Toamasina", cin: "", telephone: "034 12 345 67", adresse: "Lot II A 12 Tanambao V",
+      tuteurNom: "RAKOTO Jean", tuteurTelephone: "033 12 345 67", tuteurProfession: "Commerçant",
       filiere: p.codesFilieres[0] ?? "IF", anneeEntree: String(p.anneeDebut), niveau: "1", redoublant: "non", droitsEnTranches: "3",
     },
     {
       numero: "2", nom: b.nom, prenoms: b.prenoms, sexe: "F", dateNaissance: naissance(b.dateNaissance),
       lieuNaissance: "Fénérive-Est", cin: "501 011 012 345", telephone: "032 98 765 43", adresse: "Ankirihiry",
+      tuteurNom: "", tuteurTelephone: "", tuteurProfession: "",
       filiere: p.codesFilieres[1] ?? p.codesFilieres[0] ?? "SF", anneeEntree: String(p.anneeDebut - 1), niveau: String(deux), redoublant: "non", droitsEnTranches: "1",
     },
     {
       numero: "3", nom: c.nom, prenoms: c.prenoms, sexe: "M", dateNaissance: naissance(c.dateNaissance),
       lieuNaissance: "Brickaville", cin: "", telephone: "033 45 678 90", adresse: "Morarano",
+      tuteurNom: "RASOA Marie", tuteurTelephone: "034 98 765 43", tuteurProfession: "Institutrice",
       filiere: p.codesFilieres[0] ?? "IF", anneeEntree: String(p.anneeDebut - 2), niveau: String(deux), redoublant: "oui", droitsEnTranches: "1",
     },
   ];

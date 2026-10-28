@@ -38,6 +38,9 @@ export default async function PageModifierEtudiant({ params }: { params: Promise
           telephone: e.telephoneAffiche ?? "",
           email: e.email ?? "",
           adresse: e.adresse ?? "",
+          tuteurNom: e.tuteur?.nom ?? "",
+          tuteurTelephone: e.tuteur?.telephoneAffiche ?? "",
+          tuteurProfession: e.tuteur?.profession ?? "",
         }}
         verrouille={{
           matricule: e.matricule,

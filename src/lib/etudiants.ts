@@ -88,6 +88,29 @@ const champTelephone = z
     return t;
   });
 
+const champTelephoneFacultatif = z
+  .string()
+  .nullish()
+  .transform((v, ctx) => {
+    const saisie = (v ?? "").trim();
+    if (saisie === "") return null;
+    const t = normaliserTelephone(saisie);
+    if (!t) {
+      ctx.addIssue({ code: "custom", message: "Numéro malgache attendu : 10 chiffres commençant par 032 à 038 (ex. 034 12 345 67)." });
+      return z.NEVER;
+    }
+    return t;
+  });
+
+/** Texte facultatif : vide → null, espaces multiples réduits. */
+const texteFacultatif = (max: number, tropLong: string) =>
+  z
+    .string()
+    .nullish()
+    .transform((v) => (v ?? "").replace(/\s+/g, " ").trim())
+    .pipe(z.string().max(max, tropLong))
+    .transform((v) => (v === "" ? null : v));
+
 /** Date saisie « AAAA-MM-JJ » → minuit UTC (colonne `@db.Date`). */
 const champDate = z
   .string({ error: "Indiquez la date de naissance." })
@@ -139,7 +162,22 @@ const identite = {
   telephone: champTelephone,
   email: champEmail,
   adresse: texte("Indiquez l'adresse.", 3, 200, "Adresse trop longue (200 caractères maximum)."),
+  tuteurNom: texteFacultatif(120, "Nom du tuteur trop long (120 caractères maximum)."),
+  tuteurTelephone: champTelephoneFacultatif,
+  tuteurProfession: texteFacultatif(80, "Profession trop longue (80 caractères maximum)."),
 };
+
+const MESSAGE_NOM_TUTEUR = "Indiquez le nom du tuteur, ou videz son téléphone et sa profession.";
+
+/** Un téléphone ou une profession de tuteur sans son nom ne permet pas de savoir qui appeler. */
+function controlerTuteur(
+  v: { tuteurNom: string | null; tuteurTelephone: string | null; tuteurProfession: string | null },
+  ctx: z.RefinementCtx,
+) {
+  if (!v.tuteurNom && (v.tuteurTelephone || v.tuteurProfession)) {
+    ctx.addIssue({ code: "custom", path: ["tuteurNom"], message: MESSAGE_NOM_TUTEUR });
+  }
+}
 
 export const schemaCreationEtudiant = z.object(
   {
@@ -155,7 +193,7 @@ export const schemaCreationEtudiant = z.object(
     confirmerDoublon: z.boolean().default(false),
   },
   DONNEES_INVALIDES,
-);
+).superRefine(controlerTuteur);
 export type EntreeCreationEtudiant = z.input<typeof schemaCreationEtudiant>;
 export type CreationEtudiant = z.output<typeof schemaCreationEtudiant>;
 
@@ -163,7 +201,7 @@ export type CreationEtudiant = z.output<typeof schemaCreationEtudiant>;
 export const schemaModificationEtudiant = z.object(
   { id: z.string({ error: "Étudiant introuvable. Rechargez la page." }).min(1, "Étudiant introuvable. Rechargez la page."), ...identite },
   DONNEES_INVALIDES,
-);
+).superRefine(controlerTuteur);
 export type EntreeModificationEtudiant = z.input<typeof schemaModificationEtudiant>;
 export type ModificationEtudiant = z.output<typeof schemaModificationEtudiant>;
 

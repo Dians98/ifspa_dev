@@ -198,6 +198,10 @@ model Etudiant {
   telephone     String?
   email         String?
   adresse       String?
+  // Tuteur facultatif, un seul par étudiant (rétabli le 28/10/2026, avec la profession)
+  tuteurNom        String?
+  tuteurTelephone  String?
+  tuteurProfession String?
   photo         String?
   // Nom, prénoms et matricule sans accents, en minuscules (normaliserRecherche) : recherche sans extension unaccent
   recherche     String

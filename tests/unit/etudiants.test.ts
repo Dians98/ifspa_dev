@@ -256,3 +256,43 @@ describe("controleModifTranches", () => {
     expect(controleModifTranches(5)).not.toBeNull();
   });
 });
+
+describe("tuteur (facultatif, un par étudiant)", () => {
+  it("absent ou vide : les trois champs valent null", () => {
+    const r = analyser({ tuteurNom: "  ", tuteurTelephone: "", tuteurProfession: undefined });
+    expect(r.success && [r.data.tuteurNom, r.data.tuteurTelephone, r.data.tuteurProfession]).toEqual([null, null, null]);
+  });
+
+  it("nom et profession aux espaces réduits, téléphone normalisé", () => {
+    const r = analyser({ tuteurNom: " RAKOTO   Jean ", tuteurTelephone: "+261 33 12 345 67", tuteurProfession: "Commerçant " });
+    expect(r.success && [r.data.tuteurNom, r.data.tuteurTelephone, r.data.tuteurProfession]).toEqual([
+      "RAKOTO Jean",
+      "0331234567",
+      "Commerçant",
+    ]);
+  });
+
+  it("téléphone non malgache : refusé sur le champ du tuteur", () => {
+    const r = analyser({ tuteurNom: "RAKOTO Jean", tuteurTelephone: "12345" });
+    expect(r.success).toBe(false);
+    expect(!r.success && r.error.issues.map((i) => i.path.join("."))).toEqual(["tuteurTelephone"]);
+  });
+
+  it("téléphone ou profession sans nom : le nom du tuteur est demandé", () => {
+    for (const surcharge of [{ tuteurTelephone: "033 12 345 67" }, { tuteurProfession: "Commerçant" }]) {
+      const r = analyser(surcharge);
+      expect(!r.success && r.error.issues.map((i) => i.path.join("."))).toEqual(["tuteurNom"]);
+    }
+    const { filiereId: _f, niveau: _n, ...identite } = SAISIE;
+    const r = schemaModificationEtudiant.safeParse({ id: "e1", ...identite, tuteurProfession: "Commerçant" });
+    expect(!r.success && r.error.issues.map((i) => i.path.join("."))).toEqual(["tuteurNom"]);
+  });
+
+  it("nom seul accepté ; nom ou profession trop longs refusés", () => {
+    expect(analyser({ tuteurNom: "RAKOTO Jean" }).success).toBe(true);
+    expect(messages(analyser({ tuteurNom: "x".repeat(121) }))).toEqual(["Nom du tuteur trop long (120 caractères maximum)."]);
+    expect(messages(analyser({ tuteurNom: "A", tuteurProfession: "x".repeat(81) }))).toEqual([
+      "Profession trop longue (80 caractères maximum).",
+    ]);
+  });
+});

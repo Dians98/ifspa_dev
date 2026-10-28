@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus } from "lucide-react";
+import { DialogueMotDePasse } from "@/components/app/dialogue-mot-de-passe";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TableRow } from "@/components/ui/table";
@@ -176,7 +177,17 @@ function LigneUtilisateur({ utilisateur: u }: { utilisateur: UtilisateurParametr
               Réactiver
             </BoutonAction>
           )}
-          <MotifsRefus motifs={motifs} />
+          {u.estMoi ? (
+            <DialogueMotDePasse
+              declencheur={
+                <Button variant="outline" size="sm" className="max-md:h-11">
+                  Changer mon mot de passe
+                </Button>
+              }
+            />
+          ) : (
+            <MotifsRefus motifs={motifs} />
+          )}
         </div>
       </CelluleAdaptative>
     </LigneAdaptative>

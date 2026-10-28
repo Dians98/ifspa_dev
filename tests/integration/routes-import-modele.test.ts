@@ -145,7 +145,7 @@ describe("modèle servi à l'administrateur", () => {
     expect([...corps.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
     const texte = new TextDecoder().decode(corps);
     expect(texte.split("\r\n")[0]).toBe(
-      "N° *;Nom *;Prénoms *;Sexe *;Date de naissance *;Lieu de naissance *;CIN;Téléphone;Adresse;Filière *;Année d'entrée *;Niveau 2026-2027 *;Redoublant;Droits en",
+      "N° *;Nom *;Prénoms *;Sexe *;Date de naissance *;Lieu de naissance *;CIN;Téléphone;Adresse;Tuteur;Téléphone tuteur;Profession tuteur;Filière *;Année d'entrée *;Niveau 2026-2027 *;Redoublant;Droits en",
     );
     expect(texte).toContain("RAKOTOMALALA");
   });

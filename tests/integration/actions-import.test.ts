@@ -764,3 +764,24 @@ describe("classeur .xlsx et variante deux CSV", () => {
     expect(reussi(etat)).toMatchObject({ etudiantsCrees: 3, paiements: 2 });
   });
 });
+
+describe("importerReprise : tuteur", () => {
+  it("enregistre nom, téléphone normalisé et profession du tuteur ; sans tuteur, les trois restent vides", async () => {
+    const depot = depotCsv([
+      etu(1, { tuteurNom: "RAKOTO Jean", tuteurTelephone: "033 12 345 67", tuteurProfession: "Commerçant" }),
+      etu(2),
+    ]);
+
+    expect((await importer(depot)).statut).toBe("succes");
+
+    const parNom = Object.fromEntries(
+      (await db.etudiant.findMany({ select: { nom: true, tuteurNom: true, tuteurTelephone: true, tuteurProfession: true } })).map(
+        ({ nom, ...t }) => [nom, t],
+      ),
+    );
+    expect(parNom).toEqual({
+      NOM1: { tuteurNom: "RAKOTO Jean", tuteurTelephone: "0331234567", tuteurProfession: "Commerçant" },
+      NOM2: { tuteurNom: null, tuteurTelephone: null, tuteurProfession: null },
+    });
+  });
+});
