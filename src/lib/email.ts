@@ -1,15 +1,16 @@
 import "server-only";
 
-// Envoi d'e-mails transactionnels via l'API HTTP de SMTP2GO (offre gratuite).
-// Pour changer de fournisseur (Brevo, Resend…), seule cette fonction est à adapter.
-// Référence API : https://developers.smtp2go.com/reference/send-standard-email
+// Envoi d'e-mails transactionnels via l'API HTTP de Resend.
+// Pour changer de fournisseur, seule cette fonction est à adapter.
+// Référence API : https://resend.com/docs/api-reference/emails/send-email
 //
 // Variables d'environnement :
-//   SMTP2GO_API_KEY        clé API SMTP2GO
-//   EMAIL_EXPEDITEUR       expéditeur vérifié chez le fournisseur, ex. "IFSPA <site@ifspa.mg>"
-//   CONTACT_DESTINATAIRE   adresse qui reçoit les messages du formulaire de contact
+//   RESEND_API_KEY         clé API Resend (re_…)
+//   EMAIL_EXPEDITEUR       adresse d'un domaine vérifié chez Resend, ex. "IFSPA <site@ifspa.mg>"
 
 type Email = {
+  a: string;
+  copie?: readonly string[];
   sujet: string;
   texte: string;
   repondreA?: string;
@@ -17,41 +18,41 @@ type Email = {
 
 export type ResultatEnvoi = { ok: boolean; simule?: boolean };
 
-export async function envoyerEmail({ sujet, texte, repondreA }: Email): Promise<ResultatEnvoi> {
-  const cle = process.env.SMTP2GO_API_KEY;
+export async function envoyerEmail({ a, copie = [], sujet, texte, repondreA }: Email): Promise<ResultatEnvoi> {
+  const cle = process.env.RESEND_API_KEY;
   const expediteur = process.env.EMAIL_EXPEDITEUR;
-  const destinataire = process.env.CONTACT_DESTINATAIRE;
 
-  if (!cle || !expediteur || !destinataire) {
+  if (!cle || !expediteur) {
     if (process.env.NODE_ENV !== "production") {
       // En développement sans configuration : on simule l'envoi.
-      console.info(`[email simulé] ${sujet}\n${texte}`);
+      const copies = copie.length ? `, copie ${copie.join(", ")}` : "";
+      console.info(`[email simulé] à ${a}${copies}\n${sujet}\n${texte}`);
       return { ok: true, simule: true };
     }
-    console.error("[email] configuration manquante : SMTP2GO_API_KEY, EMAIL_EXPEDITEUR ou CONTACT_DESTINATAIRE");
+    console.error("[email] configuration manquante : RESEND_API_KEY ou EMAIL_EXPEDITEUR");
     return { ok: false };
   }
 
   try {
-    const reponse = await fetch("https://api.smtp2go.com/v3/email/send", {
+    const reponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Accept: "application/json",
-        "X-Smtp2go-Api-Key": cle,
+        Authorization: `Bearer ${cle}`,
       },
       body: JSON.stringify({
-        sender: expediteur,
-        to: [destinataire],
+        from: expediteur,
+        to: [a],
+        ...(copie.length ? { cc: [...copie] } : {}),
         subject: sujet,
-        text_body: texte,
-        ...(repondreA ? { custom_headers: [{ header: "Reply-To", value: repondreA }] } : {}),
+        text: texte,
+        ...(repondreA ? { reply_to: repondreA } : {}),
       }),
       signal: AbortSignal.timeout(15_000),
     });
-    const donnees = (await reponse.json().catch(() => null)) as { data?: { succeeded?: number } } | null;
-    const ok = reponse.ok && donnees?.data?.succeeded === 1;
-    if (!ok) console.error("[email] échec SMTP2GO", reponse.status, donnees);
+    const donnees = (await reponse.json().catch(() => null)) as { id?: string; message?: string } | null;
+    const ok = reponse.ok && Boolean(donnees?.id);
+    if (!ok) console.error("[email] échec Resend", reponse.status, donnees?.message ?? donnees);
     return { ok };
   } catch (erreur) {
     console.error("[email] erreur réseau", erreur);

@@ -47,9 +47,9 @@ services:
       SEED_USER_EMAIL: secretariat@ifspa.mg
       SEED_USER_PASSWORD: Secretariat2026!
       SEED_USER_NAME: Secrétariat IFSPA
-      SMTP2GO_API_KEY: ""
+      RESEND_API_KEY: ""
       EMAIL_EXPEDITEUR: IFSPA <site@ifspa.mg>
-      CONTACT_DESTINATAIRE: secretariat@ifspa.mg
+      CONTACT_DESTINATAIRE: admin@ifspa.mg
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: ""
       TURNSTILE_SECRET_KEY: ""
     volumes:

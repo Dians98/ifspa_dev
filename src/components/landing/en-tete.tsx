@@ -10,6 +10,7 @@ import logo from "../../../public/brand/logo-ifspa.png";
 const LIENS = [
   { href: "#institut", label: "L'institut" },
   { href: "#filieres", label: "Filières" },
+  { href: "#admission", label: "Admission" },
   { href: "#galerie", label: "Galerie" },
   { href: "#agrements", label: "Agréments" },
   { href: "#contact", label: "Contact" },
@@ -20,7 +21,7 @@ export function EnTete() {
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
       <div className="mx-auto flex h-18 max-w-7xl items-center justify-between gap-6 px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-3 rounded-md">
-          <Image src={logo} alt="Logo de l'IFSPA" className="h-11 w-auto" priority />
+          <Image src={logo} alt="Logo de l'IFSPA" width={65} height={44} className="h-11 w-auto" priority />
           <span className="leading-tight">
             <span className="block font-heading text-xl font-bold text-primary">IFSPA</span>
             <span className="hidden text-xs text-muted-foreground sm:block">

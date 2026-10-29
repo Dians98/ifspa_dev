@@ -2,7 +2,8 @@
 
 import { headers } from "next/headers";
 import { z } from "zod";
-import { OBJETS_CONTACT } from "@/lib/contact";
+import { copiesContact, DESTINATAIRE_CONTACT, OBJETS_CONTACT } from "@/lib/contact";
+import { db } from "@/lib/db";
 import { envoyerEmail } from "@/lib/email";
 import { verifierTurnstile } from "@/lib/turnstile";
 
@@ -62,7 +63,15 @@ export async function envoyerMessageContact(_precedent: EtatContact, formData: F
   }
 
   const d = resultat.data;
+  const destinataire = process.env.CONTACT_DESTINATAIRE?.trim() || DESTINATAIRE_CONTACT;
+  // Copie aux comptes Secrétariat actifs : un compte créé ou désactivé dans Paramètres est suivi sans réglage.
+  const secretariat = await db.user.findMany({
+    where: { role: "user", OR: [{ banned: false }, { banned: null }] },
+    select: { email: true },
+  });
   const envoi = await envoyerEmail({
+    a: destinataire,
+    copie: copiesContact(destinataire, secretariat.map((u) => u.email)),
     sujet: `[Site IFSPA] ${d.objet} — ${d.nom}`,
     repondreA: d.email || undefined,
     texte: [

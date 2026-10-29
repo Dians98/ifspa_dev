@@ -246,8 +246,8 @@ Le cœur métier est dans des fonctions pures et testables :
   - anti-robot :
     - **Cloudflare Turnstile**, gratuit : widget `src/components/landing/turnstile.tsx`, vérification serveur dans `src/lib/turnstile.ts`, variables `NEXT_PUBLIC_TURNSTILE_SITE_KEY` et `TURNSTILE_SECRET_KEY`. Sans clés en développement, ni widget ni vérification ; en production, les deux clés sont obligatoires ;
     - un champ piège invisible en plus ;
-  - envoi : API SMTP2GO (`src/lib/email.ts`, variables `SMTP2GO_API_KEY`, `EMAIL_EXPEDITEUR`, `CONTACT_DESTINATAIRE`). Sans clé, l'envoi est simulé en développement.
-- [ ] Créer le compte SMTP2GO (gratuit), vérifier l'expéditeur et renseigner les variables en production
+  - envoi : API Resend (`src/lib/email.ts`, variables `RESEND_API_KEY`, `EMAIL_EXPEDITEUR`, `CONTACT_DESTINATAIRE`). Sans clé, l'envoi est simulé en développement.
+- [ ] Vérifier le domaine ifspa.mg chez Resend et renseigner les variables en production
 - [x] Créer un widget Turnstile dans Cloudflare (gratuit), avec le domaine du site (09/10/2026 : clés dans le `.env` de dev ; leur place en production est décrite en phase 8)
 - [x] Galerie photo (section `#galerie`) : diaporama shadcn Carousel (Embla) avec flèches, compteur, légende et vignettes, sans défilement automatique. Composant `src/components/landing/galerie.tsx`, liste des photos `PHOTOS_GALERIE` dans `src/app/page.tsx`, images dans `public/images/galerie/`.
 - [ ] Remplacer les photos d'illustration Pexels (`public/images/illustration/`) par les vraies photos de l'institut
@@ -326,7 +326,7 @@ Décision du 17/10/2026 : **un écran dans Paramètres** (`/app/parametres/impor
   - ⚠️ **Variables `NEXT_PUBLIC_*` figées au build** : Next.js les inscrit dans le code au moment de `pnpm build`. Elles doivent donc être dans le `.env` du PC de dev **avec leurs valeurs de production** avant le build (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `NEXT_PUBLIC_APP_URL` avec le vrai domaine). Les définir seulement dans cPanel ne sert à rien ; en changer une impose de refaire le build et de le renvoyer.
   - Les autres variables (secrètes ou non) sont lues au démarrage du serveur : elles se mettent dans « Setup Node.js App » (voir plus bas), jamais dans le build envoyé.
 - [x] Envoi sans SSH (port fermé chez GasyWeb, ticket à ouvrir) : archive découpée en morceaux de 9 Mo, déposés par le gestionnaire de fichiers, recollés et décompressés (`unzip`) dans `~/ifspa-app` via le Terminal cPanel
-- [x] « Setup Node.js App » : `ifspa-app`, `server.js`, mode Production ; secrets dans `~/ifspa-app/.env.production` (chmod 600), lu par Next au démarrage. **Reste : `SMTP2GO_API_KEY`, `EMAIL_EXPEDITEUR`, `CONTACT_DESTINATAIRE`** (absents du .env de dev)
+- [x] « Setup Node.js App » : `ifspa-app`, `server.js`, mode Production ; secrets dans `~/ifspa-app/.env.production` (chmod 600), lu par Next au démarrage. **Reste : `RESEND_API_KEY`, `EMAIL_EXPEDITEUR`, `CONTACT_DESTINATAIRE`** (absents du .env de dev)
 - [x] Base initiale (migrations + admin + filières, sans année : `SEED_SANS_ANNEE=1`) construite sur un PostgreSQL 10 local puis importée par `psql` dans le Terminal cPanel
 - [ ] HTTPS via AutoSSL ; sauvegardes via les outils de cPanel. **HTTPS obligatoire pour l'encaissement hors ligne** : le service worker n'existe qu'en contexte sécurisé, un poste ouvert en `http://` n'aura jamais le hors ligne.
 - [ ] Postes du guichet : ouvrir `/app/encaisser` en ligne une première fois après chaque déploiement, et mettre un marque-page sur `/app/encaisser` (après une coupure de courant sans Internet, `/` et `/connexion` ne s'ouvrent pas).

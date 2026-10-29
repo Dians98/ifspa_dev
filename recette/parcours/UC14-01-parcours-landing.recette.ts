@@ -102,7 +102,7 @@ test("UC14-01 un visiteur parcourt la landing", async ({ page }) => {
     const pied = page.getByRole("contentinfo");
     await pied.scrollIntoViewIfNeeded();
     await attendreFinDefilement(page);
-    for (const l of ["L'institut", "Filières", "Galerie", "Agréments", "Contact"]) {
+    for (const l of ["L'institut", "Filières", "Admission", "Galerie", "Agréments", "Contact"]) {
       await expect(pied.getByRole("link", { name: l, exact: true }).first()).toBeVisible();
     }
     await expect(pied.getByRole("link", { name: "Infirmier(e)s" })).toHaveAttribute("href", "#filieres");
@@ -110,8 +110,11 @@ test("UC14-01 un visiteur parcourt la landing", async ({ page }) => {
     const credit = pied.getByRole("link", { name: /Diano ANDRIANTSALAMA/ });
     await expect(credit).toHaveAttribute("href", "https://dians98.vercel.app/");
     await expect(credit).toHaveAttribute("target", "_blank");
-    await expect(pied.getByText(/Devise de l'institut à compléter/)).toBeVisible();
-    await expect(pied.getByText("Établissement autorisé par arrêté N° 04460/2011-MESupRes")).toBeVisible();
+    // Une coordonnée ou une devise non saisie n'apparaît pas : aucun « à compléter » visible du public.
+    await expect(pied.getByText(/à compléter/i)).toHaveCount(0);
+    await expect(pied.getByText("Plle 32/32, Station FJKM David Jones, Toamasina")).toBeVisible();
+    await expect(pied.getByText("034 07 576 81")).toBeVisible();
+    await expect(pied.getByText("Foi – Civisme – Performance")).toBeVisible();
     await captureEcran(page, "UC14-01-11-pied-de-page");
   });
 

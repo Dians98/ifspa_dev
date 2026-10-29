@@ -27,6 +27,8 @@ export const metadata: Metadata = {
     title: TITRE_SITE,
     description: DESCRIPTION_SITE,
   },
+  // L'image vient de src/app/opengraph-image.png (convention de fichier de Next).
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

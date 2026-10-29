@@ -5,8 +5,9 @@ import { ArrowRight, CircleCheck, Clock, Mail, MapPin, Phone, ShieldCheck } from
 import { Button } from "@/components/ui/button";
 import { EnTete } from "@/components/landing/en-tete";
 import { FormulaireContact } from "@/components/landing/formulaire-contact";
+import { IconeFacebook } from "@/components/landing/icone-facebook";
 import { PiedDePage } from "@/components/landing/pied-de-page";
-import { ARRETES, ETABLISSEMENT, getCoordonnees } from "@/lib/etablissement";
+import { ARRETES, COORDONNEES, DEVISE, ETABLISSEMENT, ETUDES, getCoordonnees } from "@/lib/etablissement";
 import { DESCRIPTION_SITE, TITRE_SITE, URL_SITE } from "@/lib/site";
 import logo from "../../public/brand/logo-ifspa.png";
 import photoHero from "../../public/images/illustration/hero-etudiants-1920.webp";
@@ -32,8 +33,9 @@ export const metadata: Metadata = {
   },
 };
 
-// Photos d'illustration (Pexels) à remplacer par les vraies photos de l'institut.
-const PHOTOS_GALERIE: PhotoGalerie[] = [
+// Photos d'illustration (Pexels) à remplacer par les vraies photos de l'institut ; chacune est signalée comme telle.
+const PHOTOS_GALERIE: PhotoGalerie[] = (
+  [
   { src: galTension, legende: "Travaux pratiques : prise de la tension artérielle", alt: "Étudiantes s'exerçant à mesurer la tension artérielle" },
   { src: galSimulation, legende: "Simulation sur mannequin", alt: "Étudiants pratiquant des soins sur un mannequin de simulation" },
   { src: galPrelevement, legende: "Apprentissage du prélèvement sanguin", alt: "Étudiante préparant un prélèvement sanguin encadrée par une formatrice" },
@@ -42,7 +44,19 @@ const PHOTOS_GALERIE: PhotoGalerie[] = [
   { src: galEncadrement, legende: "Encadrement en salle de pratique clinique", alt: "Formatrice encadrant des étudiants en salle de pratique" },
   { src: photoInfirmier, legende: "Préparation d'une injection", alt: "Élève infirmière préparant une seringue" },
   { src: photoHero, legende: "Une promotion d'étudiants en tenue", alt: "Groupe d'étudiants en tenue de soins" },
-];
+  ] satisfies PhotoGalerie[]
+).map((p) => ({ ...p, illustration: true }));
+
+const PRESENTATION = `L'${ETABLISSEMENT.nom} est un établissement supérieur privé fondé en ${ETABLISSEMENT.anneeFondation} et autorisé depuis 2011, qui forme en ${ETUDES.dureeAnnees} ans des infirmier(e)s et des sages-femmes.`;
+
+/** Mention posée sur une photo de banque d'images. */
+function MentionIllustration({ className }: { className?: string }) {
+  return (
+    <span className={`pointer-events-none absolute rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white ${className ?? ""}`}>
+      Photo d&apos;illustration
+    </span>
+  );
+}
 
 const FILIERES = [
   {
@@ -51,7 +65,7 @@ const FILIERES = [
     photo: photoInfirmier,
     alt: "Élève infirmière en tenue blanche préparant une seringue",
     texte:
-      "Une formation aux soins infirmiers qui alterne enseignements théoriques, travaux pratiques et stages en milieu de soins.",
+      "Trois ans de formation aux soins infirmiers : cours théoriques, travaux pratiques sur modèles anatomiques, puis stages auprès des patients.",
     points: ["Soins infirmiers et gestes techniques", "Stages en établissement de santé", "Titre reconnu dans la Fonction publique"],
     teinte: "bleu" as const,
   },
@@ -61,7 +75,7 @@ const FILIERES = [
     photo: photoSageFemme,
     alt: "Sage-femme s'occupant d'un nouveau-né en maternité",
     texte:
-      "Une formation à l'accompagnement de la grossesse, de l'accouchement et des premiers jours du nouveau-né, avec stages en maternité.",
+      "Trois ans de formation pour accompagner la grossesse, l'accouchement et les premiers jours du nouveau-né : cours théoriques, travaux pratiques, puis stages auprès des patients.",
     points: ["Suivi de grossesse et accouchement", "Soins au nouveau-né", "Stages en maternité"],
     teinte: "rose" as const,
   },
@@ -75,22 +89,49 @@ export default async function Accueil() {
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || undefined;
 
   // Données structurées : uniquement ce qui est affiché sur la page (les coordonnées non saisies sont omises).
+  const institut = { "@id": `${URL_SITE}/#institut` };
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "EducationalOrganization",
-    name: ETABLISSEMENT.nom,
-    alternateName: ETABLISSEMENT.sigle,
-    url: `${URL_SITE}/`,
-    logo: `${URL_SITE}/brand/logo-ifspa.png`, // chemin public stable, pas l'URL hachée du build
-    address: {
-      "@type": "PostalAddress",
-      ...(coord.adresse && { streetAddress: coord.adresse }),
-      addressLocality: coord.ville,
-      addressRegion: ETABLISSEMENT.region,
-      addressCountry: "MG",
-    },
-    ...(coord.telephone && { telephone: coord.telephone }),
-    ...(coord.email && { email: coord.email }),
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": `${URL_SITE}/#site`,
+        url: `${URL_SITE}/`,
+        name: ETABLISSEMENT.sigle,
+        alternateName: ETABLISSEMENT.nom,
+        inLanguage: "fr",
+        publisher: institut,
+      },
+      {
+        "@type": "CollegeOrUniversity",
+        ...institut,
+        name: ETABLISSEMENT.nom,
+        alternateName: ETABLISSEMENT.sigle,
+        description: PRESENTATION,
+        foundingDate: String(ETABLISSEMENT.anneeFondation),
+        ...(DEVISE && { slogan: DEVISE }),
+        url: `${URL_SITE}/`,
+        logo: `${URL_SITE}/brand/logo-ifspa.png`, // chemin public stable, pas l'URL hachée du build
+        address: {
+          "@type": "PostalAddress",
+          ...(coord.adresse && { streetAddress: coord.adresse }),
+          addressLocality: coord.ville,
+          addressRegion: ETABLISSEMENT.region,
+          addressCountry: "MG",
+        },
+        ...(coord.telephone && { telephone: coord.telephone }),
+        ...(coord.email && { email: coord.email }),
+      },
+      ...FILIERES.map((f) => ({
+        "@type": "EducationalOccupationalProgram",
+        name: f.nom,
+        description: f.texte,
+        url: `${URL_SITE}/#filieres`,
+        timeToComplete: `P${ETUDES.dureeAnnees}Y`,
+        programPrerequisites: ETUDES.admission,
+        provider: institut,
+      })),
+    ],
   };
 
   return (
@@ -123,6 +164,7 @@ export default async function Accueil() {
               className="object-cover object-[center_35%]"
             />
           </div>
+          <MentionIllustration className="right-4 bottom-4 sm:right-6" />
           <div aria-hidden className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgb(18_36_60/0.92)_0%,rgb(18_36_60/0.78)_45%,rgb(18_36_60/0.25)_100%)]" />
           {/* Voile qui s'assombrit à mesure que la photo est recouverte */}
           <div aria-hidden className="ouverture-voile absolute inset-0 -z-10 bg-[rgb(12_24_40)] opacity-0" />
@@ -132,8 +174,7 @@ export default async function Accueil() {
                 Se former aux métiers paramédicaux à Toamasina
               </h1>
               <p className="arrivee mt-6 max-w-xl text-lg leading-relaxed text-white/85 [--rang:1]">
-                L&apos;{ETABLISSEMENT.nom} est un établissement supérieur privé autorisé depuis 2011, qui forme en deux
-                filières : Infirmier(e)s et Sage-femmes.
+                {PRESENTATION}
               </p>
               <div className="arrivee mt-10 flex flex-wrap gap-3 [--rang:2]">
                 <Button asChild size="lg" className="group/cta h-12 bg-rose-fonce px-6 text-white hover:bg-rose-fonce/90">
@@ -179,17 +220,28 @@ export default async function Accueil() {
               </h2>
               <div className="mt-6 space-y-4 text-lg leading-relaxed text-muted-foreground">
                 <p>
-                  Implanté à Toamasina, l&apos;{ETABLISSEMENT.sigle} prépare ses étudiants aux métiers d&apos;infirmier(e)
-                  et de sage-femme, dans le domaine « {ETABLISSEMENT.domaine} ».
+                  Fondé en {ETABLISSEMENT.anneeFondation} à Toamasina, l&apos;{ETABLISSEMENT.sigle} a pour mission de former des
+                  infirmier(e)s et des sages-femmes compétents, dans le domaine «&nbsp;{ETABLISSEMENT.domaine}&nbsp;».
                 </p>
                 <p>
                   La formation dispensée est habilitée par le ministère de l&apos;Enseignement supérieur, et le titre
                   délivré bénéficie d&apos;une équivalence administrative dans la Fonction publique.
                 </p>
               </div>
+              {DEVISE && (
+                <p className="mt-8 font-heading text-xl font-semibold text-rose-fonce">
+                  <span className="sr-only">Devise de l&apos;institut : </span>
+                  {DEVISE}
+                </p>
+              )}
             </div>
             <figure className="rounded-2xl bg-rose-pale p-8 sm:p-12">
-              <Image src={logo} alt="Écusson de l'Institut de Formation Supérieur des Paramédicaux Atsinanana" className="mx-auto w-full max-w-md" />
+              <Image
+                src={logo}
+                alt="Écusson de l'Institut de Formation Supérieur des Paramédicaux Atsinanana"
+                sizes="(min-width: 768px) 448px, 100vw"
+                className="mx-auto w-full max-w-md"
+              />
 
             </figure>
           </div>
@@ -210,6 +262,7 @@ export default async function Accueil() {
                 <article key={f.code} className="grid items-center gap-8 md:grid-cols-2 lg:gap-16">
                   <div className={`relative aspect-[4/3] overflow-hidden rounded-2xl ${i % 2 ? "md:order-2" : ""}`}>
                     <Image src={f.photo} alt={f.alt} fill placeholder="blur" sizes="(min-width: 768px) 50vw, 100vw" className="object-cover object-[center_30%]" />
+                    <MentionIllustration className="bottom-3 left-3" />
                   </div>
                   <div>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -235,6 +288,46 @@ export default async function Accueil() {
           </div>
         </section>
 
+        {/* ── Admission et études ── */}
+        <section id="admission" className="scroll-mt-20 border-t">
+          <div className="mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.6fr] lg:gap-20 lg:px-8 lg:py-28">
+            <div>
+              <h2 className="titre-section text-3xl font-bold tracking-tight text-primary after:mt-4 after:block after:h-1 after:w-12 after:rounded-full after:bg-rose after:content-[''] sm:text-4xl">
+                Admission et études
+              </h2>
+              <p className="mt-4 text-lg text-muted-foreground">
+                Les mêmes conditions valent pour les deux filières, Infirmier(e)s et Sage-femmes.
+              </p>
+            </div>
+            <dl className="divide-y border-y">
+              {[
+                { terme: "Durée des études", definition: `${ETUDES.dureeAnnees} ans, pour les Infirmier(e)s comme pour les Sage-femmes.` },
+                { terme: "Conditions d'admission", definition: "Être titulaire du baccalauréat, série A, C ou D." },
+                { terme: "Déroulement de la formation", definition: ETUDES.deroulement },
+              ].map(({ terme, definition }) => (
+                <div key={terme} className="grid gap-1 py-5 sm:grid-cols-[13rem_1fr] sm:gap-6">
+                  <dt className="font-semibold text-primary">{terme}</dt>
+                  <dd className="text-muted-foreground">{definition}</dd>
+                </div>
+              ))}
+              <div className="grid gap-1 py-5 sm:grid-cols-[13rem_1fr] sm:gap-6">
+                <dt className="font-semibold text-primary">Pièces et dates d&apos;inscription</dt>
+                <dd className="text-muted-foreground">
+                  Le secrétariat vous les communique : appelez le{" "}
+                  <a href={`tel:${coord.telephone.replace(/\s/g, "")}`} className="font-medium text-primary underline underline-offset-4">
+                    {coord.telephone}
+                  </a>{" "}
+                  ou{" "}
+                  <a href="#contact" className="font-medium text-primary underline underline-offset-4">
+                    écrivez-nous
+                  </a>
+                  .
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </section>
+
         {/* ── Galerie ── */}
         <section id="galerie" className="scroll-mt-20 border-t pb-20 lg:pb-28">
           <div className="mx-auto max-w-7xl px-4 pt-20 sm:px-6 lg:px-8 lg:pt-28">
@@ -243,7 +336,7 @@ export default async function Accueil() {
                 Galerie
               </h2>
               <p className="mt-4 text-lg text-muted-foreground">
-                Travaux pratiques, stages et vie de l&apos;institut en images.
+                Travaux pratiques et gestes de soins, en images.
               </p>
             </div>
           </div>
@@ -281,28 +374,70 @@ export default async function Accueil() {
             <h2 className="titre-section text-3xl font-bold tracking-tight after:mt-4 after:block after:h-1 after:w-12 after:rounded-full after:bg-rose after:content-[''] sm:text-4xl">
               Nous contacter
             </h2>
-            <p className="mt-4 max-w-xl text-lg text-primary-foreground/80">
-              Le secrétariat vous renseigne sur les conditions d&apos;admission, les pièces à fournir et les frais de
-              scolarité. Écrivez-nous, ou passez nous voir.
-            </p>
-            <dl className="mt-10 grid gap-8 sm:grid-cols-2">
+            <dl className="mt-10 divide-y divide-white/15 border-y border-white/15">
               {[
-                { icon: MapPin, label: "Adresse", value: coord.adresse ? `${coord.adresse}, ${coord.ville}` : null },
-                { icon: Phone, label: "Téléphone", value: coord.telephone },
-                { icon: Mail, label: "Courriel", value: coord.email },
-                { icon: Clock, label: "Secrétariat", value: null },
+                { icon: MapPin, label: "Adresse", value: `${coord.adresse}, ${coord.ville}` },
+                {
+                  icon: Phone,
+                  label: "Téléphone",
+                  value: (
+                    <a href={`tel:${coord.telephone.replace(/\s/g, "")}`} className="underline-offset-4 hover:underline">
+                      {coord.telephone}
+                    </a>
+                  ),
+                },
+                {
+                  icon: Mail,
+                  label: "Courriel",
+                  value: (
+                    <>
+                      <a href={`mailto:${coord.email}`} className="underline-offset-4 [overflow-wrap:anywhere] hover:underline">
+                        {coord.email}
+                      </a>
+                      {" / "}
+                      <a href={`mailto:${COORDONNEES.emailAdmin}`} className="underline-offset-4 [overflow-wrap:anywhere] hover:underline">
+                        {COORDONNEES.emailAdmin}
+                      </a>
+                    </>
+                  ),
+                },
+                {
+                  icon: Clock,
+                  label: "Horaires du secrétariat",
+                  value: (
+                    <span className="flex flex-wrap gap-x-4">
+                      {COORDONNEES.horaires.map((plage) => (
+                        <span key={plage} className="whitespace-nowrap">
+                          {plage}
+                        </span>
+                      ))}
+                    </span>
+                  ),
+                },
               ].map(({ icon: Icon, label, value }) => (
-                <div key={label} className="relative pl-9">
-                  <dt className="text-sm font-medium text-primary-foreground/70">
-                    <Icon className="absolute top-1 left-0 size-5 text-rose" aria-hidden />
-                    {label}
-                  </dt>
-                  <dd className="mt-1 text-lg font-medium">
-                    {value ?? <span className="italic text-rose-clair">À compléter</span>}
-                  </dd>
+                <div key={label} className="flex gap-4 py-5">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-full bg-white/10 text-rose" aria-hidden>
+                    <Icon className="size-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <dt className="text-sm font-medium text-primary-foreground/70">{label}</dt>
+                    <dd className="mt-0.5 text-lg font-medium">{value}</dd>
+                  </div>
                 </div>
               ))}
             </dl>
+            <div className="mt-8 flex items-center gap-4">
+              <p className="text-sm font-medium text-primary-foreground/70">Suivez-nous</p>
+              <a
+                href={COORDONNEES.facebookUrl}
+                target="_blank"
+                rel="noopener"
+                className="grid size-11 place-items-center rounded-full bg-white/10 text-white transition-colors hover:bg-white hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                <IconeFacebook className="size-5" />
+                <span className="sr-only">Page Facebook « {COORDONNEES.facebook} » (nouvel onglet)</span>
+              </a>
+            </div>
           </div>
           <FormulaireContact turnstileSiteKey={turnstileSiteKey} />
           </div>

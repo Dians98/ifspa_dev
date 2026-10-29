@@ -12,7 +12,8 @@ import {
   type CarouselApi,
 } from "@/components/ui/carousel";
 
-export type PhotoGalerie = { src: StaticImageData; legende: string; alt: string };
+/** `illustration` : photo de banque d'images, signalée comme telle tant que les vraies photos manquent. */
+export type PhotoGalerie = { src: StaticImageData; legende: string; alt: string; illustration?: boolean };
 
 /**
  * Diaporama de la galerie : grande photo, flèches, compteur et vignettes cliquables.
@@ -42,7 +43,7 @@ export function Galerie({ photos }: { photos: PhotoGalerie[] }) {
     <div>
       <Carousel setApi={setPrincipal} opts={{ loop: true }} aria-label="Galerie de photos" className="group">
         <CarouselContent>
-          {photos.map((p, i) => (
+          {photos.map((p) => (
             <CarouselItem key={p.legende}>
               {/* Pleine largeur : d'un bord à l'autre de l'écran */}
               <div className="relative h-[60svh] min-h-80 overflow-hidden bg-muted sm:h-[72svh] sm:max-h-205">
@@ -52,7 +53,6 @@ export function Galerie({ photos }: { photos: PhotoGalerie[] }) {
                   fill
                   placeholder="blur"
                   sizes="100vw"
-                  priority={i === 0}
                   className="object-cover"
                 />
               </div>
@@ -72,7 +72,10 @@ export function Galerie({ photos }: { photos: PhotoGalerie[] }) {
       {/* Légende et vignettes restent alignées sur la grille du site */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
       <div className="mt-4 flex items-baseline justify-between gap-4" aria-live="polite">
-        <p className="font-medium text-foreground">{photo?.legende}</p>
+        <p className="font-medium text-foreground">
+          {photo?.legende}
+          {photo?.illustration && <span className="ml-2 text-sm font-normal text-muted-foreground">(photo d&apos;illustration)</span>}
+        </p>
         <p className="tabular shrink-0 text-sm text-muted-foreground">
           {courante + 1} / {photos.length}
         </p>

@@ -104,17 +104,17 @@ test("UC14-05 accessibilité visible de la landing", async ({ page }) => {
     await mesure("pastille Code SF", page.getByText("Code SF"));
     await mesure("agréments (année)", page.locator("#agrements li span").first());
     await mesure("agréments (objet)", page.locator("#agrements li p").nth(1));
-    await mesure("contact (introduction)", page.locator("#contact > div > div > p").first());
+    await mesure("contact (Suivez-nous)", page.locator("#contact").getByText("Suivez-nous"));
     await mesure("contact (libellé Adresse)", page.locator("#contact dt").first());
-    await mesure("contact (« À compléter »)", page.locator("#contact dd span").first());
+    await mesure("contact (adresse)", page.locator("#contact dd").first());
     await mesure("formulaire (étiquette)", page.getByText("Nom et prénom *"));
     await mesure("formulaire (aide)", page.getByText("Les champs marqués * sont obligatoires."));
     await mesure("bouton Envoyer", page.getByRole("button", { name: "Envoyer le message" }));
     await mesure("bouton Découvrir les filières", page.getByRole("link", { name: "Découvrir les filières" }));
     await mesure("bouton Se connecter", page.getByRole("banner").getByRole("link", { name: "Se connecter" }));
     await mesure("pied de page (lien)", page.getByRole("contentinfo").getByRole("link", { name: "Galerie" }));
-    await mesure("pied de page (« à compléter »)", page.getByRole("contentinfo").getByText("Téléphone à compléter"));
-    await mesure("pied de page (mention d'arrêté)", page.getByText("Établissement autorisé par arrêté"));
+    await mesure("pied de page (contact)", page.getByRole("contentinfo").getByText("034 07 576 81"));
+    await mesure("mention « Photo d'illustration »", page.getByText("Photo d'illustration").first());
 
     // Texte blanc sur la photo d'ouverture (voile en dégradé) : mesuré sur le pixel de fond le plus clair.
     mesures["ouverture : titre"] = await contrasteSurPhoto(page, page.getByRole("heading", { level: 1 }), 1);

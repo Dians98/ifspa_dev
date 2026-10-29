@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { DEVISE, ETABLISSEMENT } from "@/lib/etablissement";
+import { COORDONNEES, DEVISE, ETABLISSEMENT } from "@/lib/etablissement";
 import logo from "../../../public/brand/logo-ifspa.png";
 
 type Coordonnees = {
@@ -12,6 +12,7 @@ type Coordonnees = {
 const NAVIGATION = [
   { href: "#institut", label: "L'institut" },
   { href: "#filieres", label: "Filières" },
+  { href: "#admission", label: "Admission" },
   { href: "#galerie", label: "Galerie" },
   { href: "#agrements", label: "Agréments" },
   { href: "#contact", label: "Contact" },
@@ -25,7 +26,8 @@ const FILIERES = [
 function Colonne({ titre, children }: { titre: string; children: React.ReactNode }) {
   return (
     <div>
-      <h2 className="font-sans text-sm font-semibold uppercase tracking-wider text-rose-fonce">{titre}</h2>
+      {/* Paragraphe et non h2 : ces titres de colonne doubleraient ceux de la page dans le plan des titres. */}
+      <p className="font-sans text-sm font-semibold uppercase tracking-wider text-rose-fonce">{titre}</p>
       <div className="mt-4">{children}</div>
     </div>
   );
@@ -35,16 +37,12 @@ export function PiedDePage({ coord }: { coord: Coordonnees }) {
   return (
     <footer className="bg-muted/70">
       <div className="mx-auto grid max-w-7xl gap-12 px-4 py-16 sm:px-6 md:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1.3fr] lg:px-8">
-        <div className="max-w-sm">
-          <Image src={logo} alt="Logo de l'IFSPA" className="h-20 w-auto" />
-          <p className="mt-5 font-heading text-lg font-semibold leading-snug text-primary">{ETABLISSEMENT.nom}</p>
-          <blockquote className="mt-3">
-            {DEVISE ? (
-              <p className="font-heading text-lg italic text-foreground">« {DEVISE} »</p>
-            ) : (
-              <p className="italic text-rose-fonce">Devise de l&apos;institut à compléter</p>
-            )}
-          </blockquote>
+        <div className="flex max-w-md items-center gap-4 self-start">
+          <Image src={logo} alt="Logo de l'IFSPA" width={95} height={64} className="h-16 w-auto shrink-0" />
+          <div>
+            <p className="font-heading text-lg font-semibold leading-snug text-primary">{ETABLISSEMENT.nom}</p>
+            {DEVISE && <p className="mt-1.5 text-sm italic text-muted-foreground">{DEVISE}</p>}
+          </div>
         </div>
 
         <Colonne titre="Navigation">
@@ -75,8 +73,9 @@ export function PiedDePage({ coord }: { coord: Coordonnees }) {
         <Colonne titre="Contact">
           <address className="space-y-3 not-italic text-muted-foreground">
             <p>{coord.adresse ? `${coord.adresse}, ${coord.ville}` : `${coord.ville}, Madagascar`}</p>
-            <p>{coord.telephone ?? <span className="italic text-rose-fonce">Téléphone à compléter</span>}</p>
-            <p>{coord.email ?? <span className="italic text-rose-fonce">Courriel à compléter</span>}</p>
+            {coord.telephone && <p>{coord.telephone}</p>}
+            {coord.email && <p className="[overflow-wrap:anywhere]">{coord.email}</p>}
+            <p className="[overflow-wrap:anywhere]">{COORDONNEES.emailAdmin}</p>
           </address>
         </Colonne>
       </div>
@@ -94,7 +93,7 @@ export function PiedDePage({ coord }: { coord: Coordonnees }) {
               Diano ANDRIANTSALAMA
               <span className="sr-only"> (nouvel onglet)</span>
             </a>
-          </p>
+          </p>
         </div>
       </div>
     </footer>

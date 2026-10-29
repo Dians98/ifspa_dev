@@ -1,16 +1,16 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { ETABLISSEMENT } from "@/lib/etablissement-constantes";
+import { COORDONNEES, ETABLISSEMENT } from "@/lib/etablissement-constantes";
 
-export { ARRETES, DEVISE, ETABLISSEMENT, MENTION_AGREMENT_TICKET } from "@/lib/etablissement-constantes";
+export { ARRETES, COORDONNEES, DEVISE, ETABLISSEMENT, ETUDES, MENTION_AGREMENT_TICKET } from "@/lib/etablissement-constantes";
 
-/** Coordonnées modifiables (Paramètres > Établissement). Null tant qu'elles ne sont pas saisies. */
+/** Coordonnées publiques : celles saisies en base l'emportent sur les coordonnées officielles du code. */
 export async function getCoordonnees() {
   const e = await db.etablissement.findUnique({ where: { id: 1 } });
   return {
-    adresse: e?.adresse ?? null,
+    adresse: e?.adresse ?? COORDONNEES.adresse,
     ville: e?.ville ?? ETABLISSEMENT.ville,
-    telephone: e?.telephone ?? null,
-    email: e?.email ?? null,
+    telephone: e?.telephone ?? COORDONNEES.telephone,
+    email: e?.email ?? COORDONNEES.email,
   };
 }
