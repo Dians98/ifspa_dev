@@ -24,7 +24,6 @@ test("UC03-01 : création d'un compte, refus du formulaire, administrateur cré�
   try {
     await test.step("1. L'administrateur ouvre « Nouvel utilisateur » : le rôle Secrétariat est proposé, avec son aide", async () => {
       await ouvrirListe(page);
-      await expect(page.getByText("Pas d'inscription libre : seuls les comptes créés ici peuvent se connecter.")).toBeVisible();
       await expect(page.getByRole("row")).toHaveCount(3);
       await capture(page, DOSSIER, "UC03-01-01-liste-de-depart");
       await page.getByRole("button", { name: "Nouvel utilisateur" }).click();

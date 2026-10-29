@@ -7,7 +7,7 @@ import type { Role } from "@/lib/roles";
 export const NOMBRE_MOIS_ECOLAGE = 10;
 export const DUREE_MIN = 1;
 export const DUREE_MAX = 6;
-export const MOIS_DEBUT_POSSIBLES = [9, 10, 11] as const;
+export const MOIS_DEBUT_POSSIBLES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 // L'année scolaire couvre 10 mois (dateFin) : au-delà, des mensualités tomberaient après sa fin.
 export const NOMBRE_MOIS_MAX = NOMBRE_MOIS_ECOLAGE;
 export const ANNEE_DEBUT_MIN = 2000;
@@ -31,7 +31,10 @@ function dateUTC(annee: number, moisIndex0: number, jour: number): Date {
   return new Date(Date.UTC(annee, moisIndex0, jour));
 }
 
-/** Début au 1er du mois de début des mensualités, fin au dernier jour du 10e mois (2026, 10 → 2026-10-01 / 2027-07-31). */
+/**
+ * Début au 1er du mois de début des mensualités, fin au dernier jour du 10e mois, comptés dans l'année de début :
+ * (2026, 10) → 2026-10-01 / 2027-07-31 ; (2027, 1) → 2027-01-01 / 2027-10-31.
+ */
 export function datesAnnee(anneeDebut: number, moisDebutEcolage: number): { dateDebut: Date; dateFin: Date } {
   const dateDebut = dateUTC(anneeDebut, moisDebutEcolage - 1, 1);
   // Jour 0 du mois suivant le 10e mois = dernier jour du 10e mois ; Date.UTC gère le passage d'année.
@@ -42,8 +45,38 @@ export function datesAnnee(anneeDebut: number, moisDebutEcolage: number): { date
 /** « octobre 2026 → juillet 2027 ». */
 export function periodeAnnee(anneeDebut: number, moisDebutEcolage: number): string {
   const { dateDebut, dateFin } = datesAnnee(anneeDebut, moisDebutEcolage);
-  const mois = (d: Date) => `${NOMS_MOIS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
-  return `${mois(dateDebut)} → ${mois(dateFin)}`;
+  return `${libelleMoisAnnee(dateDebut)} → ${libelleMoisAnnee(dateFin)}`;
+}
+
+function libelleMoisAnnee(d: Date): string {
+  return `${NOMS_MOIS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+type CalendrierAnnee = { anneeDebut: number; moisDebutEcolage: number };
+
+/**
+ * Refus si la nouvelle année commence avant la fin d'une année antérieure ou finit après le début d'une année
+ * postérieure. Seules les voisines (anneeDebut ± 1) peuvent chevaucher : 10 mois comptés dans l'année de début.
+ */
+export function controleChevauchement(nouvelle: CalendrierAnnee, existantes: readonly CalendrierAnnee[]): string | null {
+  const n = datesAnnee(nouvelle.anneeDebut, nouvelle.moisDebutEcolage);
+  const libelle = libelleAnnee(nouvelle.anneeDebut);
+  const triees = [...existantes].sort((a, b) => a.anneeDebut - b.anneeDebut);
+  for (const e of triees.filter((a) => a.anneeDebut < nouvelle.anneeDebut).reverse()) {
+    const { dateFin } = datesAnnee(e.anneeDebut, e.moisDebutEcolage);
+    if (n.dateDebut.getTime() <= dateFin.getTime()) {
+      const premierPossible = dateUTC(dateFin.getUTCFullYear(), dateFin.getUTCMonth() + 1, 1);
+      return `${libelle} ne peut pas commencer avant ${libelleMoisAnnee(premierPossible)} : ${libelleAnnee(e.anneeDebut)} se termine en ${libelleMoisAnnee(dateFin)}.`;
+    }
+  }
+  for (const e of triees.filter((a) => a.anneeDebut > nouvelle.anneeDebut)) {
+    const { dateDebut } = datesAnnee(e.anneeDebut, e.moisDebutEcolage);
+    if (n.dateFin.getTime() >= dateDebut.getTime()) {
+      const dernierPossible = dateUTC(dateDebut.getUTCFullYear(), dateDebut.getUTCMonth() - 1, 1);
+      return `${libelle} ne peut pas se terminer après ${libelleMoisAnnee(dernierPossible)} : ${libelleAnnee(e.anneeDebut)} commence en ${libelleMoisAnnee(dateDebut)}.`;
+    }
+  }
+  return null;
 }
 
 /** « 2026-10-01 » : jour calendaire d'une colonne `@db.Date`. */

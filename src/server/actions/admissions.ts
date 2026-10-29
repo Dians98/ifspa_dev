@@ -16,13 +16,14 @@ import {
 } from "@/lib/admissions";
 import { db } from "@/lib/db";
 import { jourMadagascar } from "@/lib/dates";
-import type { TarifEcheances } from "@/lib/ecolage";
+import type { EcheanceGeneree, TarifEcheances } from "@/lib/ecolage";
 import { echec, echecCode, echecValidationGlobale, succes, type EtatAction } from "@/lib/etat-action";
 import { exigerAdmin, exigerSession } from "@/server/acces";
 import { dossiersAnnulation, passageCourant } from "@/server/admissions";
 import { OPTIONS_TRANSACTION } from "@/server/ecolage";
 import { revaliderPagesEcolage } from "@/server/ecolage-revalidation";
 import { codePrisma, indexEnConflit } from "@/server/erreurs";
+import { cleClasse, echeancesFraisParClasse } from "@/server/frais";
 import {
   lireBlocageAnnulation,
   lireClasse,
@@ -86,7 +87,7 @@ export async function validerClasse(entree: EntreeValidationClasse): Promise<Eta
             : (passage.refus ?? "Aucun passage possible pour le moment. Rechargez la page."),
         );
       }
-      // FOR SHARE : ni clôture des années, ni changement de durée de la filière, ni tarif modifié pendant la copie.
+      // FOR SHARE : ni clôture des années, ni changement de durée de la filière, ni tarif ou frais modifiés pendant la copie.
       const [source] = await tx.$queryRaw<{ id: string; libelle: string; anneeDebut: number; cloturee: boolean }[]>`
         SELECT id, libelle, "anneeDebut", cloturee FROM annee_scolaire WHERE id = ${anneeSourceId} FOR SHARE`;
       const [cible] = source
@@ -103,6 +104,7 @@ export async function validerClasse(entree: EntreeValidationClasse): Promise<Eta
             WHERE "filiereId" = ${filiere.id} AND "anneeScolaireId" = ${cible.id} AND niveau IN (${niveau}, ${niveau + 1})
             FOR SHARE`
         : [];
+      const frais = cible ? await echeancesFraisParClasse(tx, cible.id) : new Map<string, EcheanceGeneree[]>();
 
       const membres = await tx.$queryRaw<{ etudiantId: string; inscriptionId: string }[]>`
         SELECT i."etudiantId", i.id AS "inscriptionId" FROM inscription i JOIN etudiant e ON e.id = i."etudiantId"
@@ -120,7 +122,6 @@ export async function validerClasse(entree: EntreeValidationClasse): Promise<Eta
         select: {
           id: true,
           etudiantId: true,
-          droitsEnTranches: true,
           statut: true,
           etudiant: { select: { nom: true, prenoms: true, statut: true, dateSortie: true, motifSortie: true } },
         },
@@ -140,7 +141,6 @@ export async function validerClasse(entree: EntreeValidationClasse): Promise<Eta
               etudiantId: i.etudiantId,
               nom: i.etudiant.nom,
               prenoms: i.etudiant.prenoms,
-              droitsEnTranches: i.droitsEnTranches,
               statutInscription: i.statut,
               statutEtudiant: i.etudiant.statut,
               dateSortie: i.etudiant.dateSortie,
@@ -150,6 +150,10 @@ export async function validerClasse(entree: EntreeValidationClasse): Promise<Eta
             tarifs: {
               niveauSuivant: tarifs.find((t) => t.niveau === niveau + 1) ?? null,
               memeNiveau: tarifs.find((t) => t.niveau === niveau) ?? null,
+            },
+            frais: {
+              niveauSuivant: frais.get(cleClasse(filiere.id, niveau + 1)) ?? [],
+              memeNiveau: frais.get(cleClasse(filiere.id, niveau)) ?? [],
             },
           });
 
@@ -179,7 +183,6 @@ export async function validerClasse(entree: EntreeValidationClasse): Promise<Eta
               anneeScolaireId: cible.id,
               niveau: i.niveau,
               redoublement: i.redoublement,
-              droitsEnTranches: i.droitsEnTranches,
               operationAdmissionId: operation.id,
             })),
             select: { id: true, etudiantId: true },
@@ -270,7 +273,7 @@ export async function annulerOperation(entree: z.input<typeof schemaAnnulationOp
 
     const plan = planifierRestauration(dossier.lignes);
     if (plan.inscriptionsASupprimer.length) {
-      // Les échéances partent avec leur inscription (onDelete: Cascade) ; aucune ligne de paiement ne les référence.
+      // Les échéances, frais compris, partent avec leur inscription (onDelete: Cascade) ; aucune ligne de paiement ne les référence.
       const { count } = await tx.inscription.deleteMany({
         where: { id: { in: plan.inscriptionsASupprimer }, operationAdmissionId: operationId },
       });

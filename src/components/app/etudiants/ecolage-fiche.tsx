@@ -1,12 +1,11 @@
 import { TriangleAlert } from "lucide-react";
 import { BadgeStatutEcheance } from "@/components/app/badge-statut-echeance";
 import { Badge } from "@/components/ui/badge";
+import { libelleMois } from "@/lib/ecolage";
 import { formaterAriary } from "@/lib/montant";
 import { cn } from "@/lib/utils";
 import type { DossierEtudiant, EcheanceFiche, InscriptionFiche } from "@/server/lectures/etudiants";
 import { EtatVide } from "@/components/app/parametres/panneau-parametre";
-import { MotifsRefus } from "@/components/app/parametres/motifs-refus";
-import { DialogueTranchesDroits } from "./dialogue-tranches-droits";
 
 const STYLE_CARTE: Record<EcheanceFiche["statut"], string> = {
   paye: "border-paye/30 bg-paye-pale",
@@ -44,6 +43,9 @@ function CarteEcheance({ e, moisCourant }: { e: EcheanceFiche; moisCourant: stri
         <span className="font-semibold">{e.libelle}</span>
         <BadgeStatutEcheance statut={e.statut} className="bg-background" />
       </div>
+      {e.type === "FRAIS" && (
+        <p className="text-xs text-muted-foreground">Frais, exigible en {libelleMois(new Date(`${e.mois}T00:00:00Z`)).toLowerCase()}</p>
+      )}
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
         <dt className="text-muted-foreground">Dû</dt>
         <dd className="text-right">
@@ -63,7 +65,7 @@ function CarteEcheance({ e, moisCourant }: { e: EcheanceFiche; moisCourant: stri
           <div className="h-full rounded-full bg-current text-partiel" style={{ width: `${Math.round((e.paye / e.montantDu) * 100)}%` }} />
         </div>
       )}
-      {enCours && <p className="text-xs font-semibold text-primary">Mois en cours</p>}
+      {enCours && <p className="text-xs font-semibold text-primary">{e.type === "MENSUALITE" ? "Mois en cours" : "Exigible ce mois-ci"}</p>}
     </li>
   );
 }
@@ -101,18 +103,6 @@ function AnneeEcolage({ i, moisCourant, repliable }: { i: InscriptionFiche; mois
       )}
     </div>
   );
-  const droits = (
-    <div className="flex items-center gap-2 text-sm">
-      <span className="text-muted-foreground">
-        Droits payés {i.droitsEnTranches === 1 ? "en une fois" : `en ${i.droitsEnTranches} fois`}
-      </span>
-      {i.tranchesModifiables ? (
-        <DialogueTranchesDroits inscriptionId={i.id} annee={i.annee} actuel={i.droitsEnTranches} />
-      ) : (
-        i.refusTranches && <MotifsRefus motifs={[i.refusTranches]} />
-      )}
-    </div>
-  );
   const grille = (
     <ul className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-5">
       {i.echeances.map((e) => (
@@ -126,7 +116,6 @@ function AnneeEcolage({ i, moisCourant, repliable }: { i: InscriptionFiche; mois
       <section className="rounded-xl border bg-card p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           {titre}
-          {droits}
         </div>
         {grille}
       </section>
@@ -139,7 +128,6 @@ function AnneeEcolage({ i, moisCourant, repliable }: { i: InscriptionFiche; mois
         {titre}
         {i.totaux.reste === 0 && <Badge className="shrink-0 bg-paye-pale text-paye">Soldée</Badge>}
       </summary>
-      <div className="mt-3">{droits}</div>
       {grille}
     </details>
   );
@@ -200,7 +188,7 @@ export function EcolageFiche({ dossier }: { dossier: DossierEtudiant }) {
       </section>
 
       <p className="text-sm text-muted-foreground">
-        Un paiement solde d&apos;abord l&apos;échéance la plus ancienne ; le surplus passe en acompte sur la suivante.
+        Un paiement solde d&apos;abord les droits, puis les mois dus, puis les frais dus, et enfin ce qui est à venir ; le surplus passe en acompte sur l&apos;échéance suivante.
       </p>
 
       {annees.map((i, rang) => (

@@ -4,37 +4,26 @@ import {
   lireAnneeEntree,
   lireCin,
   lireDate,
-  lireMode,
-  lireMontantCellule,
   lireNiveau,
-  lireOperateur,
   lireRedoublant,
   lireSexe,
   lireTelephone,
-  lireTranches,
-  MOIS_AVANT_RENTREE,
   normaliserNumero,
-  normaliserRecuPapier,
   validerEtudiants,
-  validerPaiements,
   type CadreValidation,
 } from "@/lib/import";
 import { type Cellule } from "@/lib/import-lecture";
 import { IDENTITES_EXEMPLES } from "@/lib/import-modele";
 import { reprise, nombre, texte, vide } from "../factories/reprise";
 
-const CADRE: CadreValidation = { jour: "2026-11-15", dateDebutAnnee: "2026-10-01" };
+const CADRE: CadreValidation = { jour: "2026-11-15" };
 const date = (jour: string): Cellule => ({ type: "date", jour });
 const serie = (jour: string) => Math.round((Date.parse(jour) - Date.UTC(1899, 11, 30)) / 86_400_000);
 
 type LigneE = Parameters<typeof reprise>[0][number];
-type LigneP = NonNullable<Parameters<typeof reprise>[1]>[number];
 
 const etudiants = (lignes: LigneE[], cadre = CADRE) => validerEtudiants(reprise(lignes).etudiants, cadre);
-const paiements = (lignes: LigneP[], numeros: string[] = ["1"], cadre = CADRE) =>
-  validerPaiements(reprise([{}], lignes).paiements, new Set(numeros), cadre);
 const erreurs = (v: { messages: { gravite: string; texte: string }[] }) => v.messages.filter((m) => m.gravite === "erreur").map((m) => m.texte);
-const avertissements = (v: { messages: { gravite: string; texte: string }[] }) => v.messages.filter((m) => m.gravite === "avertissement").map((m) => m.texte);
 
 describe("dates", () => {
   it("lit JJ/MM/AAAA dans cet ordre (03/04/2007 est le 3 avril), avec / . - comme séparateurs", () => {
@@ -135,53 +124,15 @@ describe("champs d'un étudiant", () => {
     expect(lireRedoublant(texte("peut-être")).ok).toBe(false);
   });
 
-  it("droits en tranches : vide = 1 fois, « 3 fois », 2, refuse 0 et 4", () => {
-    expect(lireTranches(vide)).toEqual({ ok: true, valeur: 1 });
-    expect(lireTranches(texte("3 fois"))).toEqual({ ok: true, valeur: 3 });
-    expect(lireTranches(nombre(2))).toEqual({ ok: true, valeur: 2 });
-    for (const saisie of [nombre(0), nombre(4), texte("trois")]) expect(lireTranches(saisie).ok, JSON.stringify(saisie)).toBe(false);
-  });
-
   it("un N° se compare sans zéros initiaux ni casse : « 007 » = 7, « a12 » = « A12 »", () => {
     expect(normaliserNumero("007")).toBe("7");
     expect(normaliserNumero("  a12 ")).toBe("A12");
-    expect(normaliserRecuPapier("0412")).toBe(normaliserRecuPapier("412"));
-  });
-});
-
-describe("champs d'un paiement", () => {
-  it("le montant est un entier positif : nombre, « 80 000 », « 80000 Ar »", () => {
-    expect(lireMontantCellule(nombre(80000))).toEqual({ ok: true, valeur: 80000 });
-    expect(lireMontantCellule(texte("80 000"))).toEqual({ ok: true, valeur: 80000 });
-    expect(lireMontantCellule(texte("80000 Ar"))).toEqual({ ok: true, valeur: 80000 });
-  });
-
-  it("refuse un montant nul, négatif, décimal, ambigu (point), en texte ou une date", () => {
-    for (const saisie of [nombre(0), nombre(-5), nombre(1500.5), texte("80.000"), texte("80,5"), texte("beaucoup"), date("2026-10-05"), vide]) {
-      expect(lireMontantCellule(saisie).ok, JSON.stringify(saisie)).toBe(false);
-    }
-    expect(lireMontantCellule(nombre(0))).toMatchObject({ raison: expect.stringMatching(/^le montant doit être supérieur à 0/) });
-  });
-
-  it("le mode accepte Espèces et Mobile Money sous leurs écritures courantes", () => {
-    for (const s of ["Espèces", "especes", "ESPÈCES", "cash"]) expect(lireMode(texte(s)), s).toEqual({ ok: true, valeur: "ESPECES" });
-    for (const s of ["Mobile Money", "mobile-money", "MM", "mobile"]) expect(lireMode(texte(s)), s).toEqual({ ok: true, valeur: "MOBILE_MONEY" });
-    expect(lireMode(texte("Chèque")).ok).toBe(false);
-    expect(lireMode(vide).ok).toBe(false);
-  });
-
-  it("l'opérateur accepte MVola, Orange Money, Airtel Money ; vide = aucun", () => {
-    expect(lireOperateur(vide)).toEqual({ ok: true, valeur: null });
-    expect(lireOperateur(texte("Telma MVola"))).toEqual({ ok: true, valeur: "MVOLA" });
-    expect(lireOperateur(texte("orange"))).toEqual({ ok: true, valeur: "ORANGE_MONEY" });
-    expect(lireOperateur(texte("Airtel Money"))).toEqual({ ok: true, valeur: "AIRTEL_MONEY" });
-    expect(lireOperateur(texte("Visa")).ok).toBe(false);
   });
 });
 
 describe("validerEtudiants", () => {
   it("rend les valeurs typées d'une ligne valide : nom en majuscules, filière en majuscules, N° normalisé", () => {
-    const v = etudiants([{ numero: "007", nom: "rakoto", filiere: "if", telephone: "34 12 345 67", cin: "501 011 012 345", redoublant: "Oui", droitsEnTranches: "3" }]);
+    const v = etudiants([{ numero: "007", nom: "rakoto", filiere: "if", telephone: "34 12 345 67", cin: "501 011 012 345", redoublant: "Oui" }]);
 
     expect(v.messages).toEqual([]);
     expect(v.refusees).toEqual([]);
@@ -189,15 +140,16 @@ describe("validerEtudiants", () => {
       {
         ligne: 2, numero: "7", nom: "RAKOTO", prenoms: "Jean", sexe: "M", dateNaissance: "2004-05-10", lieuNaissance: "Toamasina",
         cin: "501011012345", telephone: "0341234567", adresse: "Tanambao V", tuteurNom: null, tuteurTelephone: null, tuteurProfession: null, filiere: "IF", anneeEntree: 2026, niveau: 1,
-        redoublant: true, droitsEnTranches: 3,
+        redoublant: true,
       },
     ]);
   });
 
-  it("applique les défauts : adresse vide = null, redoublant = non, droits en 1 fois", () => {
-    const v = etudiants([{ adresse: null, redoublant: null, droitsEnTranches: null, telephone: null }]);
+  it("applique les défauts : adresse vide = null, redoublant = non", () => {
+    const v = etudiants([{ adresse: null, redoublant: null, telephone: null }]);
 
-    expect(v.valides[0]).toMatchObject({ adresse: null, redoublant: false, droitsEnTranches: 1, telephone: null, cin: null });
+    expect(v.valides[0]).toMatchObject({ adresse: null, redoublant: false, telephone: null, cin: null });
+    expect(v.valides[0]).not.toHaveProperty("droitsEnTranches");
   });
 
   it("lit les dates d'Excel (cellule date et numéro de série) comme le texte JJ/MM/AAAA", () => {
@@ -248,7 +200,7 @@ describe("validerEtudiants", () => {
     ]);
   });
 
-  it("une ligne refusée garde son N° pour refuser en cascade les paiements, un N° illisible reste null", () => {
+  it("une ligne refusée garde son N° pour le rapport, un N° illisible reste null", () => {
     const v = etudiants([{ numero: "3", sexe: "?" }, { numero: null, nom: "AUTRE" }]);
 
     expect(v.refusees).toEqual([{ ligne: 2, numero: "3" }, { ligne: 3, numero: null }]);
@@ -284,118 +236,10 @@ describe("validerEtudiants", () => {
   });
 
   it("une colonne facultative absente du fichier n'empêche pas la ligne d'être valide", () => {
-    const v = validerEtudiants(reprise([{}], [], { sans: ["redoublant", "droitsEnTranches", "cin", "adresse", "telephone"] }).etudiants, CADRE);
+    const v = validerEtudiants(reprise([{}], { sans: ["redoublant", "cin", "adresse", "telephone"] }).etudiants, CADRE);
 
     expect(v.messages).toEqual([]);
-    expect(v.valides[0]).toMatchObject({ redoublant: false, droitsEnTranches: 1, cin: null, adresse: null, telephone: null });
-  });
-});
-
-describe("validerPaiements", () => {
-  it("rend les valeurs typées d'un paiement valide (N° et date lus, référence vide = null)", () => {
-    const v = paiements([{ numeroEtudiant: "001", date: "05/10/2026", montant: "80 000", mode: "Mobile Money", operateur: "MVola", reference: "MP1", recuPapier: "0600" }]);
-
-    expect(v.messages).toEqual([]);
-    expect(v.valides).toEqual([
-      { ligne: 2, numeroEtudiant: "1", jour: "2026-10-05", montant: 80000, mode: "MOBILE_MONEY", operateur: "MVOLA", reference: "MP1", recuPapier: "0600" },
-    ]);
-  });
-
-  it("refuse un paiement dont le N° étudiant n'est pas dans la feuille Étudiants", () => {
-    const v = paiements([{ numeroEtudiant: "9" }]);
-
-    expect(v.valides).toEqual([]);
-    expect(v.refusees).toEqual([{ ligne: 2, numero: "9" }]);
-    expect(erreurs(v)).toEqual([expect.stringMatching(/colonne « N° étudiant » \(« 9 »\) : aucun étudiant ne porte ce N°/)]);
-  });
-
-  it("refuse une date future, accepte le jour même", () => {
-    expect(erreurs(paiements([{ date: "16/11/2026" }]))).toEqual([expect.stringMatching(/date future/)]);
-    expect(paiements([{ date: "15/11/2026" }]).valides).toHaveLength(1);
-  });
-
-  it(`un paiement de moins de ${MOIS_AVANT_RENTREE} mois avant la rentrée est accepté avec un avertissement`, () => {
-    for (const jour of ["01/07/2026", "30/09/2026"]) {
-      const v = paiements([{ date: jour }]);
-
-      expect(v.valides, jour).toHaveLength(1);
-      expect(avertissements(v), jour).toEqual([expect.stringMatching(/avant la rentrée du 01\/10\/2026/)]);
-    }
-  });
-
-  it("un paiement plus ancien de 3 mois avant la rentrée est bloquant", () => {
-    const v = paiements([{ date: "30/06/2026" }]);
-
-    expect(v.valides).toEqual([]);
-    expect(erreurs(v)).toEqual([expect.stringMatching(/antérieur au 01\/07\/2026 : les paiements des années précédentes ne sont pas repris/)]);
-  });
-
-  it("un paiement à partir de la rentrée n'a aucun message de date", () => {
-    expect(paiements([{ date: "01/10/2026" }]).messages).toEqual([]);
-  });
-
-  it("sans rentrée connue, seule la date future est contrôlée", () => {
-    const v = paiements([{ date: "01/01/2020" }], ["1"], { jour: "2026-11-15", dateDebutAnnee: null });
-
-    expect(v.messages).toEqual([]);
-    expect(v.valides).toHaveLength(1);
-  });
-
-  it("Mobile Money sans opérateur est bloquant", () => {
-    const v = paiements([{ mode: "Mobile Money", operateur: null, reference: "MP1" }]);
-
-    expect(v.valides).toEqual([]);
-    expect(erreurs(v)).toEqual([expect.stringMatching(/colonne « Opérateur ».*opérateur obligatoire pour un paiement Mobile Money/)]);
-  });
-
-  it("Mobile Money sans référence est accepté avec un avertissement, référence vide (décision 54)", () => {
-    const v = paiements([{ mode: "Mobile Money", operateur: "Orange Money", reference: null }]);
-
-    expect(v.valides).toMatchObject([{ mode: "MOBILE_MONEY", operateur: "ORANGE_MONEY", reference: null }]);
-    expect(avertissements(v)).toEqual([expect.stringMatching(/colonne « Référence ».*sans référence/)]);
-    expect(erreurs(v)).toEqual([]);
-  });
-
-  it("Mobile Money complet n'a aucun message", () => {
-    expect(paiements([{ mode: "Mobile Money", operateur: "Airtel Money", reference: "AM123" }]).messages).toEqual([]);
-  });
-
-  it("Espèces avec un opérateur ou une référence est bloquant, un message par colonne", () => {
-    expect(erreurs(paiements([{ mode: "Espèces", operateur: "MVola" }]))).toEqual([expect.stringMatching(/colonne « Opérateur ».*ne concerne que le Mobile Money/)]);
-    expect(erreurs(paiements([{ mode: "Espèces", reference: "MP1" }]))).toEqual([expect.stringMatching(/colonne « Référence ».*ne concerne que le Mobile Money/)]);
-    const les2 = paiements([{ mode: "Espèces", operateur: "MVola", reference: "MP1" }]);
-    expect(les2.valides).toEqual([]);
-    expect(erreurs(les2)).toHaveLength(2);
-  });
-
-  it("un mode illisible ne déclenche pas les contrôles d'opérateur", () => {
-    const v = paiements([{ mode: "Chèque", operateur: "MVola" }]);
-
-    expect(erreurs(v)).toEqual([expect.stringMatching(/colonne « Mode ».*indiquez Espèces ou Mobile Money/)]);
-  });
-
-  it("refuse les lignes d'exemple du modèle, « 412 » valant « 0412 »", () => {
-    for (const recu of ["0412", "412", 412]) {
-      const v = paiements([{ numeroEtudiant: "1", montant: "34000", mode: "Espèces", recuPapier: recu }]);
-
-      expect(v.valides, String(recu)).toEqual([]);
-      expect(erreurs(v), String(recu)).toEqual([expect.stringMatching(/ligne d'exemple du modèle/)]);
-    }
-    const mobile = paiements([{ numeroEtudiant: "1", montant: "80000", mode: "Mobile Money", operateur: "MVola", reference: "MP1", recuPapier: "413" }]);
-    expect(erreurs(mobile)).toEqual([expect.stringMatching(/ligne d'exemple du modèle/)]);
-  });
-
-  it("accepte le même montant avec un autre reçu papier ou un autre étudiant : ce n'est plus l'exemple", () => {
-    expect(paiements([{ montant: "34000", recuPapier: "0999" }]).valides).toHaveLength(1);
-    expect(paiements([{ numeroEtudiant: "5", montant: "34000", recuPapier: "0412" }], ["5"]).valides).toHaveLength(1);
-    expect(paiements([{ montant: "34000", recuPapier: null }]).valides).toHaveLength(1);
-  });
-
-  it("refuse un montant nul et garde le N° pour la cascade", () => {
-    const v = paiements([{ montant: "0" }]);
-
-    expect(v.refusees).toEqual([{ ligne: 2, numero: "1" }]);
-    expect(erreurs(v)).toEqual([expect.stringMatching(/colonne « Montant \(Ar\) » \(« 0 »\) : le montant doit être supérieur à 0/)]);
+    expect(v.valides[0]).toMatchObject({ redoublant: false, cin: null, adresse: null, telephone: null });
   });
 });
 

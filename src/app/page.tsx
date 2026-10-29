@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { connection } from "next/server";
-import { ArrowRight, CircleCheck, Clock, Mail, MapPin, Phone, ShieldCheck } from "lucide-react";
+import { ArrowRight, Clock, Mail, MapPin, Phone, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EnTete } from "@/components/landing/en-tete";
 import { FormulaireContact } from "@/components/landing/formulaire-contact";
+import { ChiffresCles } from "@/components/landing/chiffres-cles";
+import { Reveal } from "@/components/motion/reveal";
+import { FiliereAnimee } from "@/components/landing/filiere-animee";
+import { FriseAgrements } from "@/components/landing/frise-agrements";
 import { IconeFacebook } from "@/components/landing/icone-facebook";
 import { PiedDePage } from "@/components/landing/pied-de-page";
 import { ARRETES, COORDONNEES, DEVISE, ETABLISSEMENT, ETUDES, getCoordonnees } from "@/lib/etablissement";
@@ -153,7 +157,7 @@ export default async function Accueil() {
         {/* Exactement un écran (100svh moins l'en-tête). La section reste collée
             sous l'en-tête pendant que le reste de la page glisse par-dessus et la recouvre. */}
         <section className="sticky top-18.25 z-0 isolate flex h-[calc(100svh-var(--hauteur-chrome))] min-h-136 items-center overflow-hidden">
-          <div className="absolute inset-0 -z-10">
+          <div className="accueil-dezoom absolute inset-0 -z-10">
             <Image
               src={photoHero}
               alt="Étudiants en tenue de soins posant en extérieur"
@@ -214,7 +218,7 @@ export default async function Accueil() {
         {/* ── L'institut ── */}
         <section id="institut" className="scroll-mt-20">
           <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 py-20 sm:px-6 md:grid-cols-2 lg:gap-20 lg:px-8 lg:py-28">
-            <div>
+            <Reveal>
               <h2 className="titre-section text-3xl font-bold tracking-tight text-primary after:mt-4 after:block after:h-1 after:w-12 after:rounded-full after:bg-rose after:content-[''] sm:text-4xl">
                 Un institut de formation au service de la santé dans la région d&apos;Atsinanana
               </h2>
@@ -234,55 +238,50 @@ export default async function Accueil() {
                   {DEVISE}
                 </p>
               )}
-            </div>
-            <figure className="rounded-2xl bg-rose-pale p-8 sm:p-12">
+            </Reveal>
+            <Reveal as="figure" delai={0.15} className="rounded-2xl bg-rose-pale p-8 sm:p-12">
               <Image
                 src={logo}
                 alt="Écusson de l'Institut de Formation Supérieur des Paramédicaux Atsinanana"
                 sizes="(min-width: 768px) 448px, 100vw"
                 className="mx-auto w-full max-w-md"
               />
-
-            </figure>
+            </Reveal>
           </div>
         </section>
+
+        {/* ── Chiffres clés ── */}
+        <ChiffresCles />
 
         {/* ── Filières ── */}
         <section id="filieres" className="scroll-mt-20 border-t border-rose/20 bg-rose-pale/60">
           <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
-            <div className="max-w-2xl">
+            <Reveal className="max-w-2xl">
               <h2 className="titre-section text-3xl font-bold tracking-tight text-primary after:mt-4 after:block after:h-1 after:w-12 after:rounded-full after:bg-rose after:content-[''] sm:text-4xl">Nos filières</h2>
               <p className="mt-4 text-lg text-muted-foreground">
                 Deux formations paramédicales, du premier jour jusqu&apos;au diplôme.
               </p>
-            </div>
+            </Reveal>
 
             <div className="mt-14 space-y-16 lg:space-y-24">
               {FILIERES.map((f, i) => (
-                <article key={f.code} className="grid items-center gap-8 md:grid-cols-2 lg:gap-16">
-                  <div className={`relative aspect-[4/3] overflow-hidden rounded-2xl ${i % 2 ? "md:order-2" : ""}`}>
-                    <Image src={f.photo} alt={f.alt} fill placeholder="blur" sizes="(min-width: 768px) 50vw, 100vw" className="object-cover object-[center_30%]" />
-                    <MentionIllustration className="bottom-3 left-3" />
+                <FiliereAnimee
+                  key={f.code}
+                  photoADroite={i % 2 === 1}
+                  teinte={f.teinte}
+                  points={f.points}
+                  photo={<Image src={f.photo} alt={f.alt} fill placeholder="blur" sizes="(min-width: 768px) 50vw, 100vw" className="object-cover object-[center_30%]" />}
+                  mention={<MentionIllustration className="bottom-3 left-3" />}
+                >
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <h3 className="text-3xl font-bold tracking-tight text-primary">{f.nom}</h3>
+                    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold ${f.teinte === "rose" ? "bg-rose-pale text-rose-fonce" : "bg-bleu-pale text-primary"}`}>
+                      <span className={`size-2 rounded-full ${f.teinte === "rose" ? "bg-rose" : "bg-bleu"}`} aria-hidden />
+                      Code {f.code}
+                    </span>
                   </div>
-                  <div>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                      <h3 className="text-3xl font-bold tracking-tight text-primary">{f.nom}</h3>
-                      <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold ${f.teinte === "rose" ? "bg-rose-pale text-rose-fonce" : "bg-bleu-pale text-primary"}`}>
-                        <span className={`size-2 rounded-full ${f.teinte === "rose" ? "bg-rose" : "bg-bleu"}`} aria-hidden />
-                        Code {f.code}
-                      </span>
-                    </div>
-                    <p className="mt-4 text-lg leading-relaxed text-muted-foreground">{f.texte}</p>
-                    <ul className="mt-6 space-y-3">
-                      {f.points.map((p) => (
-                        <li key={p} className="flex items-start gap-3">
-                          <CircleCheck className={`mt-0.5 size-5 shrink-0 ${f.teinte === "rose" ? "text-rose-fonce" : "text-bleu"}`} aria-hidden />
-                          <span>{p}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </article>
+                  <p className="mt-4 text-lg leading-relaxed text-muted-foreground">{f.texte}</p>
+                </FiliereAnimee>
               ))}
             </div>
           </div>
@@ -291,26 +290,26 @@ export default async function Accueil() {
         {/* ── Admission et études ── */}
         <section id="admission" className="scroll-mt-20 border-t">
           <div className="mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.6fr] lg:gap-20 lg:px-8 lg:py-28">
-            <div>
+            <Reveal>
               <h2 className="titre-section text-3xl font-bold tracking-tight text-primary after:mt-4 after:block after:h-1 after:w-12 after:rounded-full after:bg-rose after:content-[''] sm:text-4xl">
                 Admission et études
               </h2>
               <p className="mt-4 text-lg text-muted-foreground">
                 Les mêmes conditions valent pour les deux filières, Infirmier(e)s et Sage-femmes.
               </p>
-            </div>
+            </Reveal>
             <dl className="divide-y border-y">
               {[
                 { terme: "Durée des études", definition: `${ETUDES.dureeAnnees} ans, pour les Infirmier(e)s comme pour les Sage-femmes.` },
                 { terme: "Conditions d'admission", definition: "Être titulaire du baccalauréat, série A, C ou D." },
                 { terme: "Déroulement de la formation", definition: ETUDES.deroulement },
-              ].map(({ terme, definition }) => (
-                <div key={terme} className="grid gap-1 py-5 sm:grid-cols-[13rem_1fr] sm:gap-6">
+              ].map(({ terme, definition }, i) => (
+                <Reveal key={terme} delai={i * 0.08} className="grid gap-1 py-5 sm:grid-cols-[13rem_1fr] sm:gap-6">
                   <dt className="font-semibold text-primary">{terme}</dt>
                   <dd className="text-muted-foreground">{definition}</dd>
-                </div>
+                </Reveal>
               ))}
-              <div className="grid gap-1 py-5 sm:grid-cols-[13rem_1fr] sm:gap-6">
+              <Reveal delai={0.24} className="grid gap-1 py-5 sm:grid-cols-[13rem_1fr] sm:gap-6">
                 <dt className="font-semibold text-primary">Pièces et dates d&apos;inscription</dt>
                 <dd className="text-muted-foreground">
                   Le secrétariat vous les communique : appelez le{" "}
@@ -323,7 +322,7 @@ export default async function Accueil() {
                   </a>
                   .
                 </dd>
-              </div>
+              </Reveal>
             </dl>
           </div>
         </section>
@@ -331,14 +330,14 @@ export default async function Accueil() {
         {/* ── Galerie ── */}
         <section id="galerie" className="scroll-mt-20 border-t pb-20 lg:pb-28">
           <div className="mx-auto max-w-7xl px-4 pt-20 sm:px-6 lg:px-8 lg:pt-28">
-            <div className="mb-10 max-w-2xl">
+            <Reveal className="mb-10 max-w-2xl">
               <h2 className="titre-section text-3xl font-bold tracking-tight text-primary after:mt-4 after:block after:h-1 after:w-12 after:rounded-full after:bg-rose after:content-[''] sm:text-4xl">
                 Galerie
               </h2>
               <p className="mt-4 text-lg text-muted-foreground">
                 Travaux pratiques et gestes de soins, en images.
               </p>
-            </div>
+            </Reveal>
           </div>
           <Galerie photos={PHOTOS_GALERIE} />
         </section>
@@ -346,31 +345,21 @@ export default async function Accueil() {
         {/* ── Agréments ── */}
         <section id="agrements" className="scroll-mt-20 border-t">
           <div className="mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.6fr] lg:gap-20 lg:px-8 lg:py-28">
-            <div>
+            <Reveal>
               <h2 className="titre-section text-3xl font-bold tracking-tight text-primary after:mt-4 after:block after:h-1 after:w-12 after:rounded-full after:bg-rose after:content-[''] sm:text-4xl">Agréments officiels</h2>
               <p className="mt-4 text-lg text-muted-foreground">
                 L&apos;ouverture de l&apos;institut et la formation qu&apos;il dispense reposent sur des actes du ministère de
                 l&apos;Enseignement supérieur et de la Recherche scientifique.
               </p>
-            </div>
-            <ol className="sequence divide-y border-y">
-              {ARRETES.map((a) => (
-                <li key={a.reference} className="grid gap-1 py-5 sm:grid-cols-[4.5rem_1fr] sm:gap-6">
-                  <span className="tabular font-heading text-2xl font-semibold text-rose-fonce">{a.annee}</span>
-                  <div>
-                    <p className="tabular font-semibold text-primary">Arrêté {a.reference}</p>
-                    <p className="mt-1 text-muted-foreground">{a.objet}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
+            </Reveal>
+            <FriseAgrements arretes={ARRETES} />
           </div>
         </section>
 
         {/* ── Contact ── */}
         <section id="contact" className="scroll-mt-20 border-t bg-primary text-primary-foreground">
           <div className="mx-auto grid max-w-7xl items-start gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.15fr] lg:gap-16 lg:px-8 lg:py-24">
-          <div>
+          <Reveal>
             <h2 className="titre-section text-3xl font-bold tracking-tight after:mt-4 after:block after:h-1 after:w-12 after:rounded-full after:bg-rose after:content-[''] sm:text-4xl">
               Nous contacter
             </h2>
@@ -438,8 +427,10 @@ export default async function Accueil() {
                 <span className="sr-only">Page Facebook « {COORDONNEES.facebook} » (nouvel onglet)</span>
               </a>
             </div>
-          </div>
-          <FormulaireContact turnstileSiteKey={turnstileSiteKey} />
+          </Reveal>
+          <Reveal delai={0.15}>
+            <FormulaireContact turnstileSiteKey={turnstileSiteKey} />
+          </Reveal>
           </div>
         </section>
         </div>

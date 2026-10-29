@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { CircleCheck, CircleAlert, Loader2, Send } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
+import { CircleAlert, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,19 @@ import { envoyerMessageContact, type EtatContact } from "@/server/actions/contac
 import { Turnstile } from "./turnstile";
 
 const INITIAL: EtatContact = { statut: "initial" };
+
+/** Coche qui se dessine : le cercle, puis le trait. */
+function CocheDessinee() {
+  const sansAnimation = useReducedMotion();
+  const trace = (delay: number, duration: number) =>
+    sansAnimation ? { duration: 0 } : { duration, delay, ease: "easeOut" as const };
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="size-7" aria-hidden>
+      <motion.circle cx="12" cy="12" r="10" initial={{ pathLength: sansAnimation ? 1 : 0 }} animate={{ pathLength: 1 }} transition={trace(0, 0.35)} />
+      <motion.path d="m9 12 2 2 4-4" initial={{ pathLength: sansAnimation ? 1 : 0 }} animate={{ pathLength: 1 }} transition={trace(0.3, 0.3)} />
+    </svg>
+  );
+}
 
 function Erreur({ id, texte, alerte }: { id: string; texte?: string; alerte?: boolean }) {
   if (!texte) return null;
@@ -45,7 +59,7 @@ export function FormulaireContact({ turnstileSiteKey }: { turnstileSiteKey?: str
     return (
       <div role="status" className="flex flex-col items-center gap-4 rounded-2xl bg-white p-10 text-center text-foreground shadow-xl">
         <span className="grid size-14 place-items-center rounded-full bg-paye-pale text-paye">
-          <CircleCheck className="size-7" aria-hidden />
+          <CocheDessinee />
         </span>
         <p className="font-heading text-2xl font-semibold text-primary">Message envoyé</p>
         <p className="max-w-sm text-muted-foreground">{etat.message}</p>

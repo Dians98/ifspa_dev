@@ -13,7 +13,7 @@ const { db } = await import("@/lib/db");
 const route = await import("@/app/api/import/modele/route");
 
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-const FORMATS = ["xlsx", "etudiants.csv", "paiements.csv"];
+const FORMATS = ["xlsx", "etudiants.csv"];
 
 let m: Monde;
 
@@ -68,11 +68,11 @@ describe("accès", () => {
 
 describe("refus de l'administrateur", () => {
   it("format inconnu : 400 INVALIDE, avec les formats possibles", async () => {
-    for (const format of ["pdf", "csv", "XLSX", ""]) {
+    for (const format of ["pdf", "csv", "XLSX", "", "paiements.csv"]) {
       const r = await demander(format);
 
       expect(r.status, format).toBe(400);
-      expect(await r.json()).toEqual({ erreur: "Format inconnu : demandez xlsx, etudiants.csv ou paiements.csv.", code: "INVALIDE" });
+      expect(await r.json()).toEqual({ erreur: "Format inconnu : demandez xlsx ou etudiants.csv.", code: "INVALIDE" });
     }
   });
 
@@ -110,7 +110,7 @@ describe("modèle servi à l'administrateur", () => {
     }
   });
 
-  it("le classeur se relit : feuilles Étudiants et Paiements, en-tête « Niveau 2026-2027 », lignes d'exemple en ligne 3", async () => {
+  it("le classeur se relit : feuille Étudiants, en-tête « Niveau 2026-2027 », lignes d'exemple en ligne 3", async () => {
     const corps = await octets(await demander("xlsx"));
 
     const lu = await lireFichiersReprise([{ nom: "modele.xlsx", octets: corps }]);
@@ -119,7 +119,6 @@ describe("modèle servi à l'administrateur", () => {
     if (!lu.ok) return;
     expect(lu.lu.anneeNiveau).toBe("2026-2027");
     expect(lu.lu.etudiants.lignes.map((l) => l.ligne)).toEqual([3, 4, 5]);
-    expect(lu.lu.paiements.lignes).toHaveLength(3);
     expect(lu.lu.messages).toEqual([]);
   });
 
@@ -128,7 +127,7 @@ describe("modèle servi à l'administrateur", () => {
 
     const feuilles = await readXlsxFile(Buffer.from(corps));
 
-    expect(feuilles.map((f) => f.sheet)).toEqual(["Lisez-moi", "Étudiants", "Paiements"]);
+    expect(feuilles.map((f) => f.sheet)).toEqual(["Lisez-moi", "Étudiants"]);
     const consignes = feuilles[0].data.map((r) => String(r[0] ?? "")).join("\n");
     expect(consignes).toContain("année 2026-2027");
     expect(consignes).toContain("années absentes aujourd'hui de Paramètres › Années : 2024-2025, 2025-2026");
@@ -145,32 +144,20 @@ describe("modèle servi à l'administrateur", () => {
     expect([...corps.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
     const texte = new TextDecoder().decode(corps);
     expect(texte.split("\r\n")[0]).toBe(
-      "N° *;Nom *;Prénoms *;Sexe *;Date de naissance *;Lieu de naissance *;CIN;Téléphone;Adresse;Tuteur;Téléphone tuteur;Profession tuteur;Filière *;Année d'entrée *;Niveau 2026-2027 *;Redoublant;Droits en",
+      "N° *;Nom *;Prénoms *;Sexe *;Date de naissance *;Lieu de naissance *;CIN;Téléphone;Adresse;Tuteur;Téléphone tuteur;Profession tuteur;Filière *;Année d'entrée *;Niveau 2026-2027 *;Redoublant",
     );
     expect(texte).toContain("RAKOTOMALALA");
   });
 
-  it("paiements.csv : BOM UTF-8, nom de fichier d'après l'année, colonnes du modèle", async () => {
-    const r = await demander("paiements.csv");
+  it("le CSV téléchargé se relit comme le classeur", async () => {
+    const [etudiants, classeur] = await Promise.all(["etudiants.csv", "xlsx"].map(async (f) => octets(await demander(f))));
 
-    expect(r.status).toBe(200);
-    expect(r.headers.get("Content-Type")).toBe("text/csv; charset=utf-8");
-    expect(r.headers.get("Content-Disposition")).toBe('attachment; filename="paiements-2026-2027.csv"');
-    const corps = await octets(r);
-    expect([...corps.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
-    expect(new TextDecoder().decode(corps).split("\r\n")[0]).toBe("N° étudiant *;Date *;Montant (Ar) *;Mode *;Opérateur;Référence;N° reçu papier");
-  });
-
-  it("les deux CSV téléchargés se relisent ensemble comme le classeur", async () => {
-    const [etudiants, paiements, classeur] = await Promise.all(["etudiants.csv", "paiements.csv", "xlsx"].map(async (f) => octets(await demander(f))));
-
-    const csv = await lireFichiersReprise([{ nom: "etudiants-2026-2027.csv", octets: etudiants }, { nom: "paiements-2026-2027.csv", octets: paiements }]);
+    const csv = await lireFichiersReprise([{ nom: "etudiants-2026-2027.csv", octets: etudiants }]);
     const xlsx = await lireFichiersReprise([{ nom: "modele.xlsx", octets: classeur }]);
 
     expect(csv.ok && xlsx.ok).toBe(true);
     if (!csv.ok || !xlsx.ok) return;
     expect(csv.lu.etudiants.lignes).toEqual(xlsx.lu.etudiants.lignes);
-    expect(csv.lu.paiements.lignes).toEqual(xlsx.lu.paiements.lignes);
   });
 
   it("le modèle suit la base : l'année courante, les codes de filière actifs, les niveaux", async () => {

@@ -7,11 +7,7 @@ import type { SituationGuichet } from "@/lib/encaissement-hors-ligne";
 /** Part de cette échéance couverte par le montant saisi : `entiere` la solde, `partielle` n'en paie qu'une partie. */
 export type ImputationCase = { montant: number; resteApres: number };
 
-// Affichage rangé par type : les tranches de droits, puis les mois. Le cochage, lui, suit toujours l'ordre de solde
-// (le plus ancien d'abord, via `indexParId`) : cocher Novembre coche aussi la tranche 1/3 d'octobre.
-const rangType = (e: SituationGuichet["echeances"][number]) => (e.type === "DROITS" ? 0 : 1);
-
-/** Échéances non soldées, groupées par année scolaire ; chaque case se coche, la dernière touchée peut être partielle. */
+/** Échéances non soldées, groupées par année scolaire, dans l'ordre de solde du serveur ; la dernière case touchée peut être partielle. */
 export function ListeEcheances({
   annees,
   imputations,
@@ -37,7 +33,7 @@ export function ListeEcheances({
               <span className="text-sm text-muted-foreground tabular-nums">Reste {formaterAriary(annee.reste)}</span>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-              {[...annee.echeances].sort((a, b) => rangType(a) - rangType(b)).map((e) => {
+              {annee.echeances.map((e) => {
                 const imputation = imputations.get(e.id);
                 const partielle = !!imputation && imputation.resteApres > 0;
                 const entiere = !!imputation && !partielle;

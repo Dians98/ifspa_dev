@@ -281,7 +281,7 @@ describe("lireClasse", () => {
 
   it("les mois non dus d'un étudiant n'entrent pas dans son impayé en retard", async () => {
     const e = await inscrire(m.ifs.id, 1);
-    await db.echeance.updateMany({ where: { inscriptionId: e.inscription.id, ordre: 3 }, data: { nonDueSortie: true } });
+    await db.echeance.updateMany({ where: { inscriptionId: e.inscription.id, type: "MENSUALITE", mois: new Date(Date.UTC(2026, 10, 1)) }, data: { nonDueSortie: true } });
 
     const c = (await lireClasse(m.ifs.id, 1, "2027-03-15"))!;
 
@@ -408,7 +408,7 @@ describe("lireBlocageAnnulation", () => {
     expect(await lireBlocageAnnulation(operationId)).toEqual({ annulable: true, refus: null, recusBloquants: [] });
     expect(await actions.chargerBlocageAnnulation(operationId)).toEqual({ annulable: true, refus: null, recusBloquants: [] });
 
-    const ic = await db.inscription.findFirstOrThrow({ where: { etudiantId: membres[0].etudiant.id, anneeScolaireId: cible.id }, include: { echeances: { orderBy: { ordre: "asc" } } } });
+    const ic = await db.inscription.findFirstOrThrow({ where: { etudiantId: membres[0].etudiant.id, anneeScolaireId: cible.id }, include: { echeances: { orderBy: [{ mois: "asc" }, { type: "asc" }] } } });
     const annule = await fabriquerPaiement(
       membres[0].etudiant.id,
       m.user.id,

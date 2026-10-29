@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DecisionAdmission } from "@/generated/prisma/enums";
-import { fabriquerAnnee, fabriquerInscription, fabriquerPaiement } from "../factories";
+import { fabriquerAnnee, fabriquerFrais, fabriquerInscription, fabriquerPaiement } from "../factories";
 import {
   connecter,
   fabriquerAnneeCible,
@@ -66,11 +66,16 @@ function entree(membres: Inscrit[], liste: DecisionAdmission | DecisionAdmission
 const valider = (membres: Inscrit[], liste: DecisionAdmission | DecisionAdmission[], niveau = 1) =>
   actions.validerClasse(entree(membres, liste, niveau));
 
-const inscriptionCible = (etudiantId: string) =>
-  db.inscription.findFirst({
+/** Inscription de l'année cible ; `echeances` dans l'ordre de lecture : droits, puis mois par mois (index 1 = octobre). */
+async function inscriptionCible(etudiantId: string) {
+  const inscription = await db.inscription.findFirst({
     where: { etudiantId, anneeScolaireId: cible.id },
-    include: { echeances: { orderBy: { ordre: "asc" } } },
+    include: { echeances: { orderBy: [{ mois: "asc" }, { type: "asc" }] } },
   });
+  if (!inscription) return null;
+  const { echeances } = inscription;
+  return { ...inscription, echeances: [...echeances.filter((e) => e.type === "DROITS"), ...echeances.filter((e) => e.type !== "DROITS")] };
+}
 
 function sansMiseAJour<T extends { updatedAt: Date }>(ligne: T): Omit<T, "updatedAt"> {
   const copie: Partial<T> = { ...ligne };
@@ -109,7 +114,7 @@ async function rienEcrit(avant: Awaited<ReturnType<typeof instantane>>) {
 describe("validerClasse : effets", () => {
   it("le secrétariat valide une classe : inscriptions cibles, échéances copiées du tarif cible, statuts, sortie de l'abandon", async () => {
     const a = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarifSource(1));
-    const b = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarifSource(1), {}, 3);
+    const b = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarifSource(1));
     const c = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarifSource(1));
     const d = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarifSource(1));
     const matricules = (await db.etudiant.findMany({ orderBy: { id: "asc" }, select: { id: true, matricule: true } }));
@@ -121,7 +126,7 @@ describe("validerClasse : effets", () => {
     expect(r).toMatchObject({ message: expect.stringMatching(/validée : 2 passent en 2e année · 1 redouble · 1 abandon\./) });
 
     const ia = (await inscriptionCible(a.etudiant.id))!;
-    expect(ia).toMatchObject({ niveau: 2, redoublement: false, droitsEnTranches: 1, statut: "EN_COURS", operationAdmissionId: operationId });
+    expect(ia).toMatchObject({ niveau: 2, redoublement: false, statut: "EN_COURS", operationAdmissionId: operationId });
     expect(ia.echeances).toHaveLength(11);
     expect(ia.echeances[0]).toMatchObject({ type: "DROITS", montantDu: tarifCible(2).droitsInscription, nonDueSortie: false });
     expect(ia.echeances[0].mois.toISOString().slice(0, 10)).toBe("2027-10-01");
@@ -129,8 +134,7 @@ describe("validerClasse : effets", () => {
     expect(ia.echeances.at(-1)?.mois.toISOString().slice(0, 10)).toBe("2028-07-01");
 
     const ib = (await inscriptionCible(b.etudiant.id))!;
-    expect(ib.droitsEnTranches).toBe(3);
-    expect(ib.echeances.filter((e) => e.type === "DROITS").map((e) => e.montantDu)).toEqual([43_000, 41_000, 41_000]);
+    expect(ib.echeances.filter((e) => e.type === "DROITS").map((e) => e.montantDu)).toEqual([tarifCible(2).droitsInscription]);
     expect(ib.echeances.filter((e) => e.type === "MENSUALITE")).toHaveLength(10);
 
     const ic = (await inscriptionCible(c.etudiant.id))!;
@@ -342,15 +346,25 @@ describe("validerClasse : refus", () => {
     expect(await db.operationAdmission.count()).toBe(0);
   });
 
-  it("droits de la cible trop faibles pour les tranches choisies : refusé en nommant l'étudiant", async () => {
-    await db.tarif.update({ where: { filiereId_anneeScolaireId_niveau: { filiereId: m.ifs.id, anneeScolaireId: cible.id, niveau: 2 } }, data: { droitsInscription: 2_000 } });
-    const trois = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarifSource(1), { nom: "TROISFOIS" }, 3);
+  it("droits invalides dans le tarif cible : refusé, rien n'est écrit", async () => {
+    await db.tarif.update({ where: { filiereId_anneeScolaireId_niveau: { filiereId: m.ifs.id, anneeScolaireId: cible.id, niveau: 2 } }, data: { droitsInscription: 0 } });
+    const membres = await classe(1);
     const avant = await instantane();
 
-    const r = await valider([trois], "ADMIS");
+    const r = await valider(membres, "ADMIS");
 
-    expect(r).toMatchObject({ statut: "erreur", message: expect.stringMatching(/TROISFOIS .*trop faibles pour être payés en 3 fois/) });
+    expect(r).toMatchObject({ statut: "erreur", message: expect.stringMatching(/droits d'inscription du tarif sont invalides/) });
     await rienEcrit(avant);
+  });
+
+  it("de petits droits ne bloquent plus le passage : une seule échéance de droits", async () => {
+    await db.tarif.update({ where: { filiereId_anneeScolaireId_niveau: { filiereId: m.ifs.id, anneeScolaireId: cible.id, niveau: 2 } }, data: { droitsInscription: 2_000 } });
+    const membres = await classe(1);
+
+    reussi(await valider(membres, "ADMIS"));
+
+    const ia = (await inscriptionCible(membres[0].etudiant.id))!;
+    expect(ia.echeances.filter((e) => e.type === "DROITS").map((e) => e.montantDu)).toEqual([2_000]);
   });
 
   it("liste incomplète, en trop ou année source périmée : message de rechargement", async () => {
@@ -419,7 +433,7 @@ describe("validerClasse : concurrence", () => {
     for (let tour = 0; tour < 3; tour++) {
       const membres = await classe(4);
       const payer = (e: Inscrit) =>
-        paiements.encaisser({ etudiantId: e.etudiant.id, montant: 10_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: 900_000 });
+        paiements.encaisser({ etudiantId: e.etudiant.id, montant: 10_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: 900_000, jourAffiche: "2026-11-15" });
 
       const [validation, ...encaissements] = await Promise.all([valider(membres, "ADMIS"), ...membres.map(payer)]);
 
@@ -480,7 +494,7 @@ describe("validerClasse : robustesse", () => {
   it("annulation du passage et encaissement simultanés sur l'inscription créée : l'un ou l'autre, jamais les deux", async () => {
     for (let tour = 0; tour < 3; tour++) {
       const [a] = await classe(1);
-      reussi(await paiements.encaisser({ etudiantId: a.etudiant.id, montant: 900_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: 900_000 }));
+      reussi(await paiements.encaisser({ etudiantId: a.etudiant.id, montant: 900_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: 900_000, jourAffiche: "2026-11-15" }));
       const { operationId } = reussi(await valider([a], "ADMIS"));
       connecter(getSession, m.admin);
       const reste = (await paiements.chargerSituationGuichet(a.etudiant.id))!.resteDuTotal;
@@ -488,7 +502,7 @@ describe("validerClasse : robustesse", () => {
 
       const [annulation, encaissement] = await Promise.all([
         actions.annulerOperation({ operationId }),
-        paiements.encaisser({ etudiantId: a.etudiant.id, montant: 10_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: reste }),
+        paiements.encaisser({ etudiantId: a.etudiant.id, montant: 10_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: reste, jourAffiche: "2026-11-15" }),
       ]);
 
       const ic = await inscriptionCible(a.etudiant.id);
@@ -533,7 +547,7 @@ describe("annulerOperation", () => {
 
   it("restaure exactement l'état d'avant : étudiants, inscriptions, échéances, paiements et compteurs identiques", async () => {
     const ancienne = new Date(Date.UTC(2026, 0, 5));
-    const a = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarifSource(1), {}, 3);
+    const a = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarifSource(1));
     const b = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarifSource(1));
     const c = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarifSource(1));
     const d = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarifSource(1), { dateSortie: ancienne, motifSortie: "ancien motif" });
@@ -568,6 +582,60 @@ describe("annulerOperation", () => {
     }
     expect(await db.ligneAdmission.count()).toBe(6);
     expect(await db.inscription.count({ where: { operationAdmissionId: { not: null } } })).toBe(0);
+  });
+
+  it("frais prévus sur l'année cible : copiés sur les admis (niveau + 1) et les redoublants (même niveau), l'annulation restaure l'état exact", async () => {
+    const [a, b, c, d] = await classe(4);
+    const mars = new Date(Date.UTC(2028, 2, 1));
+    const fraisNiveau2 = await fabriquerFrais(cible.id, { classes: [{ filiereId: m.ifs.id, niveau: 2 }], libelle: "Frais niveau 2", montant: 15_000, mois: mars });
+    const fraisNiveau1 = await fabriquerFrais(cible.id, { classes: [{ filiereId: m.ifs.id, niveau: 1 }], libelle: "Frais niveau 1", montant: 9_000, mois: new Date(Date.UTC(2028, 0, 1)) });
+    const fraisSf = await fabriquerFrais(cible.id, { classes: [{ filiereId: m.sf.id, niveau: 1 }], libelle: "Frais SF" });
+    const avant = await instantane();
+
+    const { operationId } = reussi(await valider([a, b, c, d], ["ADMIS", "REDOUBLANT", "ADMIS", "ABANDON"]));
+
+    const frais = async (x: Inscrit) =>
+      (await inscriptionCible(x.etudiant.id))?.echeances.filter((e) => e.type === "FRAIS").map((e) => [e.fraisId, e.montantDu, e.nonDueSortie]);
+    expect(await frais(a)).toEqual([[fraisNiveau2.frais.id, 15_000, false]]);
+    expect(await frais(b)).toEqual([[fraisNiveau1.frais.id, 9_000, false]]);
+    expect(await frais(c)).toEqual([[fraisNiveau2.frais.id, 15_000, false]]);
+    expect(await frais(d)).toBeUndefined();
+    expect(await db.echeance.count({ where: { fraisId: fraisSf.frais.id } })).toBe(0);
+    expect((await inscriptionCible(a.etudiant.id))!.echeances).toHaveLength(12);
+
+    connecter(getSession, m.admin);
+    reussi(await actions.annulerOperation({ operationId }));
+
+    expect(await instantane()).toEqual(avant);
+    expect(await db.echeance.count({ where: { type: "FRAIS" } })).toBe(0);
+  });
+
+  it("dernière année : les diplômés ne reçoivent aucun frais, le redoublant reçoit celui de son niveau", async () => {
+    const [d, r] = await classe(2, 3);
+    const frais = await fabriquerFrais(cible.id, { classes: [{ filiereId: m.ifs.id, niveau: 3 }], mois: new Date(Date.UTC(2028, 2, 1)) });
+
+    reussi(await valider([d, r], ["DIPLOME", "REDOUBLANT"], 3));
+
+    expect(await db.echeance.findMany({ where: { fraisId: frais.frais.id }, include: { inscription: true } })).toMatchObject([
+      { inscription: { etudiantId: r.etudiant.id } },
+    ]);
+  });
+
+  it("validation d'une classe et création d'un frais pour l'année cible simultanées : chaque inscription créée a exactement un frais", async () => {
+    const membres = await classe(3);
+    const { creerFrais } = await import("@/server/actions/frais");
+    connecter(getSession, m.admin);
+
+    const [passage, frais] = await Promise.all([
+      valider(membres, "ADMIS"),
+      creerFrais({ libelle: "Frais de stage", montant: 20_000, mois: "2028-03", anneeScolaireId: cible.id, classes: [{ filiereId: m.ifs.id, niveau: 2 }] }),
+    ]);
+
+    expect(passage.statut).toBe("succes");
+    expect(frais.statut).toBe("succes");
+    for (const x of membres) {
+      expect((await inscriptionCible(x.etudiant.id))!.echeances.filter((e) => e.type === "FRAIS"), x.etudiant.id).toHaveLength(1);
+    }
   });
 
   it("l'annulation libère la classe : elle peut être validée de nouveau", async () => {
@@ -621,7 +689,7 @@ describe("annulerOperation", () => {
     const { operationId } = reussi(await valider([a], "ADMIS"));
     const reste = (await paiements.chargerSituationGuichet(a.etudiant.id))!.resteDuTotal;
     // Le plus ancien dû est l'année 2026 : on solde tout 2026 puis un peu de 2027.
-    reussi(await paiements.encaisser({ etudiantId: a.etudiant.id, montant: 900_000 + 10_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: reste }));
+    reussi(await paiements.encaisser({ etudiantId: a.etudiant.id, montant: 900_000 + 10_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: reste, jourAffiche: "2026-11-15" }));
     connecter(getSession, m.admin);
 
     const r = await actions.annulerOperation({ operationId });
@@ -632,7 +700,7 @@ describe("annulerOperation", () => {
 
   it("un paiement sur l'année source ne bloque pas l'annulation", async () => {
     const [a] = await classe(1);
-    reussi(await paiements.encaisser({ etudiantId: a.etudiant.id, montant: 100_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: 900_000 }));
+    reussi(await paiements.encaisser({ etudiantId: a.etudiant.id, montant: 100_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: 900_000, jourAffiche: "2026-11-15" }));
     const { operationId } = reussi(await valider([a], "ADMIS"));
     connecter(getSession, m.admin);
 

@@ -5,125 +5,86 @@ import { NOMS_MOIS } from "@/lib/parametres";
 
 // Règles de l'écolage. Isomorphe et pur (serveur, Encaisser hors ligne, admissions) : ni base, ni horloge.
 
-export const TRANCHES_POSSIBLES = [1, 2, 3] as const;
-export type NombreTranches = (typeof TRANCHES_POSSIBLES)[number];
-
-/** Les tranches sont arrondies au millier inférieur ; le reste va sur la 1re. */
-const ARRONDI_TRANCHE = 1000;
-
 export type TarifEcheances = { droitsInscription: number; montantMensuel: number; nombreMois: number };
 export type AnneeEcheances = { anneeDebut: number; moisDebutEcolage: number };
 
 export type EcheanceGeneree = {
   type: TypeEcheance;
-  /** 1 à 3 pour les droits, null pour une mensualité. */
-  tranche: number | null;
   /** 1er du mois d'exigibilité, à minuit UTC (colonne `@db.Date`). */
   mois: Date;
-  /** Ordre de solde dans l'inscription, à partir de 1. */
-  ordre: number;
   montantDu: number;
+  /** Frais d'origine d'une échéance FRAIS, null sinon. */
+  fraisId: string | null;
 };
 
 function estEntier(n: number): boolean {
   return Number.isInteger(n);
 }
 
-/** Message si les droits ne peuvent pas être découpés en `n` tranches, sinon null. */
-export function controleTranches(droits: number, n: number): string | null {
-  if (!TRANCHES_POSSIBLES.includes(n as NombreTranches)) return "Choisissez un paiement des droits en 1, 2 ou 3 fois.";
-  if (!estEntier(droits) || droits <= 0) return "Les droits d'inscription du tarif sont invalides : vérifiez le tarif dans Paramètres › Tarifs.";
-  const part = Math.floor(droits / n / ARRONDI_TRANCHE) * ARRONDI_TRANCHE;
-  if (n > 1 && part <= 0) {
-    return `Les droits d'inscription (${formaterAriary(droits)}) sont trop faibles pour être payés en ${n} fois : choisissez un paiement en une fois.`;
-  }
-  return null;
-}
-
-/** 100 000 en 3 → [34 000, 33 000, 33 000]. Lève une RangeError (message affichable) si le découpage est impossible. */
-export function tranchesDroits(droits: number, n: number): number[] {
-  const refus = controleTranches(droits, n);
-  if (refus) throw new RangeError(refus);
-  const part = Math.floor(droits / n / ARRONDI_TRANCHE) * ARRONDI_TRANCHE;
-  return Array.from({ length: n }, (_, k) => (k === 0 ? droits - part * (n - 1) : part));
-}
-
 function premierDuMois(annee: number, moisIndex0: number): Date {
   return new Date(Date.UTC(annee, moisIndex0, 1));
 }
 
+/** Message si les droits du tarif ne peuvent pas être copiés sur une échéance, sinon null. */
+export function controleDroits(droits: number): string | null {
+  if (!estEntier(droits) || droits <= 0) {
+    return "Les droits d'inscription du tarif sont invalides : vérifiez le tarif dans Paramètres › Tarifs.";
+  }
+  return null;
+}
+
+/** Droits exigibles le 1er mois de l'année scolaire, en retard dès le 1er du 2e mois. */
+export function moisDroits(annee: AnneeEcheances): Date {
+  if (!estEntier(annee.moisDebutEcolage) || annee.moisDebutEcolage < 1 || annee.moisDebutEcolage > 12) {
+    throw new RangeError(`Mois de début d'écolage invalide : ${annee.moisDebutEcolage}.`);
+  }
+  return premierDuMois(annee.anneeDebut, annee.moisDebutEcolage - 1);
+}
+
 /**
- * Échéances d'une année complète (pas d'inscription en cours d'année) : tranche k des droits au mois k,
+ * Échéances d'une année complète (pas d'inscription en cours d'année) : une échéance de droits,
  * une mensualité par mois ; montants copiés du tarif, pour qu'un changement de tarif ne réécrive pas le passé.
  */
-export function genererEcheances(
-  tarif: TarifEcheances,
-  annee: AnneeEcheances,
-  droitsEnTranches: number,
-): EcheanceGeneree[] {
+export function genererEcheances(tarif: TarifEcheances, annee: AnneeEcheances): EcheanceGeneree[] {
+  const refus = controleDroits(tarif.droitsInscription);
+  if (refus) throw new RangeError(refus);
   if (!estEntier(tarif.montantMensuel) || tarif.montantMensuel <= 0) {
     throw new RangeError("La mensualité du tarif est invalide : vérifiez le tarif dans Paramètres › Tarifs.");
   }
   if (!estEntier(tarif.nombreMois) || tarif.nombreMois < 1 || tarif.nombreMois > 12) {
     throw new RangeError("Le nombre de mois du tarif est invalide : vérifiez le tarif dans Paramètres › Tarifs.");
   }
-  if (!estEntier(annee.moisDebutEcolage) || annee.moisDebutEcolage < 1 || annee.moisDebutEcolage > 12) {
-    throw new RangeError(`Mois de début d'écolage invalide : ${annee.moisDebutEcolage}.`);
-  }
-  const tranches = tranchesDroits(tarif.droitsInscription, droitsEnTranches);
-  const debut = annee.moisDebutEcolage - 1;
-  const nbMois = Math.max(tarif.nombreMois, tranches.length);
-
-  const echeances: EcheanceGeneree[] = [];
-  let ordre = 1;
-  for (let i = 0; i < nbMois; i++) {
-    const mois = premierDuMois(annee.anneeDebut, debut + i);
-    if (i < tranches.length) {
-      echeances.push({
-        type: "DROITS",
-        tranche: i + 1,
-        mois,
-        ordre: ordre++,
-        montantDu: tranches[i],
-      });
-    }
-    if (i < tarif.nombreMois) {
-      echeances.push({ type: "MENSUALITE", tranche: null, mois, ordre: ordre++, montantDu: tarif.montantMensuel });
-    }
+  const echeances: EcheanceGeneree[] = [
+    { type: "DROITS", mois: moisDroits(annee), montantDu: tarif.droitsInscription, fraisId: null },
+  ];
+  for (let i = 0; i < tarif.nombreMois; i++) {
+    echeances.push({
+      type: "MENSUALITE",
+      mois: premierDuMois(annee.anneeDebut, annee.moisDebutEcolage - 1 + i),
+      montantDu: tarif.montantMensuel,
+      fraisId: null,
+    });
   }
   return echeances;
 }
 
-type EcheanceMontant = { type: TypeEcheance; montantDu: number };
-
-/**
- * Montants d'origine d'une inscription, relus sur ses échéances : pour redécouper les droits
- * sans relire un tarif qui a pu changer depuis.
- */
-export function tarifDepuisEcheances(echeances: EcheanceMontant[]): TarifEcheances {
-  const droits = echeances.filter((e) => e.type === "DROITS");
-  const mensualites = echeances.filter((e) => e.type === "MENSUALITE");
-  const montants = new Set(mensualites.map((e) => e.montantDu));
-  if (droits.length === 0 || mensualites.length === 0 || montants.size !== 1) {
-    throw new RangeError("Échéancier incohérent : redécoupage des droits impossible. Prévenez le responsable technique.");
-  }
-  return {
-    droitsInscription: droits.reduce((s, e) => s + e.montantDu, 0),
-    montantMensuel: mensualites[0].montantDu,
-    nombreMois: mensualites.length,
-  };
+/** Échéance d'un frais pour une inscription : même montant et même mois pour tous les concernés. */
+export function echeanceFrais(frais: { id: string; montant: number; mois: Date }): EcheanceGeneree {
+  if (!estEntier(frais.montant) || frais.montant <= 0) throw new RangeError("Montant du frais invalide.");
+  return { type: "FRAIS", mois: frais.mois, montantDu: frais.montant, fraisId: frais.id };
 }
 
-/** « Droits d'inscription », « Droits — tranche 2/3 », « Octobre 2026 ». */
-export function libelleEcheance(
-  e: { type: TypeEcheance; tranche: number | null; mois: Date },
-  droitsEnTranches: number,
-): string {
-  if (e.type === "DROITS") {
-    return droitsEnTranches > 1 ? `Droits — tranche ${e.tranche ?? 1}/${droitsEnTranches}` : "Droits d'inscription";
-  }
-  const nom = NOMS_MOIS[e.mois.getUTCMonth()];
-  return `${nom.charAt(0).toUpperCase()}${nom.slice(1)} ${e.mois.getUTCFullYear()}`;
+/** « Octobre 2026 ». */
+export function libelleMois(mois: Date): string {
+  const nom = NOMS_MOIS[mois.getUTCMonth()];
+  return `${nom.charAt(0).toUpperCase()}${nom.slice(1)} ${mois.getUTCFullYear()}`;
+}
+
+/** « Droits d'inscription », « Octobre 2026 », ou le libellé du frais. */
+export function libelleEcheance(e: { type: TypeEcheance; mois: Date; libelleFrais?: string | null }): string {
+  if (e.type === "DROITS") return "Droits d'inscription";
+  if (e.type === "FRAIS") return e.libelleFrais?.trim() || "Frais";
+  return libelleMois(e.mois);
 }
 
 // Retard et statuts
@@ -156,6 +117,12 @@ export function estEchue(mois: Date, jour: Jour): boolean {
   return indexMois(mois.getUTCFullYear(), mois.getUTCMonth() + 1) < indexMois(j.annee, j.mois);
 }
 
+/** Échéance du mois M exigible dès le 1er du mois M (mois passés et mois en cours). */
+export function estExigible(mois: Date, jour: Jour): boolean {
+  const j = lireJour(jour);
+  return indexMois(mois.getUTCFullYear(), mois.getUTCMonth() + 1) <= indexMois(j.annee, j.mois);
+}
+
 /** Un mois passé payé en partie est « en retard » ; « partiel » seulement tant que le mois n'est pas échu. */
 export function statutEcheance(montantDu: number, paye: number, mois: Date, jour: Jour): StatutEcheance {
   if (paye >= montantDu) return "paye";
@@ -166,10 +133,12 @@ export function statutEcheance(montantDu: number, paye: number, mois: Date, jour
 /** Échéance avec ce qui a été payé dessus (somme des lignes de paiements non annulés). */
 export type EcheancePayee = {
   id: string;
+  type: TypeEcheance;
   /** Année scolaire de l'inscription (2026 pour 2026-2027). */
   anneeDebut: number;
   mois: Date;
-  ordre: number;
+  /** `Frais.rang` d'une échéance FRAIS : deux frais du même mois se soldent dans l'ordre de création. */
+  rangFrais?: number | null;
   montantDu: number;
   paye: number;
   /** Mois postérieur à une sortie, rien payé dessus : ignorée par `situation()`. */
@@ -197,7 +166,7 @@ export type TotauxEcolage = {
   reste: number;
   /** Reste dû sur les échéances échues. */
   resteEnRetard: number;
-  /** Mois distincts ayant au moins une échéance échue non soldée (tranche et mensualité d'un même mois = 1). */
+  /** Mois distincts ayant au moins une échéance échue non soldée (droits, mensualité ou frais d'un même mois = 1). */
   moisEnRetard: number;
   /** « Attendu à date » : dû des échéances échues. */
   duEchu: number;
@@ -247,12 +216,48 @@ export function situation(toutes: EcheancePayee[], jour: Jour): SituationEcolage
 
 // Répartition d'un paiement
 
-type CleSolde = { mois: Date; anneeDebut: number; ordre: number };
+type CleSolde = { id: string; type: TypeEcheance; mois: Date; anneeDebut: number; rangFrais?: number | null };
 
-/** Ordre de solde, toutes années confondues : la plus ancienne d'abord (mois, puis année scolaire, puis ordre). */
-export function trierPourSolde<E extends CleSolde>(echeances: readonly E[]): E[] {
+function comparerId(a: { id: string }, b: { id: string }): number {
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+/**
+ * Rang dans une année scolaire : 1 droits, 2 mensualités exigibles, 3 frais exigibles,
+ * 4 mensualités à venir, 5 frais à venir. Dépend du jour : serveur et poste doivent passer le même.
+ */
+export function rangSolde(e: { type: TypeEcheance; mois: Date }, jour: Jour): number {
+  if (e.type === "DROITS") return 1;
+  const exigible = estExigible(e.mois, jour);
+  if (e.type === "MENSUALITE") return exigible ? 2 : 4;
+  return exigible ? 3 : 5;
+}
+
+/** Ordre de solde : année par année (la plus ancienne d'abord), puis rang, mois, ordre de création des frais, id. */
+export function trierPourSolde<E extends CleSolde>(echeances: readonly E[], jour: Jour): E[] {
+  const rangs = new Map(echeances.map((e) => [e, rangSolde(e, jour)]));
   return [...echeances].sort(
-    (a, b) => a.mois.getTime() - b.mois.getTime() || a.anneeDebut - b.anneeDebut || a.ordre - b.ordre,
+    (a, b) =>
+      a.anneeDebut - b.anneeDebut ||
+      rangs.get(a)! - rangs.get(b)! ||
+      a.mois.getTime() - b.mois.getTime() ||
+      (a.rangFrais ?? 0) - (b.rangFrais ?? 0) ||
+      comparerId(a, b),
+  );
+}
+
+const RANG_LECTURE: Record<TypeEcheance, number> = { DROITS: 0, MENSUALITE: 1, FRAIS: 2 };
+
+/** Ordre de lecture (fiche, relevé) : année, droits, puis mois par mois, la mensualité avant les frais. */
+export function trierChronologique<E extends CleSolde>(echeances: readonly E[]): E[] {
+  return [...echeances].sort(
+    (a, b) =>
+      a.anneeDebut - b.anneeDebut ||
+      Number(b.type === "DROITS") - Number(a.type === "DROITS") ||
+      a.mois.getTime() - b.mois.getTime() ||
+      RANG_LECTURE[a.type] - RANG_LECTURE[b.type] ||
+      (a.rangFrais ?? 0) - (b.rangFrais ?? 0) ||
+      comparerId(a, b),
   );
 }
 

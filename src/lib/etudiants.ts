@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Sexe, type StatutEtudiant, type StatutInscription } from "@/generated/prisma/enums";
 import { dateDuJour, lireJour, type Jour } from "@/lib/dates";
-import { controleTranches, TRANCHES_POSSIBLES, type TarifEcheances } from "@/lib/ecolage";
+import { controleDroits, type TarifEcheances } from "@/lib/ecolage";
 import { DUREE_MAX, libelleNiveau } from "@/lib/parametres";
 
 // Règles de la fiche étudiant. Pur : ni base, ni date implicite.
@@ -188,7 +188,6 @@ export const schemaCreationEtudiant = z.object(
       .int("Choisissez le niveau.")
       .min(1, "Choisissez le niveau.")
       .max(DUREE_MAX, "Niveau invalide."),
-    droitsEnTranches: z.literal(TRANCHES_POSSIBLES, "Choisissez un paiement des droits en 1, 2 ou 3 fois.").default(1),
     /** Coché après l'avertissement « un étudiant porte déjà ce nom et cette date de naissance ». */
     confirmerDoublon: z.boolean().default(false),
   },
@@ -204,14 +203,6 @@ export const schemaModificationEtudiant = z.object(
 ).superRefine(controlerTuteur);
 export type EntreeModificationEtudiant = z.input<typeof schemaModificationEtudiant>;
 export type ModificationEtudiant = z.output<typeof schemaModificationEtudiant>;
-
-export const schemaModifTranches = z.object(
-  {
-    inscriptionId: z.string({ error: "Inscription introuvable. Rechargez la page." }).min(1, "Inscription introuvable. Rechargez la page."),
-    droitsEnTranches: z.literal(TRANCHES_POSSIBLES, "Choisissez un paiement des droits en 1, 2 ou 3 fois."),
-  },
-  DONNEES_INVALIDES,
-);
 
 /** Minuscules sans accents ni espaces superflus : base de la colonne `Etudiant.recherche` et des saisies de recherche. */
 export function normaliserRecherche(texte: string): string {
@@ -258,7 +249,6 @@ export type ContexteCreation = {
   niveau: number;
   /** Tarif de (filière, année courante, niveau), null s'il manque. */
   tarif: TarifEcheances | null;
-  droitsEnTranches: number;
 };
 
 export function controleCreation(c: ContexteCreation): string | null {
@@ -276,23 +266,5 @@ export function controleCreation(c: ContexteCreation): string | null {
   if (!c.tarif) {
     return `Tarif manquant pour ${c.filiere.nom} ${libelleNiveau(c.niveau)} en ${c.annee.libelle} : demandez à l'administrateur de le saisir dans Paramètres › Tarifs.`;
   }
-  return controleTranches(c.tarif.droitsInscription, c.droitsEnTranches);
-}
-
-/** Refus d'un redécoupage des droits, affiché sur la fiche et revérifié par l'action. */
-export function controleTranchesModifiables(c: {
-  lignesPaiementDroits: number;
-  anneeLibelle: string;
-  anneeCloturee: boolean;
-}): string | null {
-  if (c.anneeCloturee) return `L'année ${c.anneeLibelle} est clôturée : son échéancier ne se modifie plus.`;
-  return controleModifTranches(c.lignesPaiementDroits);
-}
-
-/** Une ligne annulée compte aussi : elle référence les échéances qu'un redécoupage supprimerait. */
-export function controleModifTranches(nbLignesPaiement: number): string | null {
-  if (nbLignesPaiement > 0) {
-    return "Le paiement des droits ne peut plus être redécoupé : des paiements ont déjà été enregistrés sur cette année, même annulés.";
-  }
-  return null;
+  return controleDroits(c.tarif.droitsInscription);
 }

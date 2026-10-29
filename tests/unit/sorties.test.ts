@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { TypeEcheance } from "@/generated/prisma/enums";
 import { dateDuJour } from "@/lib/dates";
 import { genererEcheances } from "@/lib/ecolage";
 import {
@@ -109,8 +110,13 @@ describe("controleSortie", () => {
 });
 
 describe("echeancesNonDuesApresSortie", () => {
-  const echeance = (id: string, m: Date, surcharge: Partial<{ nonDueSortie: boolean; lignesNonAnnulees: number }> = {}) => ({
+  const echeance = (
+    id: string,
+    m: Date,
+    surcharge: Partial<{ type: TypeEcheance; nonDueSortie: boolean; lignesNonAnnulees: number }> = {},
+  ) => ({
     id,
+    type: "MENSUALITE" as TypeEcheance,
     mois: m,
     nonDueSortie: false,
     lignesNonAnnulees: 0,
@@ -155,24 +161,49 @@ describe("echeancesNonDuesApresSortie", () => {
     const deuxAnnees = [echeance("a2025", mois(2026, 6)), echeance("a2026", mois(2027, 6))];
     expect(echeancesNonDuesApresSortie(deuxAnnees, "2026-11-15")).toEqual(["a2026"]);
   });
+
+  it("les droits restent dus même après une sortie avant leur mois, sans paiement dessus", () => {
+    const avecDroits = [echeance("droits", mois(2026, 10), { type: "DROITS" }), echeance("jan", mois(2027, 1))];
+    expect(echeancesNonDuesApresSortie(avecDroits, "2026-09-15")).toEqual(["jan"]);
+    expect(echeancesNonDuesApresSortie(avecDroits, "2026-11-30")).toEqual(["jan"]);
+  });
+
+  it("un frais exigible après la sortie et sans paiement n'est plus dû", () => {
+    const lignes = [echeance("frais-mars", mois(2027, 3), { type: "FRAIS" }), echeance("mars", mois(2027, 3))];
+    expect(echeancesNonDuesApresSortie(lignes, "2027-02-15")).toEqual(["frais-mars", "mars"]);
+  });
+
+  it("un frais payé, même en partie, reste dû ; celui du mois de sortie et les frais échus aussi", () => {
+    const lignes = [
+      echeance("frais-paye", mois(2027, 3), { type: "FRAIS", lignesNonAnnulees: 1 }),
+      echeance("frais-mois-sortie", mois(2027, 2), { type: "FRAIS" }),
+      echeance("frais-echu", mois(2026, 11), { type: "FRAIS" }),
+      echeance("frais-futur", mois(2027, 5), { type: "FRAIS" }),
+    ];
+    expect(echeancesNonDuesApresSortie(lignes, "2027-02-15")).toEqual(["frais-futur"]);
+  });
+
+  it("un frais dont les paiements ont tous été annulés est retiré comme une mensualité", () => {
+    const lignes = [echeance("frais-annule", mois(2027, 3), { type: "FRAIS", lignesNonAnnulees: 0 })];
+    expect(echeancesNonDuesApresSortie(lignes, "2027-01-10")).toEqual(["frais-annule"]);
+  });
 });
 
 describe("apercuSortie", () => {
   const ar = (n: number) => `${n} Ar`;
   const total = 100_000 + 10 * 80_000;
 
-  /** Inscription 2025-2026 : droits en une fois (octobre) et 10 mensualités de 80 000 Ar, octobre à juillet. */
+  /** Inscription 2025-2026 : droits (octobre) et 10 mensualités de 80 000 Ar, octobre à juillet. */
   function echeances2025(
     surcharges: Record<string, Partial<Pick<EcheanceAvantSortie, "paye" | "nonDueSortie" | "lignesNonAnnulees">>> = {},
   ): EcheanceAvantSortie[] {
     return genererEcheances(
       { droitsInscription: 100_000, montantMensuel: 80_000, nombreMois: 10 },
       { anneeDebut: 2025, moisDebutEcolage: 10 },
-      1,
     ).map((e) => {
       const mois = e.mois.toISOString().slice(0, 10);
       const id = e.type === "DROITS" ? "droits" : mois.slice(0, 7);
-      return { id, mois, montantDu: e.montantDu, paye: 0, nonDueSortie: false, lignesNonAnnulees: 0, ...surcharges[id] };
+      return { id, type: e.type, mois, montantDu: e.montantDu, paye: 0, nonDueSortie: false, lignesNonAnnulees: 0, ...surcharges[id] };
     });
   }
 
@@ -218,6 +249,21 @@ describe("apercuSortie", () => {
 
     expect(a).toEqual({ resteApres: 0, nonDues: { nombre: 7, montant: 560_000 } });
     expect(messageApercuSortie(a, ar)).toBe("7 échéances ne seront plus dues (560000 Ar) ; il ne restera rien à payer.");
+  });
+
+  it("sortie le 1er mois : les droits restent dus, seules les mensualités suivantes sont retirées", () => {
+    const a = apercuSortie(echeances2025(), "2025-10-15");
+    expect(a).toEqual({ resteApres: 100_000 + 80_000, nonDues: { nombre: 9, montant: 9 * 80_000 } });
+  });
+
+  it("sortie avant le début de l'année : les droits restent dus, toutes les mensualités sont retirées", () => {
+    const a = apercuSortie(echeances2025(), "2025-09-20");
+    expect(a).toEqual({ resteApres: 100_000, nonDues: { nombre: 10, montant: 10 * 80_000 } });
+  });
+
+  it("des droits payés à moitié restent dus pour le reste après une sortie en octobre", () => {
+    const a = apercuSortie(echeances2025({ droits: { paye: 50_000, lignesNonAnnulees: 1 } }), "2025-10-15");
+    expect(a.resteApres).toBe(50_000 + 80_000);
   });
 
   it("une échéance déjà non due est exclue du reste et du compte", () => {

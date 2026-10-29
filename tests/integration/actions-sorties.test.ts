@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { dateLimiteRetard, situation } from "@/lib/ecolage";
-import { fabriquerAnnee, fabriquerEtudiant, fabriquerInscription, fabriquerPaiement } from "../factories";
+import { fabriquerAnnee, fabriquerEtudiant, fabriquerFrais, fabriquerInscription, fabriquerPaiement } from "../factories";
 import {
   connecter,
   fabriquerEtudiantInscrit,
@@ -39,17 +39,16 @@ beforeEach(async () => {
 
 afterEach(() => vi.useRealTimers());
 
-const etudiantStandard = async (droitsEnTranches = 1, donnees = {}) =>
-  fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF, donnees, droitsEnTranches);
+const etudiantStandard = async (donnees = {}) => fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF, donnees);
 
 const sortir = (etudiantId: string, surcharge: Partial<{ type: "ABANDON" | "EXCLU"; date: string; motif: string }> = {}) =>
   actions.enregistrerSortie({ etudiantId, type: "ABANDON", date: "2026-11-15", motif: "Départ de la ville", ...surcharge });
 
 const echeancesDe = (etudiantId: string) =>
-  db.echeance.findMany({ where: { inscription: { etudiantId } }, orderBy: [{ inscriptionId: "asc" }, { ordre: "asc" }] });
+  db.echeance.findMany({ where: { inscription: { etudiantId } }, orderBy: [{ inscriptionId: "asc" }, { mois: "asc" }, { type: "asc" }] });
 
 const nonDues = async (etudiantId: string) =>
-  (await echeancesDe(etudiantId)).filter((e) => e.nonDueSortie).map((e) => `${e.type === "DROITS" ? "D" : "M"}${e.mois.toISOString().slice(0, 7)}`);
+  (await echeancesDe(etudiantId)).filter((e) => e.nonDueSortie).map((e) => `${{ DROITS: "D", MENSUALITE: "M", FRAIS: "F" }[e.type]}${e.mois.toISOString().slice(0, 7)}`);
 
 const reste = async (etudiantId: string) => (await situationGuichet(etudiantId, "2026-11-15"))!.resteDuTotal;
 
@@ -74,7 +73,7 @@ describe("enregistrerSortie : rôle et validation", () => {
   });
 
   it.each(["DIPLOME", "ABANDON", "EXCLU"] as const)("étudiant %s : refusé, sa sortie déjà enregistrée n'est pas écrasée", async (statut) => {
-    const { etudiant } = await etudiantStandard(1, { statut, dateSortie: new Date(Date.UTC(2026, 10, 1)), motifSortie: "motif d'origine" });
+    const { etudiant } = await etudiantStandard({ statut, dateSortie: new Date(Date.UTC(2026, 10, 1)), motifSortie: "motif d'origine" });
 
     const r = await sortir(etudiant.id, { type: "EXCLU", motif: "Nouveau motif" });
 
@@ -170,7 +169,8 @@ describe("enregistrerSortie : effets", () => {
 
     const moisSortie = date.slice(0, 7);
     const dues = (await echeancesDe(etudiant.id)).filter((e) => !e.nonDueSortie);
-    expect(dues.every((e) => e.mois.toISOString().slice(0, 7) <= moisSortie)).toBe(true);
+    expect(dues.filter((e) => e.type !== "DROITS").every((e) => e.mois.toISOString().slice(0, 7) <= moisSortie)).toBe(true);
+    expect(dues.some((e) => e.type === "DROITS")).toBe(true);
     expect((await nonDues(etudiant.id)).every((n) => n.slice(1) > moisSortie)).toBe(true);
     expect(dues.some((e) => e.mois.toISOString().slice(0, 7) === moisSortie && e.type === "MENSUALITE")).toBe(true);
   });
@@ -187,20 +187,39 @@ describe("enregistrerSortie : effets", () => {
 
     expect(reussi(await sortir(etudiant.id, { date: "2026-10-31" }))).toEqual({ echeancesNonDues: 9 });
 
-    const sit = situation(await echeancesEtudiant(db, etudiant.id, { avecNonDues: true }), "2027-03-15");
+    const sit = situation(await echeancesEtudiant(db, etudiant.id, "2027-03-15", { avecNonDues: true }), "2027-03-15");
+    // Droits et octobre tombent le même mois : un seul mois en retard.
     expect(sit).toMatchObject({ du: 180_000, reste: 180_000, moisEnRetard: 1 });
   });
 
-  it("droits en 3 tranches : seules les tranches des mois postérieurs sont rendues", async () => {
-    const { etudiant } = await etudiantStandard(3);
+  it("les droits restent dus après une sortie le 1er mois : seules les mensualités suivantes sont rendues", async () => {
+    const { etudiant } = await etudiantStandard();
 
-    reussi(await sortir(etudiant.id, { date: "2026-10-20" }));
+    expect(reussi(await sortir(etudiant.id, { date: "2026-10-20" }))).toEqual({ echeancesNonDues: 9 });
 
     const rendues = await nonDues(etudiant.id);
-    expect(rendues.filter((x) => x.startsWith("D"))).toEqual(["D2026-11", "D2026-12"]);
+    expect(rendues.filter((x) => x.startsWith("D"))).toEqual([]);
     expect(rendues.filter((x) => x.startsWith("M"))).toHaveLength(9);
-    expect(rendues).not.toContain("D2026-10");
     expect(rendues).not.toContain("M2026-10");
+    expect(await reste(etudiant.id)).toBe(100_000 + 80_000);
+  });
+
+  it("un frais exigible après la sortie et sans paiement n'est plus dû ; celui du mois de sortie, échu ou payé reste dû", async () => {
+    const { etudiant, inscription } = await etudiantStandard();
+    const ligne = { classes: [{ filiereId: m.ifs.id, niveau: 1 }], inscriptionIds: [inscription.id] };
+    const tard = await fabriquerFrais(m.annee.id, { ...ligne, libelle: "Frais de mars", mois: new Date(Date.UTC(2027, 2, 1)) });
+    const duMois = await fabriquerFrais(m.annee.id, { ...ligne, libelle: "Frais de novembre", mois: new Date(Date.UTC(2026, 10, 1)) });
+    const paye = await fabriquerFrais(m.annee.id, { ...ligne, libelle: "Frais de mai", mois: new Date(Date.UTC(2027, 4, 1)) });
+    await fabriquerPaiement(etudiant.id, m.user.id, [{ echeanceId: paye.echeances[0].id, montant: 5_000, resteEcheanceApres: 10_000 }]);
+
+    expect(reussi(await sortir(etudiant.id))).toEqual({ echeancesNonDues: 8 + 1 });
+
+    const frais = await db.echeance.findMany({ where: { type: "FRAIS" }, select: { id: true, nonDueSortie: true } });
+    const etat = Object.fromEntries(frais.map((f) => [f.id, f.nonDueSortie]));
+    expect(etat[tard.echeances[0].id]).toBe(true);
+    expect(etat[duMois.echeances[0].id]).toBe(false);
+    expect(etat[paye.echeances[0].id]).toBe(false);
+    expect(await reste(etudiant.id)).toBe(100_000 + 80_000 + 80_000 + 15_000 + 10_000);
   });
 
   it("un paiement non annulé, même partiel, garde son échéance due ; un paiement annulé n'empêche pas", async () => {
@@ -253,7 +272,7 @@ describe("enregistrerSortie : effets", () => {
 
       const [sortie, encaissement] = await Promise.all([
         sortir(etudiant.id),
-        paiements.encaisser({ etudiantId: etudiant.id, montant: 500_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: 900_000 }),
+        paiements.encaisser({ etudiantId: etudiant.id, montant: 500_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: 900_000, jourAffiche: "2026-11-15" }),
       ]);
 
       expect(sortie.statut).toBe("succes");
@@ -273,24 +292,24 @@ describe("enregistrerSortie : effets", () => {
 
 describe("échéances non dues : exclues de tous les calculs", () => {
   async function sorti() {
-    const e = await etudiantStandard(1, { nom: "SORTANT" });
+    const e = await etudiantStandard({ nom: "SORTANT" });
     reussi(await sortir(e.etudiant.id));
     return e.etudiant;
   }
 
   it("situation() : dû, reste et retard ne comptent que le mois de sortie et l'échu", async () => {
     const etudiant = await sorti();
-    const echeances = await echeancesEtudiant(db, etudiant.id, { avecNonDues: true });
+    const echeances = await echeancesEtudiant(db, etudiant.id, "2027-03-15", { avecNonDues: true });
     expect(echeances).toHaveLength(11);
 
     expect(situation(echeances, "2027-03-15")).toMatchObject({ du: 260_000, reste: 260_000, resteEnRetard: 260_000, moisEnRetard: 2, duEchu: 260_000, payeEchu: 0 });
-    expect((await echeancesEtudiant(db, etudiant.id)).map((x) => x.libelle)).toEqual(["Droits d'inscription", "Octobre 2026", "Novembre 2026"]);
+    expect((await echeancesEtudiant(db, etudiant.id, "2027-03-15")).map((x) => x.libelle)).toEqual(["Droits d'inscription", "Octobre 2026", "Novembre 2026"]);
   });
 
   it("sqlRestes : mêmes sommes que situation(), à plusieurs dates", async () => {
     const etudiant = await sorti();
     for (const jour of ["2026-10-31", "2026-11-15", "2026-12-01", "2027-03-15"]) {
-      const sit = situation(await echeancesEtudiant(db, etudiant.id, { avecNonDues: true }), jour);
+      const sit = situation(await echeancesEtudiant(db, etudiant.id, jour, { avecNonDues: true }), jour);
 
       const r = (await restesParEtudiant([etudiant.id], dateLimiteRetard(jour))).get(etudiant.id)!;
 
@@ -305,7 +324,7 @@ describe("échéances non dues : exclues de tous les calculs", () => {
     expect(avant.lignes[0]).toMatchObject({ statut: "ABANDON", resteDu: 260_000, resteEnRetard: 260_000, moisEnRetard: 2 });
     expect((await lireEtudiants({ enRetard: true }, "2027-03-15")).lignes.map((l) => l.id)).toEqual([etudiant.id]);
 
-    reussi(await paiements.encaisser({ etudiantId: etudiant.id, montant: 260_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: 260_000 }));
+    reussi(await paiements.encaisser({ etudiantId: etudiant.id, montant: 260_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: 260_000, jourAffiche: "2026-11-15" }));
 
     const apres = await lireEtudiants({ q: "sortant" }, "2027-03-15");
     expect(apres.lignes[0]).toMatchObject({ resteDu: 0, resteEnRetard: 0, moisEnRetard: 0 });
@@ -316,7 +335,7 @@ describe("échéances non dues : exclues de tous les calculs", () => {
     await sorti();
     expect((await lireImpayes({}, "2027-03-15")).lignes).toEqual([]);
 
-    const force = await etudiantStandard(1, { nom: "FORCE" });
+    const force = await etudiantStandard({ nom: "FORCE" });
     const echeances = await echeancesDe(force.etudiant.id);
     await db.echeance.updateMany({ where: { id: { in: echeances.slice(3).map((x) => x.id) } }, data: { nonDueSortie: true } });
 
@@ -363,11 +382,11 @@ describe("échéances non dues : exclues de tous les calculs", () => {
 
   it("encaisser : la répartition ignore les mois non dus, le trop-perçu est mesuré sur le dû restant", async () => {
     const etudiant = await sorti();
-    const base = { etudiantId: etudiant.id, mode: "ESPECES" as const, resteDuAffiche: 260_000 };
+    const base = { etudiantId: etudiant.id, mode: "ESPECES" as const, resteDuAffiche: 260_000, jourAffiche: "2026-11-15" };
 
     const trop = await paiements.encaisser({ ...base, montant: 260_001, idClient: randomUUID() });
     expect(trop).toMatchObject({ statut: "erreur", message: expect.stringMatching(/260.000.Ar au plus/) });
-    const ancien900 = await paiements.encaisser({ ...base, montant: 100_000, idClient: randomUUID(), resteDuAffiche: 900_000 });
+    const ancien900 = await paiements.encaisser({ ...base, montant: 100_000, idClient: randomUUID(), resteDuAffiche: 900_000, jourAffiche: "2026-11-15" });
     expect(ancien900).toMatchObject({ statut: "erreur", code: "SITUATION_CHANGEE" });
 
     const partiel = reussi(await paiements.encaisser({ ...base, montant: 130_000, idClient: randomUUID() }));
@@ -377,11 +396,11 @@ describe("échéances non dues : exclues de tous les calculs", () => {
     ]);
     expect(partiel.resteApres).toBe(130_000);
 
-    const solde = reussi(await paiements.encaisser({ ...base, montant: 130_000, idClient: randomUUID(), resteDuAffiche: 130_000 }));
+    const solde = reussi(await paiements.encaisser({ ...base, montant: 130_000, idClient: randomUUID(), resteDuAffiche: 130_000, jourAffiche: "2026-11-15" }));
     expect(solde.lignes.map((l) => l.libelle)).toEqual(["Octobre 2026", "Novembre 2026"]);
     expect(solde.resteApres).toBe(0);
 
-    expect(await paiements.encaisser({ ...base, montant: 1_000, idClient: randomUUID(), resteDuAffiche: 0 })).toMatchObject({
+    expect(await paiements.encaisser({ ...base, montant: 1_000, idClient: randomUUID(), resteDuAffiche: 0, jourAffiche: "2026-11-15" })).toMatchObject({
       statut: "erreur",
       message: expect.stringMatching(/rien à payer/),
     });
@@ -390,7 +409,7 @@ describe("échéances non dues : exclues de tous les calculs", () => {
 
   it("annuler un paiement après la sortie ne rend pas les échéances non dues", async () => {
     const etudiant = await sorti();
-    const recu = reussi(await paiements.encaisser({ etudiantId: etudiant.id, montant: 260_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: 260_000 }));
+    const recu = reussi(await paiements.encaisser({ etudiantId: etudiant.id, montant: 260_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: 260_000, jourAffiche: "2026-11-15" }));
 
     reussi(await paiements.annulerPaiement({ paiementId: recu.paiementId!, motif: "erreur de saisie" }));
 

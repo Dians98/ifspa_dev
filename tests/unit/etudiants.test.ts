@@ -2,13 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   controleCreation,
   controleDateNaissance,
-  controleModifTranches,
   formaterTelephone,
   motsRecherche,
   normaliserRecherche,
   normaliserTelephone,
   schemaCreationEtudiant,
-  schemaModifTranches,
   schemaModificationEtudiant,
   texteRecherche,
   type ContexteCreation,
@@ -46,7 +44,6 @@ describe("schemaCreationEtudiant", () => {
       telephone: "0341234567",
       cin: null,
       email: null,
-      droitsEnTranches: 1,
       confirmerDoublon: false,
     });
     expect(r.data.dateNaissance.toISOString()).toBe("2005-03-14T00:00:00.000Z");
@@ -112,13 +109,10 @@ describe("schemaCreationEtudiant", () => {
     }
   });
 
-  it("droits en 1, 2 ou 3 tranches seulement", () => {
-    for (const droitsEnTranches of [1, 2, 3]) expect(analyser({ droitsEnTranches }).success).toBe(true);
-    for (const droitsEnTranches of [0, 4, "3", 2.5]) {
-      expect(messages(analyser({ droitsEnTranches })), String(droitsEnTranches)).toContain(
-        "Choisissez un paiement des droits en 1, 2 ou 3 fois.",
-      );
-    }
+  it("n'a plus de choix de tranches : un ancien champ droitsEnTranches est ignoré", () => {
+    const r = analyser({ droitsEnTranches: 3 } as Record<string, unknown>);
+    expect(r.success).toBe(true);
+    expect(r.success && r.data).not.toHaveProperty("droitsEnTranches");
   });
 
   it("refuse une date de naissance inexistante ou antérieure à 1900", () => {
@@ -138,19 +132,13 @@ describe("schemaCreationEtudiant", () => {
   });
 });
 
-describe("schemaModificationEtudiant et schemaModifTranches", () => {
+describe("schemaModificationEtudiant", () => {
   it("la modification reprend l'identité et exige l'identifiant, sans filière ni niveau", () => {
     const { filiereId: _f, niveau: _n, ...identite } = SAISIE;
     expect(schemaModificationEtudiant.safeParse({ id: "e1", ...identite }).success).toBe(true);
     expect(schemaModificationEtudiant.safeParse(identite).success).toBe(false);
     const r = schemaModificationEtudiant.safeParse({ id: "e1", ...identite, telephone: "+261 32 00 000 00" });
     expect(r.success && r.data.telephone).toBe("0320000000");
-  });
-
-  it("le redécoupage des droits accepte 1, 2 ou 3 et rien d'autre", () => {
-    expect(schemaModifTranches.safeParse({ inscriptionId: "i1", droitsEnTranches: 2 }).success).toBe(true);
-    expect(schemaModifTranches.safeParse({ inscriptionId: "i1", droitsEnTranches: 4 }).success).toBe(false);
-    expect(schemaModifTranches.safeParse({ inscriptionId: "", droitsEnTranches: 2 }).success).toBe(false);
   });
 });
 
@@ -208,7 +196,6 @@ describe("controleCreation", () => {
     filiere: { code: "IF", nom: "Infirmier(e)s", dureeAnnees: 3, actif: true },
     niveau: 1,
     tarif: { droitsInscription: 100_000, montantMensuel: 80_000, nombreMois: 10 },
-    droitsEnTranches: 1,
   };
 
   it("contexte complet : aucun refus", () => {
@@ -242,18 +229,9 @@ describe("controleCreation", () => {
     );
   });
 
-  it("refuse des droits trop faibles pour le nombre de tranches choisi", () => {
-    const tarif = { ...valide.tarif!, droitsInscription: 2_000 };
-    expect(controleCreation({ ...valide, tarif, droitsEnTranches: 3 })).toMatch(/trop faibles/);
-    expect(controleCreation({ ...valide, tarif, droitsEnTranches: 1 })).toBeNull();
-  });
-});
-
-describe("controleModifTranches", () => {
-  it("refus dès une ligne de paiement, même annulée", () => {
-    expect(controleModifTranches(0)).toBeNull();
-    expect(controleModifTranches(1)).toMatch(/même annulés/);
-    expect(controleModifTranches(5)).not.toBeNull();
+  it("refuse des droits de tarif invalides, mais accepte de petits droits : plus de découpage en tranches", () => {
+    expect(controleCreation({ ...valide, tarif: { ...valide.tarif!, droitsInscription: 0 } })).toMatch(/invalides/);
+    expect(controleCreation({ ...valide, tarif: { ...valide.tarif!, droitsInscription: 2_000 } })).toBeNull();
   });
 });
 

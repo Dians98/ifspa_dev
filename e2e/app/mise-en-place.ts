@@ -56,9 +56,9 @@ export async function creerEtudiantTest(): Promise<EtudiantTest> {
     ]);
     for (let i = 0; i < MOIS.length; i++) {
       await c.query(
-        `INSERT INTO echeance (id, "inscriptionId", type, tranche, mois, ordre, "montantDu")
-         VALUES ($1, $2, 'MENSUALITE', NULL, $3, $4, 80000)`,
-        [randomUUID(), inscriptionId, `2020-0${i + 1}-01`, i + 1],
+        `INSERT INTO echeance (id, "inscriptionId", type, mois, "montantDu")
+         VALUES ($1, $2, 'MENSUALITE', $3, 80000)`,
+        [randomUUID(), inscriptionId, `2020-0${i + 1}-01`],
       );
     }
     return { id, nom, prenoms, nomComplet: `${nom} ${prenoms}`, echeances: MOIS.map((m) => `${m} 2020`) };

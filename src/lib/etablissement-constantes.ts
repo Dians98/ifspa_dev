@@ -35,6 +35,23 @@ export const ETUDES = {
     "Cours théoriques et stages pratiques, d'abord sur modèles anatomiques, puis auprès des patients.",
 } as const;
 
+/**
+ * Chiffres clés de la landing. `valeur: null` : un tiret s'affiche à la place du chiffre.
+ * ⚠️ Valeurs PROVISOIRES posées en attendant les chiffres de l'institut : à remplacer avant la mise en ligne.
+ */
+export type ChiffreCle = {
+  nature: "etudiants" | "insertion" | "partenaires";
+  valeur: number | null;
+  libelle: string;
+  precision: string | null;
+};
+
+export const CHIFFRES_CLES: readonly ChiffreCle[] = [
+  { nature: "etudiants", valeur: 1200, libelle: "étudiants", precision: null },
+  { nature: "insertion", valeur: 92, libelle: "d'insertion professionnelle", precision: null },
+  { nature: "partenaires", valeur: 15, libelle: "partenaires", precision: null },
+];
+
 export const ARRETES = [
   {
     reference: "N° 04460/2011-MESupRes",

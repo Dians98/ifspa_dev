@@ -21,7 +21,7 @@ export function verifierDepot(fichiers: File[]): string | null {
   const xls = fichiers.find((f) => extension(f) === "xls");
   if (xls) return `« ${xls.name} » est un ancien format Excel (.xls) : ouvrez-le dans Excel et enregistrez-le au format .xlsx.`;
   const autre = fichiers.find((f) => !["xlsx", "csv"].includes(extension(f)));
-  if (autre) return `« ${autre.name} » n'est pas un fichier du modèle : déposez le .xlsx, ou les CSV Étudiants et Paiements.`;
+  if (autre) return `« ${autre.name} » n'est pas un fichier du modèle : déposez le .xlsx, ou le CSV Étudiants.`;
   const total = fichiers.reduce((s, f) => s + f.size, 0);
   if (total > TAILLE_MAX_OCTETS) {
     return `Fichier trop volumineux (${taille(total)}) : 1 Mo au plus. Retirez les feuilles ou colonnes inutiles, ou importez en plusieurs fois.`;
@@ -29,12 +29,12 @@ export function verifierDepot(fichiers: File[]): string | null {
   const classeurs = fichiers.filter((f) => extension(f) === "xlsx").length;
   const csv = fichiers.length - classeurs;
   if (classeurs > 1 || (classeurs === 1 && csv > 0) || csv > 2) {
-    return "Déposez un seul fichier .xlsx, ou deux CSV (Étudiants et Paiements), pas un mélange.";
+    return "Déposez un seul fichier : le .xlsx du modèle, ou le CSV Étudiants.";
   }
   return null;
 }
 
-/** Deux CSV choisis l'un après l'autre se complètent ; tout autre choix remplace le précédent. */
+/** Deux CSV choisis l'un après l'autre se complètent (un ancien CSV Paiements, ignoré par le serveur) ; tout autre choix remplace le précédent. */
 function fusionner(actuels: File[], nouveaux: File[]): File[] {
   const tousCsv = [...actuels, ...nouveaux].every((f) => extension(f) === "csv");
   if (!tousCsv) return nouveaux;

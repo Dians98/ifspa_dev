@@ -38,7 +38,7 @@ export async function fabriquerEtudiantInscrit(
   droitsEnTranches = 1,
 ) {
   const etudiant = await fabriquerEtudiant(filiereId, annee.id, donnees);
-  const inscription = await fabriquerInscription(etudiant.id, annee.id, tarif, annee.dateDebut, droitsEnTranches);
+  const inscription = await fabriquerInscription(etudiant.id, annee.id, tarif, annee.dateDebut);
   return { etudiant, inscription };
 }
 

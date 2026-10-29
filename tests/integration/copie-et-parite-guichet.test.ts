@@ -7,7 +7,7 @@ import {
   schemaCopieGuichet,
   type EtudiantCopie,
 } from "@/lib/encaissement-hors-ligne";
-import { fabriquerAnnee, fabriquerEtudiant, fabriquerInscription, fabriquerPaiement } from "../factories";
+import { fabriquerAnnee, fabriquerEtudiant, fabriquerFrais, fabriquerInscription, fabriquerPaiement } from "../factories";
 import { elementHorsLigne, numero, POSTE_A, reserver, SAISI_LE } from "../factories/hors-ligne";
 import { fabriquerEtudiantInscrit, fabriquerMonde, type Monde } from "../factories/scenarios";
 
@@ -48,9 +48,9 @@ async function deuxAnnees() {
 
 async function sortiAvecEcheancesFutures(statut: "ABANDON" | "EXCLU" | "DIPLOME", payerTout = false) {
   const { etudiant, inscription } = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF, { statut });
-  await db.echeance.updateMany({ where: { inscriptionId: inscription.id, mois: { gt: new Date("2026-11-30T00:00:00Z") } }, data: { nonDueSortie: true } });
+  await db.echeance.updateMany({ where: { inscriptionId: inscription.id, type: { not: "DROITS" }, mois: { gt: new Date("2026-11-30T00:00:00Z") } }, data: { nonDueSortie: true } });
   if (payerTout) {
-    const dues = inscription.echeances.filter((e) => e.mois <= new Date("2026-11-30T00:00:00Z"));
+    const dues = inscription.echeances.filter((e) => e.type === "DROITS" || e.mois <= new Date("2026-11-30T00:00:00Z"));
     await payer(dues, m.user.id, etudiant.id, dues.map((e) => e.montantDu));
   }
   return etudiant;
@@ -85,7 +85,11 @@ describe("copieGuichet : qui figure dans la copie", () => {
     const e = (await copieGuichet(MAINTENANT)).etudiants.find((x) => x.id === sorti.id)!;
 
     expect(e.statut).toBe("ABANDON");
-    expect(e.echeances.map((x) => x.mois)).toEqual(["2026-10-01", "2026-10-01", "2026-11-01"]);
+    expect(e.echeances.map((x) => [x.type, x.mois]).sort()).toEqual([
+      ["DROITS", "2026-10-01"],
+      ["MENSUALITE", "2026-10-01"],
+      ["MENSUALITE", "2026-11-01"],
+    ]);
   });
 
   it("un sorti dont ne reste que du « non dû » n'est pas encaissable, même quand le jour passe", async () => {
@@ -105,8 +109,24 @@ describe("copieGuichet : qui figure dans la copie", () => {
     expect(texte).not.toMatch(/tarif|droitsInscription|montantMensuel|nombreMois/i);
     expect(Object.keys(copie).sort()).toEqual(["etudiants", "genereeLeISO"]);
     expect(Object.keys(copie.etudiants[0].echeances[0]).sort()).toEqual(
-      ["anneeDebut", "anneeLibelle", "droitsEnTranches", "id", "mois", "montantDu", "ordre", "paye", "tranche", "type"],
+      ["anneeDebut", "anneeLibelle", "id", "libelle", "mois", "montantDu", "paye", "rangFrais", "type"],
     );
+  });
+
+  it("un frais figure dans la copie avec son libellé, son montant, son mois et son ordre de création", async () => {
+    const s = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF);
+    const a = await fabriquerFrais(m.annee.id, { classes: [{ filiereId: m.ifs.id, niveau: 1 }], libelle: "Frais d'examen", montant: 15_000, inscriptionIds: [s.inscription.id] });
+    const b = await fabriquerFrais(m.annee.id, { classes: [{ filiereId: m.ifs.id, niveau: 1 }], libelle: "Stage", montant: 5_000, inscriptionIds: [s.inscription.id] });
+
+    const e = (await copieGuichet(MAINTENANT)).etudiants.find((x) => x.id === s.etudiant.id)!;
+
+    const frais = e.echeances.filter((x) => x.type === "FRAIS").sort((x, y) => x.rangFrais! - y.rangFrais!);
+    expect(frais).toMatchObject([
+      { libelle: "Frais d'examen", montantDu: 15_000, mois: "2027-03-01", rangFrais: a.frais.rang, paye: 0 },
+      { libelle: "Stage", montantDu: 5_000, rangFrais: b.frais.rang },
+    ]);
+    expect(a.frais.rang).toBeLessThan(b.frais.rang);
+    expect(e.echeances.filter((x) => x.type !== "FRAIS").every((x) => x.rangFrais === null)).toBe(true);
   });
 
   it("la copie sérialisée en JSON est relue par son schéma, étudiants triés par nom", async () => {
@@ -177,7 +197,7 @@ describe("confidentialité : le guichet ne renvoie ni téléphone ni adresse", (
 });
 
 describe("parité : la situation du poste hors ligne est celle du serveur", () => {
-  const JOURS = ["2025-09-01", "2026-10-31", "2026-11-01", "2026-11-15", "2027-03-01", "2027-08-01"];
+  const JOURS = ["2025-09-01", "2026-10-31", "2026-11-01", "2026-11-15", "2026-12-31", "2027-01-01", "2027-03-01", "2027-03-31", "2027-04-01", "2027-08-01"];
 
   async function comparer(etudiantId: string) {
     for (const jour of JOURS) {
@@ -211,11 +231,41 @@ describe("parité : la situation du poste hors ligne est celle du serveur", () =
     await comparer((await sortiAvecEcheancesFutures("ABANDON")).id);
   });
 
-  it("droits en 3 tranches payés en partie", async () => {
-    const s = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF, {}, 3);
+  it("droits payés en partie", async () => {
+    const s = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF);
     await payer(s.inscription.echeances, m.user.id, s.etudiant.id, [20_000]);
 
     await comparer(s.etudiant.id);
+  });
+
+  it("frais : à jour en mars, en retard, frais payé en partie, deux frais du même mois", async () => {
+    const classe = [{ filiereId: m.ifs.id, niveau: 1 }];
+    const aJour = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF);
+    const enRetard = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF);
+    const mars = new Date(Date.UTC(2027, 2, 1));
+    const examen = await fabriquerFrais(m.annee.id, { classes: classe, libelle: "Frais d'examen", montant: 15_000, mois: mars, inscriptionIds: [aJour.inscription.id, enRetard.inscription.id] });
+    const stage = await fabriquerFrais(m.annee.id, { classes: classe, libelle: "Stage", montant: 5_000, mois: mars, inscriptionIds: [aJour.inscription.id, enRetard.inscription.id] });
+    const jusquaMars = aJour.inscription.echeances.slice(0, 7);
+    await payer(jusquaMars, m.user.id, aJour.etudiant.id, jusquaMars.map((e) => e.montantDu));
+    await fabriquerPaiement(aJour.etudiant.id, m.user.id, [{ echeanceId: examen.echeances[0].id, montant: 6_000, resteEcheanceApres: 9_000 }]);
+    await payer(enRetard.inscription.echeances.slice(0, 2), m.user.id, enRetard.etudiant.id, [100_000, 80_000]);
+
+    await comparer(aJour.etudiant.id);
+    await comparer(enRetard.etudiant.id);
+    const ordre = (await situationGuichet(aJour.etudiant.id, "2027-03-10"))!.echeances.map((x) => x.libelle);
+    expect(ordre.slice(0, 3)).toEqual(["Frais d'examen", "Stage", "Avril 2027"]);
+    expect(stage.frais.rang).toBeGreaterThan(examen.frais.rang);
+  });
+
+  it("copie ancienne, sans libellé ni rang de frais : la situation reste celle du serveur", async () => {
+    const s = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF);
+    await payer(s.inscription.echeances, m.user.id, s.etudiant.id, [40_000]);
+    const jour = "2026-11-15";
+    const copie = await copieGuichet(new Date(`${jour}T09:00:00Z`));
+    const local = copie.etudiants.find((e) => e.id === s.etudiant.id)!;
+    const ancienne = local.echeances.map(({ libelle: _l, rangFrais: _r, ...reste }) => reste);
+
+    expect(construireSituationGuichet(local, ancienne, jour)).toEqual(await situationGuichet(s.etudiant.id, jour));
   });
 
   it("sorti soldé : hors de la copie, le serveur répond « rien à encaisser »", async () => {
@@ -228,17 +278,21 @@ describe("parité : la situation du poste hors ligne est celle du serveur", () =
 
 describe("parité : le ticket imprimé hors ligne est celui que réimprimera le serveur", () => {
   /** Ticket local avant synchro, puis relecture du même paiement enregistré au serveur. */
-  async function comparerTicket(etudiantId: string, montants: number[]) {
-    const bloc = await reserver(m.user.id, POSTE_A);
+  async function comparerTicket(etudiantId: string, montants: number[], saisiLe = SAISI_LE) {
+    const instant = new Date(saisiLe);
+    const annee = instant.getUTCFullYear();
+    const bloc = await reserver(m.user.id, POSTE_A, annee);
     for (const [i, montant] of montants.entries()) {
-      const local = (await copieGuichet(MAINTENANT)).etudiants.find((e) => e.id === etudiantId) as EtudiantCopie;
-      const numeroRecu = numero(bloc.libres[i]);
-      const instant = new Date(SAISI_LE);
+      const local = (await copieGuichet(instant)).etudiants.find((e) => e.id === etudiantId) as EtudiantCopie;
+      const numeroRecu = numero(bloc.libres[i], annee);
       const attendu = recuHorsLigne({ etudiant: local, montant, mode: "ESPECES", operateur: null, reference: null, numeroRecu, instant, caissier: m.user.name });
       if (!attendu.ok) throw new Error(attendu.erreur);
 
       const r = await synchroniserPaiement(
-        elementHorsLigne({ etudiantId, saisiParId: m.user.id, numeroRecu, montant, resteDuAffiche: attendu.resteDuAvant }),
+        elementHorsLigne(
+          { etudiantId, saisiParId: m.user.id, numeroRecu, montant, resteDuAffiche: attendu.resteDuAvant },
+          { instantSaisie: saisiLe, recuLe: new Date(instant.getTime() + 30 * 60_000) },
+        ),
       );
       if (r.statut !== "enregistre") throw new Error(JSON.stringify(r));
       expect(r.aVerifier, "aucune note attendue").toBe(false);
@@ -256,9 +310,78 @@ describe("parité : le ticket imprimé hors ligne est celui que réimprimera le 
     await comparerTicket((await deuxAnnees()).id, [150_000]);
   });
 
-  it("tranche de droits payée en partie", async () => {
-    const s = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF, {}, 3);
-    await comparerTicket(s.etudiant.id, [20_000, 14_000]);
+  it("droits payés en partie, puis le complément", async () => {
+    const s = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF);
+    await comparerTicket(s.etudiant.id, [20_000, 80_000]);
+  });
+
+  describe("frais", () => {
+    const classe = () => [{ filiereId: m.ifs.id, niveau: 1 }];
+    const mars = new Date(Date.UTC(2027, 2, 1));
+    const JUSQUA_MARS = [100_000, 80_000, 80_000, 80_000, 80_000, 80_000, 80_000];
+
+    /** Étudiant à jour jusqu'en mars (droits compris), avec un frais d'examen exigible en mars. */
+    async function aJourAvecFrais(libelle = "Frais d'examen") {
+      const s = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF);
+      const { frais, echeances } = await fabriquerFrais(m.annee.id, { classes: classe(), libelle, montant: 15_000, mois: mars, inscriptionIds: [s.inscription.id] });
+      const dues = s.inscription.echeances.slice(0, 7);
+      await payer(dues, m.user.id, s.etudiant.id, JUSQUA_MARS);
+      return { ...s, frais, fraisEcheance: echeances[0] };
+    }
+
+    it("le 31 mars : le frais d'examen est soldé avant la mensualité d'avril, ticket local = reçu du serveur", async () => {
+      const s = await aJourAvecFrais();
+      await comparerTicket(s.etudiant.id, [15_000], "2027-03-31T09:00:00.000Z");
+
+      const lignes = await db.paiementLigne.findMany({ include: { echeance: true }, where: { montant: 15_000 } });
+      expect(lignes.map((l) => l.echeance.type)).toEqual(["FRAIS"]);
+    });
+
+    it("le 1er avril : la mensualité d'avril, devenue exigible, passe avant le frais, ticket local = reçu du serveur", async () => {
+      const s = await aJourAvecFrais();
+      await comparerTicket(s.etudiant.id, [15_000], "2027-04-01T09:00:00.000Z");
+
+      const lignes = await db.paiementLigne.findMany({ include: { echeance: true }, where: { montant: 15_000 } });
+      expect(lignes.map((l) => [l.echeance.type, l.echeance.mois.toISOString().slice(0, 7)])).toEqual([["MENSUALITE", "2027-04"]]);
+    });
+
+    it("frais payé en partie, puis le complément et un surplus en acompte sur la mensualité suivante", async () => {
+      const s = await aJourAvecFrais();
+      await comparerTicket(s.etudiant.id, [6_000, 29_000], "2027-03-10T09:00:00.000Z");
+    });
+
+    it("réimpression un mois plus tard : mêmes lignes et libellé figé, même si le frais a été renommé", async () => {
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date("2027-03-10T09:00:00Z") });
+      try {
+        const s = await aJourAvecFrais("Frais d'examen");
+        const bloc = await reserver(m.user.id, POSTE_A, 2027);
+        const numeroRecu = numero(bloc.libres[0], 2027);
+        const r = await synchroniserPaiement(
+          elementHorsLigne(
+            { etudiantId: s.etudiant.id, saisiParId: m.user.id, numeroRecu, montant: 15_000, resteDuAffiche: 15_000 + 4 * 80_000 },
+            { instantSaisie: "2027-03-10T09:00:00.000Z", recuLe: new Date("2027-03-10T09:30:00Z") },
+          ),
+        );
+        if (r.statut !== "enregistre") throw new Error(JSON.stringify(r));
+        const original = await lireRecu(r.paiementId);
+        expect(original?.lignes).toEqual([{ libelle: "Frais d'examen", montant: 15_000, acompte: false, resteEcheance: 0 }]);
+
+        await db.frais.update({ where: { id: s.frais.id }, data: { libelle: "Examen final (renommé)" } });
+        vi.setSystemTime(new Date("2027-04-12T09:00:00Z"));
+
+        expect(await lireRecu(r.paiementId)).toEqual(original);
+        const ligne = await db.paiementLigne.findFirstOrThrow({ where: { paiementId: r.paiementId } });
+        expect(ligne.libelle).toBe("Frais d'examen");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("le poste hors ligne imprime le libellé de sa copie, le serveur le fige tel quel", async () => {
+      const s = await aJourAvecFrais("Frais de stage");
+      await comparerTicket(s.etudiant.id, [15_000], "2027-03-10T09:00:00.000Z");
+      expect((await db.paiementLigne.findFirstOrThrow({ where: { montant: 15_000 } })).libelle).toBe("Frais de stage");
+    });
   });
 
   it("deux paiements en file du même étudiant : le second ticket part des restes diminués par le premier", async () => {
@@ -268,7 +391,7 @@ describe("parité : le ticket imprimé hors ligne est celui que réimprimera le 
     const saisie = (etu: EtudiantCopie, montant: number, i: number) =>
       recuHorsLigne({ etudiant: etu, montant, mode: "ESPECES", operateur: null, reference: null, numeroRecu: numero(bloc.libres[i]), instant: new Date(SAISI_LE), caissier: m.user.name });
     const premier = saisie(copie.etudiants[0], 100_000, 0);
-    const vue = appliquerFile(copie, [{ etudiantId: s.etudiant.id, montant: 100_000 }]);
+    const vue = appliquerFile(copie, [{ etudiantId: s.etudiant.id, montant: 100_000, instantSaisie: SAISI_LE }]);
     const second = saisie(vue.etudiants[0], 100_000, 1);
     if (!premier.ok || !second.ok) throw new Error("tickets locaux refusés");
 

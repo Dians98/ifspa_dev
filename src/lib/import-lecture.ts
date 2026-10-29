@@ -1,11 +1,11 @@
 import { formaterJour, type Jour } from "@/lib/dates";
 import {
   COLONNES_ETUDIANTS,
-  COLONNES_PAIEMENTS,
+  COLONNES_RETIREES,
+  ENTETES_PAIEMENTS_RETIRES,
   FEUILLE_ETUDIANTS,
-  FEUILLE_PAIEMENTS,
+  FEUILLE_PAIEMENTS_RETIREE,
   type CleEtudiant,
-  type ClePaiement,
   type ColonneImport,
   type NomFeuille,
 } from "@/lib/import-modele";
@@ -14,7 +14,9 @@ import {
 // Pur : le serveur fournit les octets (CSV) ou les lignes déjà extraites du .xlsx.
 
 export const ETUDIANTS_MAX = 2000;
-export const PAIEMENTS_MAX = 10000;
+
+/** Avertissement d'un ancien fichier qui contient encore la feuille ou le CSV des paiements. */
+export const PAIEMENTS_IGNORES = `La feuille « ${FEUILLE_PAIEMENTS_RETIREE} » n'est plus importée, elle est ignorée : encaissez les paiements au guichet.`;
 
 export type Gravite = "erreur" | "avertissement";
 
@@ -270,6 +272,7 @@ export function lireFeuille<K extends string>(
     const texte = texteCellule(entete);
     if (texte === "") return;
     const c = colonneDeEntete(colonnes, texte);
+    if (!c && COLONNES_RETIREES.includes(normaliserEntete(texte))) return;
     if (!c) {
       messages.push(
         messageImport("avertissement", "colonne inconnue du modèle, ignorée.", { feuille: nom, ligne: ligneEntetes, colonne: texte }),
@@ -330,27 +333,23 @@ export function lireFeuille<K extends string>(
   return { feuille, messages };
 }
 
-/** Feuille d'après ses en-têtes : sert à reconnaître etudiants.csv et paiements.csv quel que soit leur nom. */
-export function natureTableau(tableau: Tableau): NomFeuille | null {
-  const score = (colonnes: readonly ColonneImport<string>[]) => {
-    let meilleur = 0;
-    for (const r of tableau.slice(0, LIGNES_AVANT_ENTETES_MAX)) {
-      const trouvees = new Set(
-        r.map((v) => (typeof v === "string" ? colonneDeEntete(colonnes, v)?.cle : undefined)).filter((c) => c !== undefined),
-      );
-      meilleur = Math.max(meilleur, trouvees.size);
-    }
-    return meilleur;
-  };
-  const etudiants = score(COLONNES_ETUDIANTS);
-  const paiements = score(COLONNES_PAIEMENTS);
+export type NatureTableau = "etudiants" | "paiements";
+
+/** Contenu d'un CSV d'après ses en-têtes : etudiants.csv quel que soit son nom, ou un ancien paiements.csv. */
+export function natureTableau(tableau: Tableau): NatureTableau | null {
+  let etudiants = 0;
+  let paiements = 0;
+  for (const r of tableau.slice(0, LIGNES_AVANT_ENTETES_MAX)) {
+    const textes = r.filter((v): v is string => typeof v === "string");
+    etudiants = Math.max(etudiants, new Set(textes.map((v) => colonneDeEntete(COLONNES_ETUDIANTS, v)?.cle).filter((c) => c !== undefined)).size);
+    paiements = Math.max(paiements, new Set(textes.map(normaliserEntete).filter((n) => ENTETES_PAIEMENTS_RETIRES.includes(n))).size);
+  }
   if (Math.max(etudiants, paiements) < 2 || etudiants === paiements) return null;
-  return etudiants > paiements ? FEUILLE_ETUDIANTS : FEUILLE_PAIEMENTS;
+  return etudiants > paiements ? "etudiants" : "paiements";
 }
 
 export type RepriseLue = {
   etudiants: FeuilleLue<CleEtudiant>;
-  paiements: FeuilleLue<ClePaiement>;
   /** « 2026-2027 » lu dans l'en-tête « Niveau 2026-2027 », null s'il ne porte pas d'année. */
   anneeNiveau: string | null;
   /** Problèmes de structure (erreurs) et colonnes ignorées, encodage (avertissements). */
@@ -363,19 +362,11 @@ export function anneeDeEnteteNiveau(entete: string | undefined): string | null {
   return m ? `${m[1]}-${m[2]}` : null;
 }
 
-/** `paiements` null : pas de fichier de paiements (un seul CSV, celui des étudiants). */
-export function lireReprise(
-  tableaux: { etudiants: Tableau; paiements: Tableau | null },
-  messagesLecture: MessageImport[] = [],
-): RepriseLue {
-  const etudiants = lireFeuille(tableaux.etudiants, FEUILLE_ETUDIANTS, COLONNES_ETUDIANTS, ETUDIANTS_MAX);
-  const paiements = tableaux.paiements
-    ? lireFeuille(tableaux.paiements, FEUILLE_PAIEMENTS, COLONNES_PAIEMENTS, PAIEMENTS_MAX)
-    : { feuille: { nom: FEUILLE_PAIEMENTS, lignes: [], colonnes: [], entetes: {}, ligneEntetes: null } satisfies FeuilleLue<ClePaiement>, messages: [] };
+export function lireReprise(etudiants: Tableau, messagesLecture: MessageImport[] = []): RepriseLue {
+  const lu = lireFeuille(etudiants, FEUILLE_ETUDIANTS, COLONNES_ETUDIANTS, ETUDIANTS_MAX);
   return {
-    etudiants: etudiants.feuille,
-    paiements: paiements.feuille,
-    anneeNiveau: anneeDeEnteteNiveau(etudiants.feuille.entetes.niveau),
-    messages: [...messagesLecture, ...etudiants.messages, ...paiements.messages],
+    etudiants: lu.feuille,
+    anneeNiveau: anneeDeEnteteNiveau(lu.feuille.entetes.niveau),
+    messages: [...messagesLecture, ...lu.messages],
   };
 }

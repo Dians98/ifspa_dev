@@ -162,7 +162,7 @@ export async function situationGuichet(
 ): Promise<SituationGuichet | null> {
   const e = await db.etudiant.findUnique({ where: { id: etudiantId }, select: SELECT_SOURCE_GUICHET });
   if (!e) return null;
-  const echeances = (await echeancesEtudiant(db, etudiantId)).map(echeanceCopie);
+  const echeances = (await echeancesEtudiant(db, etudiantId, jour)).map(echeanceCopie);
   return construireSituationGuichet(sourceGuichet(e), echeances, jour);
 }
 
@@ -194,17 +194,17 @@ export async function lireRecu(paiementId: string): Promise<DonneesRecu | null> 
         select: {
           montant: true,
           resteEcheanceApres: true,
+          libelle: true,
           echeance: {
             select: {
+              id: true,
               type: true,
-              tranche: true,
               mois: true,
-              ordre: true,
+              frais: { select: { rang: true, libelle: true } },
               inscription: {
                 select: {
                   niveau: true,
                   redoublement: true,
-                  droitsEnTranches: true,
                   anneeScolaire: { select: { anneeDebut: true, libelle: true } },
                 },
               },
@@ -235,14 +235,15 @@ export async function lireRecu(paiementId: string): Promise<DonneesRecu | null> 
     lignes: p.lignes.map((l) => ({
       montant: l.montant,
       resteEcheanceApres: l.resteEcheanceApres,
+      libelle: l.libelle,
       echeance: {
+        id: l.echeance.id,
         type: l.echeance.type,
-        tranche: l.echeance.tranche,
         mois: l.echeance.mois,
-        ordre: l.echeance.ordre,
-        droitsEnTranches: l.echeance.inscription.droitsEnTranches,
         anneeDebut: l.echeance.inscription.anneeScolaire.anneeDebut,
         anneeLibelle: l.echeance.inscription.anneeScolaire.libelle,
+        rangFrais: l.echeance.frais?.rang ?? null,
+        libelleFrais: l.echeance.frais?.libelle ?? null,
       },
     })),
     montant: p.montant,

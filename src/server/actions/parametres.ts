@@ -6,6 +6,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { echec, echecValidation, succes, type EtatAction } from "@/lib/etat-action";
 import {
+  controleChevauchement,
   controleCloture,
   controleDefinirCourante,
   controleLignesTarifs,
@@ -154,13 +155,24 @@ export async function creerAnnee(entree: z.input<typeof schemaAnnee>): Promise<E
   const libelle = libelleAnnee(anneeDebut);
   const existe = echec("Vérifiez les champs signalés.", { anneeDebut: `L'année ${libelle} existe déjà.` });
 
-  if (await db.anneeScolaire.findUnique({ where: { anneeDebut }, select: { id: true } })) return existe;
   try {
-    const a = await db.anneeScolaire.create({
-      data: { libelle, anneeDebut, moisDebutEcolage, ...datesAnnee(anneeDebut, moisDebutEcolage) },
-      select: { id: true },
+    const etat = await db.$transaction(async (tx): Promise<EtatAction<{ id: string }>> => {
+      // Deux créations simultanées (2026 et 2027) passeraient chacune le contrôle sans voir l'autre.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('ifspa:annees'))`;
+      const voisines = await tx.anneeScolaire.findMany({
+        where: { anneeDebut: { in: [anneeDebut - 1, anneeDebut, anneeDebut + 1] } },
+        select: { anneeDebut: true, moisDebutEcolage: true },
+      });
+      if (voisines.some((v) => v.anneeDebut === anneeDebut)) return existe;
+      const chevauchement = controleChevauchement({ anneeDebut, moisDebutEcolage }, voisines);
+      if (chevauchement) return echec(chevauchement, { moisDebutEcolage: chevauchement });
+      const a = await tx.anneeScolaire.create({
+        data: { libelle, anneeDebut, moisDebutEcolage, ...datesAnnee(anneeDebut, moisDebutEcolage) },
+        select: { id: true },
+      });
+      return succes(`Année ${libelle} créée, en préparation. Saisissez maintenant ses tarifs.`, { id: a.id });
     });
-    return apres(succes(`Année ${libelle} créée, en préparation. Saisissez maintenant ses tarifs.`, { id: a.id }));
+    return apres(etat);
   } catch (e) {
     if (indexEnConflit(e) !== null) return existe;
     throw e;
@@ -259,8 +271,10 @@ export async function supprimerAnnee(entree: z.input<typeof schemaIdentifiant>):
       if (raison) return echec(raison);
 
       await tx.tarif.deleteMany({ where: { anneeScolaireId: id } });
+      // Sans inscription, ses frais n'ont aucune échéance : ils partent avec l'année (classes en cascade).
+      await tx.frais.deleteMany({ where: { anneeScolaireId: id } });
       await tx.anneeScolaire.delete({ where: { id } });
-      return succes(`Année ${a.libelle} supprimée, avec ses tarifs.`);
+      return succes(`Année ${a.libelle} supprimée, avec ses tarifs et ses frais.`);
     });
     return apres(etat);
   } catch (e) {

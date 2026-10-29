@@ -88,30 +88,63 @@ export function fabriquerEtudiant(filiereId: string, anneeEntreeId: string, donn
   });
 }
 
-/** Inscription et ses échéances générées comme en production (`genererEcheances`), à partir du 1er mois `debut`. */
-export function fabriquerInscription(
+/**
+ * Inscription et ses échéances générées comme en production (`genererEcheances`), à partir du 1er mois `debut`.
+ * `echeances` : droits d'abord, puis les mensualités d'octobre à juillet (index 1 = octobre).
+ */
+export async function fabriquerInscription(
   etudiantId: string,
   anneeScolaireId: string,
   tarif: { niveau: number; montantMensuel: number; nombreMois: number; droitsInscription: number },
   debut: Date,
-  droitsEnTranches = 1,
 ) {
-  const echeances = genererEcheances(
-    tarif,
-    { anneeDebut: debut.getUTCFullYear(), moisDebutEcolage: debut.getUTCMonth() + 1 },
-    droitsEnTranches,
-  );
-  return db.inscription.create({
-    data: { etudiantId, anneeScolaireId, niveau: tarif.niveau, droitsEnTranches, echeances: { create: echeances } },
-    include: { echeances: { orderBy: { ordre: "asc" } } },
+  const echeances = genererEcheances(tarif, { anneeDebut: debut.getUTCFullYear(), moisDebutEcolage: debut.getUTCMonth() + 1 });
+  const inscription = await db.inscription.create({
+    data: { etudiantId, anneeScolaireId, niveau: tarif.niveau, echeances: { create: echeances } },
+    include: { echeances: true },
   });
+  const lecture = (e: { type: string; mois: Date }) => (e.type === "DROITS" ? -Infinity : e.mois.getTime());
+  return { ...inscription, echeances: inscription.echeances.sort((x, y) => lecture(x) - lecture(y)) };
+}
+
+/**
+ * Frais de l'année (classes comprises) et, pour chaque inscription donnée, son échéance FRAIS : comme `creerFrais`,
+ * sans passer par l'action. `mois` : 1er du mois d'exigibilité.
+ */
+export async function fabriquerFrais(
+  anneeScolaireId: string,
+  donnees: {
+    classes: { filiereId: string; niveau: number }[];
+    libelle?: string;
+    montant?: number;
+    mois?: Date;
+    creeParId?: string | null;
+    inscriptionIds?: string[];
+  },
+) {
+  const frais = await db.frais.create({
+    data: {
+      libelle: donnees.libelle ?? "Frais d'examen",
+      montant: donnees.montant ?? 15_000,
+      mois: donnees.mois ?? new Date(Date.UTC(2027, 2, 1)),
+      anneeScolaireId,
+      creeParId: donnees.creeParId ?? null,
+      classes: { create: donnees.classes },
+    },
+  });
+  const echeances = await Promise.all(
+    (donnees.inscriptionIds ?? []).map((inscriptionId) =>
+      db.echeance.create({ data: { inscriptionId, type: "FRAIS", mois: frais.mois, montantDu: frais.montant, fraisId: frais.id } }),
+    ),
+  );
+  return { frais, echeances };
 }
 
 /** Paiement écrit directement (sans la répartition ni le compteur) : pour préparer un état en base. */
 export function fabriquerPaiement(
   etudiantId: string,
   saisiParId: string,
-  lignes: { echeanceId: string; montant: number; resteEcheanceApres?: number }[],
+  lignes: { echeanceId: string; montant: number; resteEcheanceApres?: number; libelle?: string | null }[],
   donnees: Partial<Omit<Prisma.PaiementUncheckedCreateInput, "lignes">> = {},
 ) {
   const n = suivant();

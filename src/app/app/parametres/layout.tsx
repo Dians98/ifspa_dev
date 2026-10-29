@@ -14,7 +14,7 @@ export default async function LayoutParametres({ children }: { children: React.R
 
   return (
     <>
-      <TitrePage titre="Paramètres" description="Filières, années scolaires, tarifs, comptes utilisateurs et reprise des données." />
+      <TitrePage titre="Paramètres" />
       <OngletsParametres />
       {children}
     </>

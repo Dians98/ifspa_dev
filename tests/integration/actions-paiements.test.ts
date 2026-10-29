@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { jourMadagascar } from "@/lib/dates";
 import { montantEnLettres } from "@/lib/montant-en-lettres";
 import type { EntreeEncaissement } from "@/lib/encaissement";
-import { fabriquerAnnee, fabriquerEtudiant, fabriquerInscription } from "../factories";
+import { fabriquerAnnee, fabriquerEtudiant, fabriquerFrais, fabriquerInscription, fabriquerPaiement } from "../factories";
 import {
   connecter,
   fabriquerEtudiantInscrit,
@@ -17,6 +18,7 @@ const { getSession, revaliderPagesEcolage } = vi.hoisted(() => ({ getSession: vi
 vi.mock("@/lib/auth", () => ({ auth: { api: { getSession } } }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("@/server/ecolage-revalidation", () => ({ revaliderPagesEcolage }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 const { db } = await import("@/lib/db");
 const actions = await import("@/server/actions/paiements");
@@ -39,8 +41,8 @@ beforeEach(async () => {
 
 afterEach(() => vi.useRealTimers());
 
-const etudiantStandard = async (droitsEnTranches = 1, donnees = {}) =>
-  (await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarif, donnees, droitsEnTranches)).etudiant;
+const etudiantStandard = async (donnees = {}) => (await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarif, donnees)).etudiant;
+
 
 const resteDu = async (id: string) => (await actions.chargerSituationGuichet(id))!.resteDuTotal;
 
@@ -52,6 +54,7 @@ async function payer(etudiantId: string, montant: EntreeEncaissement["montant"],
     mode: "ESPECES",
     idClient: randomUUID(),
     resteDuAffiche: extra.resteDuAffiche ?? (await resteDu(etudiantId)),
+    jourAffiche: extra.jourAffiche ?? jourMadagascar(new Date()),
     ...extra,
   });
 }
@@ -116,14 +119,18 @@ describe("encaisser : répartition", () => {
     expect(await resteDu(e.id)).toBe(900_000 - 180_000);
   });
 
-  it("une tranche de droits payée en partie : partielle avant le 1er novembre, en retard ensuite", async () => {
-    const e = await etudiantStandard(3);
+  it("droits payés en partie, puis le complément : partiels jusqu'au 31 octobre (1er mois), en retard à partir du 1er novembre", async () => {
+    const e = await etudiantStandard();
 
     const recu = reussi(await payer(e.id, 20_000));
 
-    expect(recu.lignes).toEqual([{ libelle: "Droits — tranche 1/3", montant: 20_000, acompte: true, resteEcheance: 14_000 }]);
+    expect(recu.lignes).toEqual([{ libelle: "Droits d'inscription", montant: 20_000, acompte: true, resteEcheance: 80_000 }]);
     expect((await statuts(e.id, "2026-10-31"))[0]).toBe("partiel");
     expect((await statuts(e.id, "2026-11-01"))[0]).toBe("retard");
+
+    const suite = reussi(await payer(e.id, 80_000));
+    expect(suite.lignes).toEqual([{ libelle: "Droits d'inscription", montant: 80_000, acompte: false, resteEcheance: 0 }]);
+    expect((await statuts(e.id, "2026-11-01"))[0]).toBe("paye");
   });
 
   it("couvre deux années : l'année précédente est soldée d'abord, puis la suivante en acompte", async () => {
@@ -140,14 +147,14 @@ describe("encaisser : répartition", () => {
     expect(recu.lignes[1]).toMatchObject({ libelle: "Octobre 2025", montant: 70_000 });
     expect(recu.lignes[10]).toMatchObject({ libelle: "Juillet 2026", montant: 70_000, resteEcheance: 0 });
     expect(recu.lignes[11]).toEqual({ libelle: "Droits d'inscription 2026-2027", montant: 50_000, acompte: true, resteEcheance: 50_000 });
-    expect(recu).toMatchObject({ resteApres: 850_000, retardApres: 130_000 });
+    expect(recu).toMatchObject({ resteApres: 850_000, retardApres: 50_000 + 80_000 });
     expect(recu.etudiant).toMatchObject({ niveau: "2e année", anneeScolaire: "2026-2027" });
 
     const sur2026 = await db.paiementLigne.findMany({
       where: { paiementId: recu.paiementId!, echeance: { inscription: { anneeScolaireId: m.annee.id } } },
       include: { echeance: true },
     });
-    expect(sur2026.map((l) => [l.echeance.type, l.echeance.ordre, l.montant])).toEqual([["DROITS", 1, 50_000]]);
+    expect(sur2026.map((l) => [l.echeance.type, l.montant])).toEqual([["DROITS", 50_000]]);
   });
 
   it("un petit paiement va d'abord à l'année précédente, sans toucher à l'année en cours", async () => {
@@ -243,10 +250,45 @@ describe("encaisser : refus", () => {
 
   it("sans session : redirigé vers la connexion, aucun paiement", async () => {
     const e = await etudiantStandard();
-    const entree = { etudiantId: e.id, montant: 1_000, mode: "ESPECES" as const, idClient: randomUUID(), resteDuAffiche: 900_000 };
+    const entree = { etudiantId: e.id, montant: 1_000, mode: "ESPECES" as const, idClient: randomUUID(), resteDuAffiche: 900_000, jourAffiche: "2026-11-15" };
     getSession.mockResolvedValue(null);
     await expect(actions.encaisser(entree)).rejects.toThrow(/NEXT_REDIRECT/);
     expect(await db.paiement.count()).toBe(0);
+  });
+});
+
+describe("encaisser : jour affiché", () => {
+  it("refuse avec SITUATION_CHANGEE si le mois a changé depuis l'affichage, sans rien enregistrer", async () => {
+    const e = await etudiantStandard();
+
+    const r = await payer(e.id, 10_000, { jourAffiche: "2026-10-31" });
+
+    expect(r).toMatchObject({ statut: "erreur", code: "SITUATION_CHANGEE", message: expect.stringMatching(/Le mois a changé/) });
+    expect(await db.paiement.count()).toBe(0);
+    expect(await compteurs()).toEqual({});
+  });
+
+  it("accepte un autre jour du même mois : l'ordre de solde ne change qu'au 1er", async () => {
+    const e = await etudiantStandard();
+    reussi(await payer(e.id, 10_000, { jourAffiche: "2026-11-01" }));
+    reussi(await payer(e.id, 10_000, { jourAffiche: "2026-11-30" }));
+    expect(await db.paiement.count()).toBe(2);
+  });
+
+  it("exige le jour affiché", async () => {
+    const e = await etudiantStandard();
+    const r = await payer(e.id, 10_000, { jourAffiche: undefined as never });
+    expect(r).toMatchObject({ statut: "erreur", erreurs: { jourAffiche: expect.any(String) } });
+  });
+
+  it("le dernier jour du mois affiché, le lendemain est un autre mois : refusé", async () => {
+    const e = await etudiantStandard();
+    vi.setSystemTime(new Date("2026-11-30T20:00:00Z"));
+    const affiche = (await actions.chargerSituationGuichet(e.id))!.jour;
+    expect(affiche).toBe("2026-11-30");
+    vi.setSystemTime(new Date("2026-11-30T21:30:00Z"));
+
+    expect(await payer(e.id, 10_000, { jourAffiche: affiche })).toMatchObject({ code: "SITUATION_CHANGEE" });
   });
 });
 
@@ -298,7 +340,7 @@ describe("encaisser : mode, rôle et étudiants sortis", () => {
 describe("encaisser : idempotence et concurrence", () => {
   it("même idClient renvoyé deux fois : un seul paiement, le même reçu, même avec un reste affiché périmé", async () => {
     const e = await etudiantStandard();
-    const entree = { etudiantId: e.id, montant: 100_000, mode: "ESPECES" as const, idClient: randomUUID(), resteDuAffiche: 900_000 };
+    const entree = { etudiantId: e.id, montant: 100_000, mode: "ESPECES" as const, idClient: randomUUID(), resteDuAffiche: 900_000, jourAffiche: "2026-11-15" };
 
     const premier = reussi(await actions.encaisser(entree));
     const second = await actions.encaisser(entree);
@@ -312,7 +354,7 @@ describe("encaisser : idempotence et concurrence", () => {
 
   it("même idClient envoyé 4 fois en parallèle : un seul paiement, tous reçoivent le même reçu", async () => {
     const e = await etudiantStandard();
-    const entree = { etudiantId: e.id, montant: 100_000, mode: "ESPECES" as const, idClient: randomUUID(), resteDuAffiche: 900_000 };
+    const entree = { etudiantId: e.id, montant: 100_000, mode: "ESPECES" as const, idClient: randomUUID(), resteDuAffiche: 900_000, jourAffiche: "2026-11-15" };
 
     const etats = await Promise.all(Array.from({ length: 4 }, () => actions.encaisser(entree)));
 
@@ -338,7 +380,7 @@ describe("encaisser : idempotence et concurrence", () => {
 
   it("deux encaissements simultanés (idClient différents, même reste affiché) : un seul passe", async () => {
     const e = await etudiantStandard();
-    const base = { etudiantId: e.id, montant: 100_000, mode: "ESPECES" as const, resteDuAffiche: 900_000 };
+    const base = { etudiantId: e.id, montant: 100_000, mode: "ESPECES" as const, resteDuAffiche: 900_000, jourAffiche: "2026-11-15" };
 
     const etats = await Promise.all([
       actions.encaisser({ ...base, idClient: randomUUID() }),
@@ -564,7 +606,7 @@ describe("intégrité sous concurrence et à la limite des compteurs", () => {
   it("annulation et encaissement simultanés : état cohérent, pas d'interblocage", async () => {
     const e = await etudiantStandard();
     const p1 = reussi(await payer(e.id, 100_000));
-    const base = { etudiantId: e.id, montant: 50_000, mode: "ESPECES" as const, idClient: randomUUID(), resteDuAffiche: 800_000 };
+    const base = { etudiantId: e.id, montant: 50_000, mode: "ESPECES" as const, idClient: randomUUID(), resteDuAffiche: 800_000, jourAffiche: "2026-11-15" };
     connecter(getSession, m.admin);
 
     const [annulation, encaissement] = await Promise.all([
@@ -578,26 +620,26 @@ describe("intégrité sous concurrence et à la limite des compteurs", () => {
     expect(await surpaiements()).toEqual([]);
   });
 
-  it("redécoupage des droits et encaissement simultanés : aucun paiement ne pointe sur une échéance disparue", async () => {
+  it("création d'un frais et encaissement simultanés : aucun paiement hors de ses échéances, aucun surpaiement", async () => {
     const e = await etudiantStandard();
-    const inscription = await db.inscription.findFirstOrThrow({ where: { etudiantId: e.id } });
-    const { modifierTranchesDroits } = await import("@/server/actions/etudiants");
-    const base = { etudiantId: e.id, montant: 40_000, mode: "ESPECES" as const, idClient: randomUUID(), resteDuAffiche: 900_000 };
+    const base = { etudiantId: e.id, montant: 40_000, mode: "ESPECES" as const, idClient: randomUUID(), resteDuAffiche: 900_000, jourAffiche: "2026-11-15" };
+    connecter(getSession, m.admin);
+    const { creerFrais } = await import("@/server/actions/frais");
 
-    const [redecoupage, encaissement] = await Promise.all([
-      modifierTranchesDroits({ inscriptionId: inscription.id, droitsEnTranches: 3 }),
+    const [frais, encaissement] = await Promise.all([
+      creerFrais({ libelle: "Frais d'examen", montant: 15_000, mois: "2027-03", anneeScolaireId: m.annee.id, classes: [{ filiereId: m.ifs.id, niveau: 1 }] }),
       actions.encaisser(base),
     ]);
 
-    expect(encaissement.statut).toBe("succes");
-    const ins = await db.inscription.findUniqueOrThrow({ where: { id: inscription.id }, include: { echeances: true } });
-    const droits = ins.echeances.filter((x) => x.type === "DROITS");
-    if (redecoupage.statut === "succes") expect(droits).toHaveLength(3);
-    else expect(droits).toHaveLength(1);
-    expect(ins.echeances.reduce((s, x) => s + x.montantDu, 0)).toBe(900_000);
-    const lignes = await db.paiementLigne.findMany({ include: { echeance: true } });
-    expect(lignes.reduce((s, l) => s + l.montant, 0)).toBe(40_000);
-    expect(lignes.every((l) => l.echeance.inscriptionId === inscription.id)).toBe(true);
+    expect(frais.statut).toBe("succes");
+    if (encaissement.statut === "erreur") expect(encaissement.code).toBe("SITUATION_CHANGEE");
+    const echeances = await db.echeance.findMany({ where: { inscription: { etudiantId: e.id } } });
+    expect(echeances.filter((x) => x.type === "FRAIS")).toHaveLength(1);
+    expect(echeances.reduce((s, x) => s + x.montantDu, 0)).toBe(915_000);
+    const attendu = encaissement.statut === "succes" ? 40_000 : 0;
+    const lignes = await db.paiementLigne.findMany();
+    expect(lignes.reduce((s, l) => s + l.montant, 0)).toBe(attendu);
+    expect(await surpaiements()).toEqual([]);
   });
 
   it("plus de numéro de reçu disponible : refus affichable, rien d'enregistré, compteur inchangé", async () => {
@@ -630,7 +672,7 @@ describe("chercherAuGuichet", () => {
       statut: "ACTIF",
       sorti: false,
       resteDu: 900_000,
-      resteEnRetard: 180_000,
+      resteEnRetard: 100_000 + 80_000,
     });
   });
 
@@ -642,8 +684,8 @@ describe("chercherAuGuichet", () => {
   });
 
   it("10 résultats au plus, les actifs d'abord", async () => {
-    for (let i = 0; i < 11; i++) await etudiantStandard(1, { nom: `DUPONT${String(i).padStart(2, "0")}` });
-    const sorti = await etudiantStandard(1, { nom: "DUPONT00A" });
+    for (let i = 0; i < 11; i++) await etudiantStandard({ nom: `DUPONT${String(i).padStart(2, "0")}` });
+    const sorti = await etudiantStandard({ nom: "DUPONT00A" });
     await db.etudiant.update({ where: { id: sorti.id }, data: { statut: "ABANDON" } });
 
     const r = await actions.chercherAuGuichet("dupont");
@@ -653,15 +695,15 @@ describe("chercherAuGuichet", () => {
   });
 
   it("niveau d'un redoublant", async () => {
-    const e = await etudiantStandard(1, { nom: "REDOUBLANT" });
+    const e = await etudiantStandard({ nom: "REDOUBLANT" });
     await db.inscription.updateMany({ where: { etudiantId: e.id }, data: { redoublement: true, niveau: 2 } });
     expect((await actions.chercherAuGuichet("redoublant"))[0].niveau).toBe("2e année (redoublant)");
   });
 
   it("chargerDerniersServis : étudiants distincts du caissier, du plus récent au plus ancien, sans paiement annulé", async () => {
-    const a = await etudiantStandard(1, { nom: "PREMIER" });
-    const b = await etudiantStandard(1, { nom: "SECOND" });
-    const c = await etudiantStandard(1, { nom: "TROISIEME" });
+    const a = await etudiantStandard({ nom: "PREMIER" });
+    const b = await etudiantStandard({ nom: "SECOND" });
+    const c = await etudiantStandard({ nom: "TROISIEME" });
     vi.setSystemTime(new Date("2026-11-15T08:00:00Z"));
     reussi(await payer(a.id, 10_000));
     vi.setSystemTime(new Date("2026-11-15T09:00:00Z"));
@@ -696,7 +738,7 @@ describe("chargerSituationGuichet", () => {
 
     const s = (await actions.chargerSituationGuichet(e.id))!;
 
-    expect(s).toMatchObject({ jour: "2026-11-15", refus: null, resteDuTotal: 900_000, resteEnRetard: 180_000 });
+    expect(s).toMatchObject({ jour: "2026-11-15", refus: null, resteDuTotal: 900_000, resteEnRetard: 100_000 + 80_000 });
     expect(s.echeances).toHaveLength(11);
     expect(s.echeances.slice(0, 3).map((x) => [x.libelle, x.echue, x.statut])).toEqual([
       ["Droits d'inscription", true, "retard"],
@@ -704,7 +746,7 @@ describe("chargerSituationGuichet", () => {
       ["Novembre 2026", false, "a_venir"],
     ]);
     expect(s.annees).toHaveLength(1);
-    expect(s.annees[0]).toMatchObject({ libelle: "2026-2027", niveau: "1re année", reste: 900_000, resteEnRetard: 180_000 });
+    expect(s.annees[0]).toMatchObject({ libelle: "2026-2027", niveau: "1re année", reste: 900_000, resteEnRetard: 100_000 + 80_000 });
   });
 
   it("n'affiche que ce qui reste dû ; tout soldé : message à la place du formulaire", async () => {
@@ -733,7 +775,7 @@ describe("chargerSituationGuichet", () => {
       ["2026-2027", "2e année", 900_000],
     ]);
     expect(s.annees[0].resteEnRetard).toBe(900_000);
-    expect(s.resteEnRetard).toBe(900_000 + 180_000);
+    expect(s.resteEnRetard).toBe(900_000 + 100_000 + 80_000);
   });
 
   it("étudiant inconnu ou identifiant invalide : null", async () => {
@@ -749,5 +791,82 @@ describe("chargerSituationGuichet", () => {
     expect(await actions.obtenirRecu(recu.paiementId!)).toEqual(recu);
     expect(await actions.obtenirRecu("inconnu")).toBeNull();
     expect(await actions.obtenirRecu("")).toBeNull();
+  });
+});
+
+describe("encaisser : frais", () => {
+  /** Étudiant à jour jusqu'en mars (droits compris), frais d'examen de 15 000 Ar exigible en mars. */
+  async function aJourAvecFrais() {
+    const s = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarif);
+    const { frais, echeances } = await fabriquerFrais(m.annee.id, {
+      classes: [{ filiereId: m.ifs.id, niveau: 1 }], libelle: "Frais d'examen", montant: 15_000, mois: new Date(Date.UTC(2027, 2, 1)), inscriptionIds: [s.inscription.id],
+    });
+    const dues = s.inscription.echeances.slice(0, 7);
+    await fabriquerPaiement(s.etudiant.id, m.user.id, dues.map((e) => ({ echeanceId: e.id, montant: e.montantDu })));
+    return { ...s, frais, fraisEcheance: echeances[0] };
+  }
+
+  it("en mars, 15 000 Ar d'un étudiant à jour soldent le frais exigible avant la mensualité d'avril", async () => {
+    const s = await aJourAvecFrais();
+    vi.setSystemTime(new Date("2027-03-10T09:00:00Z"));
+
+    const recu = reussi(await payer(s.etudiant.id, 15_000));
+
+    expect(recu.lignes).toEqual([{ libelle: "Frais d'examen", montant: 15_000, acompte: false, resteEcheance: 0 }]);
+    expect(recu.resteApres).toBe(4 * 80_000);
+  });
+
+  it("un étudiant en retard solde d'abord ses mensualités dues, puis le frais", async () => {
+    const s = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarif);
+    await fabriquerFrais(m.annee.id, {
+      classes: [{ filiereId: m.ifs.id, niveau: 1 }], libelle: "Frais d'examen", montant: 15_000, mois: new Date(Date.UTC(2027, 2, 1)), inscriptionIds: [s.inscription.id],
+    });
+    await fabriquerPaiement(s.etudiant.id, m.user.id, s.inscription.echeances.slice(0, 5).map((e) => ({ echeanceId: e.id, montant: e.montantDu })));
+    vi.setSystemTime(new Date("2027-03-10T09:00:00Z"));
+
+    const recu = reussi(await payer(s.etudiant.id, 175_000));
+
+    expect(recu.lignes.map((l) => [l.libelle, l.montant])).toEqual([
+      ["Février 2027", 80_000],
+      ["Mars 2027", 80_000],
+      ["Frais d'examen", 15_000],
+    ]);
+  });
+
+  it("paiement partiel sur le frais, puis refus du trop-perçu au-delà du reste dû total", async () => {
+    const s = await aJourAvecFrais();
+    vi.setSystemTime(new Date("2027-03-10T09:00:00Z"));
+
+    const partiel = reussi(await payer(s.etudiant.id, 6_000));
+    expect(partiel.lignes).toEqual([{ libelle: "Frais d'examen", montant: 6_000, acompte: true, resteEcheance: 9_000 }]);
+
+    expect(await payer(s.etudiant.id, 9_000 + 4 * 80_000 + 1)).toMatchObject({ statut: "erreur", message: expect.stringMatching(/dépasse ce que l'étudiant doit encore/) });
+    expect(reussi(await payer(s.etudiant.id, 9_000 + 4 * 80_000)).resteApres).toBe(0);
+  });
+
+  it("réimpression un mois plus tard : lignes et libellé figés, même si le frais a été renommé entre-temps", async () => {
+    const s = await aJourAvecFrais();
+    vi.setSystemTime(new Date("2027-03-10T09:00:00Z"));
+    const recu = reussi(await payer(s.etudiant.id, 15_000));
+
+    await db.frais.update({ where: { id: s.frais.id }, data: { libelle: "Examen final (renommé)" } });
+    vi.setSystemTime(new Date("2027-04-12T09:00:00Z"));
+
+    expect(await actions.obtenirRecu(recu.paiementId!)).toEqual(recu);
+    expect((await db.paiementLigne.findFirstOrThrow({ where: { paiementId: recu.paiementId! } })).libelle).toBe("Frais d'examen");
+    const fiche = await lireFicheEtudiant(s.etudiant.id, "2027-04-12");
+    expect(fiche!.parcours[0].echeances.find((e) => e.type === "FRAIS")!.libelle).toBe("Examen final (renommé)");
+  });
+
+  it("l'annulation du paiement d'un frais le rend de nouveau dû", async () => {
+    const s = await aJourAvecFrais();
+    vi.setSystemTime(new Date("2027-03-10T09:00:00Z"));
+    const recu = reussi(await payer(s.etudiant.id, 15_000));
+    expect(await resteDu(s.etudiant.id)).toBe(4 * 80_000);
+
+    connecter(getSession, m.admin);
+    reussi(await actions.annulerPaiement({ paiementId: recu.paiementId!, motif: "erreur de saisie" }));
+
+    expect(await resteDu(s.etudiant.id)).toBe(15_000 + 4 * 80_000);
   });
 });

@@ -43,7 +43,6 @@ export function ListeUtilisateurs({ utilisateurs }: { utilisateurs: UtilisateurP
   return (
     <PanneauParametre
       titre="Utilisateurs"
-      description="Pas d'inscription libre : seuls les comptes créés ici peuvent se connecter."
       action={
         <DialogueUtilisateur
           declencheur={

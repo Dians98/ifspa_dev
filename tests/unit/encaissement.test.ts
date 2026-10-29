@@ -9,6 +9,7 @@ const BASE = {
   mode: "ESPECES",
   idClient: UUID,
   resteDuAffiche: 240_000,
+  jourAffiche: "2026-11-15",
 };
 
 function analyser(surcharge: Record<string, unknown> = {}) {
@@ -79,6 +80,17 @@ describe("schemaEncaissement", () => {
     expect(analyser({ etudiantId: "" }).success).toBe(false);
     expect(analyser({ mode: "MOBILE_MONEY", operateur: "MVOLA", reference: "R".repeat(61) }).success).toBe(false);
     expect(analyser({ observation: "o".repeat(201) }).success).toBe(false);
+  });
+});
+
+describe("schemaEncaissement : jour affiché", () => {
+  it("exige le jour de la situation affichée, au format AAAA-MM-JJ", () => {
+    expect(analyser({ jourAffiche: undefined }).success).toBe(false);
+    for (const jourAffiche of ["", "15/11/2026", "2026-11-1", "2026-02-30", "2026-13-01", 20261115]) {
+      expect(chemins(analyser({ jourAffiche })), String(jourAffiche)).toContain("jourAffiche");
+    }
+    const r = analyser({ jourAffiche: "2027-03-31" });
+    expect(r.success && r.data.jourAffiche).toBe("2027-03-31");
   });
 });
 

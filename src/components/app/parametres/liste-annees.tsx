@@ -49,7 +49,6 @@ export function ListeAnnees({ annees, anneeDebutProposee }: { annees: AnneeParam
   return (
     <PanneauParametre
       titre="Années scolaires"
-      description="L'année courante est celle proposée par défaut à l'encaissement et sur le tableau de bord."
       action={annees.length > 0 ? <BoutonNouvelleAnnee anneeDebutProposee={anneeDebutProposee} /> : undefined}
     >
       {annees.length === 0 ? (

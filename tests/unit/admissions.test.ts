@@ -24,7 +24,7 @@ import {
   type LigneRestauration,
 } from "@/lib/admissions";
 import { dateDuJour } from "@/lib/dates";
-import { genererEcheances } from "@/lib/ecolage";
+import { echeanceFrais, genererEcheances } from "@/lib/ecolage";
 
 const TARIF_1 = { droitsInscription: 100_000, montantMensuel: 80_000, nombreMois: 10 };
 const TARIF_2 = { droitsInscription: 125_000, montantMensuel: 90_000, nombreMois: 10 };
@@ -40,7 +40,6 @@ function etu(n: number, surcharge: Partial<InscriptionClasse> = {}): Inscription
     etudiantId: `etu${n}`,
     nom: `NOM${n}`,
     prenoms: `Prénom${n}`,
-    droitsEnTranches: 1,
     statutInscription: "EN_COURS",
     statutEtudiant: "ACTIF",
     dateSortie: null,
@@ -64,6 +63,7 @@ function contexte(
     inscriptions,
     decisions: Object.entries(decisions).map(([n, decision]) => ({ inscriptionId: `ins${n}`, decision })),
     tarifs: { niveauSuivant: TARIF_2, memeNiveau: TARIF_1 },
+    frais: { niveauSuivant: [], memeNiveau: [] },
     ...surcharge,
   };
 }
@@ -88,8 +88,9 @@ describe("planifierPassage : décisions", () => {
     expect(p.inscriptions[0]).toMatchObject({ etudiantId: "etu1", inscriptionSourceId: "ins1", niveau: 2, redoublement: false });
     const { echeances } = p.inscriptions[0];
     expect(echeances).toHaveLength(11);
-    expect(echeances[0]).toMatchObject({ type: "DROITS", tranche: 1, montantDu: 125_000 });
+    expect(echeances[0]).toMatchObject({ type: "DROITS", montantDu: 125_000, fraisId: null });
     expect(echeances[0].mois).toEqual(new Date(Date.UTC(2027, 9, 1)));
+    expect(echeances.filter((e) => e.type === "DROITS")).toHaveLength(1);
     expect(echeances.filter((e) => e.type === "MENSUALITE").every((e) => e.montantDu === 90_000)).toBe(true);
     expect(echeances.at(-1)?.mois).toEqual(new Date(Date.UTC(2028, 6, 1)));
     expect(p.inscriptionsSource).toEqual([{ id: "ins1", statut: "ADMIS" }]);
@@ -106,21 +107,49 @@ describe("planifierPassage : décisions", () => {
     expect(p.etudiants).toEqual([]);
   });
 
-  it("reprend les tranches de droits de l'inscription source, avec l'arrondi du tarif cible", () => {
-    const p = plan(contexte([etu(1, { droitsEnTranches: 3 }), etu(2, { droitsEnTranches: 2 })], { 1: "ADMIS", 2: "REDOUBLANT" }));
+  it("une seule échéance de droits par inscription créée, au tarif cible, sans notion de tranche", () => {
+    const p = plan(contexte([etu(1), etu(2)], { 1: "ADMIS", 2: "REDOUBLANT" }));
 
     const [admis, redoublant] = p.inscriptions;
-    expect(admis.droitsEnTranches).toBe(3);
-    expect(admis.echeances.filter((e) => e.type === "DROITS").map((e) => e.montantDu)).toEqual([43_000, 41_000, 41_000]);
-    expect(redoublant.droitsEnTranches).toBe(2);
-    expect(redoublant.echeances.filter((e) => e.type === "DROITS").map((e) => e.montantDu)).toEqual([50_000, 50_000]);
-    expect(admis.echeances).toEqual(genererEcheances(TARIF_2, CIBLE, 3));
+    expect(admis).not.toHaveProperty("droitsEnTranches");
+    expect(admis.echeances).toEqual(genererEcheances(TARIF_2, CIBLE));
+    expect(redoublant.echeances).toEqual(genererEcheances(TARIF_1, CIBLE));
+  });
+
+  it("frais déjà prévus pour la classe d'arrivée : copiés sur les admis (niveau + 1) et sur les redoublants (même niveau)", () => {
+    const fraisSuivant = echeanceFrais({ id: "f-niv2", montant: 15_000, mois: new Date(Date.UTC(2028, 2, 1)) });
+    const fraisMeme = echeanceFrais({ id: "f-niv1", montant: 9_000, mois: new Date(Date.UTC(2028, 0, 1)) });
+    const p = plan(
+      contexte([etu(1), etu(2)], { 1: "ADMIS", 2: "REDOUBLANT" }, { frais: { niveauSuivant: [fraisSuivant], memeNiveau: [fraisMeme] } }),
+    );
+
+    const [admis, redoublant] = p.inscriptions;
+    expect(admis.echeances).toEqual([...genererEcheances(TARIF_2, CIBLE), fraisSuivant]);
+    expect(redoublant.echeances).toEqual([...genererEcheances(TARIF_1, CIBLE), fraisMeme]);
+    expect(admis.echeances.at(-1)).toMatchObject({ type: "FRAIS", fraisId: "f-niv2", montantDu: 15_000 });
+    expect(redoublant.echeances.at(-1)).toMatchObject({ type: "FRAIS", fraisId: "f-niv1", montantDu: 9_000 });
+  });
+
+  it("aucun frais prévu : l'inscription créée n'a ni échéance de frais ni identifiant de frais", () => {
+    const p = plan(contexte([etu(1)], { 1: "ADMIS" }));
+    expect(p.inscriptions[0].echeances.filter((e) => e.type === "FRAIS")).toEqual([]);
+    expect(p.inscriptions[0].echeances.every((e) => e.fraisId === null)).toBe(true);
+  });
+
+  it("diplômés, abandons et exclus ne reçoivent aucune échéance, frais compris", () => {
+    const frais = echeanceFrais({ id: "f1", montant: 15_000, mois: new Date(Date.UTC(2028, 2, 1)) });
+    const p = plan(
+      contexte([etu(1), etu(2)], { 1: "DIPLOME", 2: "ABANDON" }, { niveau: 3, frais: { niveauSuivant: [frais], memeNiveau: [frais] } }),
+    );
+    expect(p.inscriptions).toEqual([]);
   });
 
   it("suit le mois de début d'écolage de l'année cible", () => {
     const p = plan(contexte([etu(1)], { 1: "ADMIS" }, { anneeCible: { ...CIBLE, moisDebutEcolage: 9 } }));
-    expect(p.inscriptions[0].echeances[0].mois).toEqual(new Date(Date.UTC(2027, 8, 1)));
-    expect(p.inscriptions[0].echeances.at(-1)?.mois).toEqual(new Date(Date.UTC(2028, 5, 1)));
+    const { echeances } = p.inscriptions[0];
+    expect(echeances.find((e) => e.type === "MENSUALITE")?.mois).toEqual(new Date(Date.UTC(2027, 8, 1)));
+    expect(echeances.at(-1)?.mois).toEqual(new Date(Date.UTC(2028, 5, 1)));
+    expect(echeances.find((e) => e.type === "DROITS")?.mois).toEqual(new Date(Date.UTC(2027, 8, 1)));
   });
 
   it("diplômé en dernière année : aucune inscription cible, étudiant sorti le jour du passage, sans motif", () => {
@@ -245,10 +274,16 @@ describe("planifierPassage : refus", () => {
     expect(() => planifierPassage(contexte([etu(1)], { 1: "ADMIS" }, { anneeCible: { ...CIBLE, anneeDebut: 2029 } }))).toThrow(RangeError);
   });
 
-  it("droits trop faibles pour les tranches reprises : refus nommant l'étudiant", () => {
-    const tarifPetit = { droitsInscription: 2_000, montantMensuel: 80_000, nombreMois: 10 };
-    const r = refus(contexte([etu(1, { droitsEnTranches: 3 })], { 1: "ADMIS" }, { tarifs: { niveauSuivant: tarifPetit, memeNiveau: TARIF_1 } }));
-    expect(r.erreur).toMatch(/NOM1 Prénom1 : Les droits d'inscription .* trop faibles pour être payés en 3 fois/);
+  it("droits du tarif cible invalides : refus affichable, sans plan", () => {
+    const tarifInvalide = { droitsInscription: 0, montantMensuel: 80_000, nombreMois: 10 };
+    const r = refus(contexte([etu(1)], { 1: "ADMIS" }, { tarifs: { niveauSuivant: tarifInvalide, memeNiveau: TARIF_1 } }));
+    expect(r.erreur).toMatch(/droits d'inscription du tarif sont invalides/);
+  });
+
+  it("droits invalides sur un tarif non utilisé par les décisions : le passage reste possible", () => {
+    const tarifInvalide = { droitsInscription: 0, montantMensuel: 80_000, nombreMois: 10 };
+    const p = plan(contexte([etu(1)], { 1: "REDOUBLANT" }, { tarifs: { niveauSuivant: tarifInvalide, memeNiveau: TARIF_1 } }));
+    expect(p.inscriptions).toHaveLength(1);
   });
 
   it("liste de noms tronquée au-delà de 5", () => {

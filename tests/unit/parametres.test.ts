@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 import {
   controleActionUtilisateur,
+  controleChevauchement,
   controleCloture,
   controleDefinirCourante,
   controleLignesTarifs,
@@ -49,6 +50,12 @@ describe("années scolaires : dates et libellés", () => {
     ]);
   });
 
+  it("10 mois comptés dans l'année de début : 2027-2028 commençant en janvier va de janvier à octobre 2027", () => {
+    expect(Object.values(datesAnnee(2027, 1)).map(jourISO)).toEqual(["2027-01-01", "2027-10-31"]);
+    expect(periodeAnnee(2027, 1)).toBe("janvier 2027 → octobre 2027");
+    expect(periodeAnnee(2027, 12)).toBe("décembre 2027 → septembre 2028");
+  });
+
   it("place les dates à minuit UTC, comme une colonne @db.Date", () => {
     const { dateDebut, dateFin } = datesAnnee(2026, 10);
     expect(dateDebut.toISOString()).toBe("2026-10-01T00:00:00.000Z");
@@ -66,6 +73,37 @@ describe("années scolaires : dates et libellés", () => {
     expect(libelleNiveau(1)).toBe("1re année");
     expect(libelleNiveau(2)).toBe("2e année");
     expect(libelleNiveau(3)).toBe("3e année");
+  });
+});
+
+describe("controleChevauchement", () => {
+  const a = (anneeDebut: number, moisDebutEcolage: number) => ({ anneeDebut, moisDebutEcolage });
+
+  it("refuse une année qui commence avant la fin de la précédente", () => {
+    expect(controleChevauchement(a(2027, 1), [a(2026, 10)])).toBe(
+      "2027-2028 ne peut pas commencer avant août 2027 : 2026-2027 se termine en juillet 2027.",
+    );
+    expect(controleChevauchement(a(2027, 7), [a(2026, 10)])).toMatch(/ne peut pas commencer avant août 2027/);
+  });
+
+  it("refuse une année qui finit après le début de la suivante", () => {
+    expect(controleChevauchement(a(2026, 10), [a(2027, 1)])).toBe(
+      "2026-2027 ne peut pas se terminer après décembre 2026 : 2027-2028 commence en janvier 2027.",
+    );
+    expect(controleChevauchement(a(2026, 11), [a(2027, 8)])).toMatch(/ne peut pas se terminer après juillet 2027/);
+  });
+
+  it("accepte des années qui se suivent sans se chevaucher, même mois contre mois", () => {
+    expect(controleChevauchement(a(2027, 8), [a(2026, 10)])).toBeNull();
+    expect(controleChevauchement(a(2027, 10), [a(2026, 10), a(2028, 10)])).toBeNull();
+    expect(controleChevauchement(a(2026, 10), [a(2027, 8)])).toBeNull();
+    expect(controleChevauchement(a(2027, 1), [a(2026, 1), a(2028, 1)])).toBeNull();
+    expect(controleChevauchement(a(2027, 1), [])).toBeNull();
+  });
+
+  it("vérifie les deux voisines : la précédente d'abord", () => {
+    expect(controleChevauchement(a(2027, 5), [a(2028, 1), a(2026, 10)])).toMatch(/^2027-2028 ne peut pas commencer/);
+    expect(controleChevauchement(a(2027, 8), [a(2028, 1), a(2026, 10)])).toMatch(/^2027-2028 ne peut pas se terminer/);
   });
 });
 
@@ -321,10 +359,10 @@ describe("schémas de saisie", () => {
     for (const dureeAnnees of [0, 7, 2.5]) expect(schemaFiliere.safeParse({ ...filiere, dureeAnnees }).success).toBe(false);
   });
 
-  it("année : début d'écolage en septembre, octobre (par défaut) ou novembre uniquement", () => {
+  it("année : début d'écolage sur l'un des 12 mois, octobre par défaut", () => {
     expect(schemaAnnee.parse({ anneeDebut: 2026 }).moisDebutEcolage).toBe(10);
-    for (const m of [9, 10, 11]) expect(schemaAnnee.safeParse({ anneeDebut: 2026, moisDebutEcolage: m }).success).toBe(true);
-    for (const m of [8, 12, 1]) expect(schemaAnnee.safeParse({ anneeDebut: 2026, moisDebutEcolage: m }).success).toBe(false);
+    for (let m = 1; m <= 12; m++) expect(schemaAnnee.safeParse({ anneeDebut: 2026, moisDebutEcolage: m }).success, String(m)).toBe(true);
+    for (const m of [0, 13, 10.5]) expect(schemaAnnee.safeParse({ anneeDebut: 2026, moisDebutEcolage: m }).success, String(m)).toBe(false);
   });
 
   it(`tarif : nombre de mois plafonné à ${NOMBRE_MOIS_MAX}, un tarif à 11 mois est refusé`, () => {

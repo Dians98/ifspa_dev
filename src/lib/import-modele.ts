@@ -5,8 +5,9 @@ import { DUREE_MAX, libelleAnnee, NOMBRE_MOIS_ECOLAGE, NOMS_MOIS } from "@/lib/p
 
 export const FEUILLE_LISEZ_MOI = "Lisez-moi";
 export const FEUILLE_ETUDIANTS = "Étudiants";
-export const FEUILLE_PAIEMENTS = "Paiements";
-export type NomFeuille = typeof FEUILLE_ETUDIANTS | typeof FEUILLE_PAIEMENTS;
+/** Feuille des anciens modèles : ignorée à la lecture, les paiements s'encaissent au guichet. */
+export const FEUILLE_PAIEMENTS_RETIREE = "Paiements";
+export type NomFeuille = typeof FEUILLE_ETUDIANTS;
 
 export type CleEtudiant =
   | "numero"
@@ -24,10 +25,7 @@ export type CleEtudiant =
   | "filiere"
   | "anneeEntree"
   | "niveau"
-  | "redoublant"
-  | "droitsEnTranches";
-
-export type ClePaiement = "numeroEtudiant" | "date" | "montant" | "mode" | "operateur" | "reference" | "recuPapier";
+  | "redoublant";
 
 export type ColonneImport<K extends string = string> = {
   cle: K;
@@ -45,8 +43,18 @@ export type ColonneImport<K extends string = string> = {
 };
 
 // Aides sans année ni code de filière : elles servent aussi à reconnaître la ligne d'aide d'un ancien modèle.
+/** En-têtes d'anciens modèles, normalisés (`normaliserEntete`) : ignorés sans avertissement. */
+export const COLONNES_RETIREES: readonly string[] = ["droits en", "droits", "tranches"];
+
+/** En-têtes de l'ancienne feuille Paiements, normalisés : reconnaissent un ancien paiements.csv, ignoré. */
+export const ENTETES_PAIEMENTS_RETIRES: readonly string[] = [
+  "n etudiant", "no etudiant", "numero etudiant", "date", "date du paiement", "date paiement", "montant ar", "montant",
+  "montant ariary", "mode", "mode de paiement", "operateur", "reference", "n recu papier", "no recu papier",
+  "numero recu papier", "recu papier", "n recu",
+];
+
 export const COLONNES_ETUDIANTS: readonly ColonneImport<CleEtudiant>[] = [
-  { cle: "numero", entete: "N°", obligatoire: true, aide: "Numéro de ligne, unique. Sert à rattacher les paiements.", largeur: 6, alias: ["no", "num", "numero"] },
+  { cle: "numero", entete: "N°", obligatoire: true, aide: "Numéro de ligne, unique. Fixe l'ordre des matricules.", largeur: 6, alias: ["no", "num", "numero"] },
   { cle: "nom", entete: "Nom", obligatoire: true, aide: "En majuscules ou non, il sera mis en majuscules.", largeur: 18 },
   { cle: "prenoms", entete: "Prénoms", obligatoire: true, aide: "", largeur: 22, alias: ["prenom"] },
   { cle: "sexe", entete: "Sexe", obligatoire: true, aide: "F ou M.", largeur: 6 },
@@ -62,17 +70,6 @@ export const COLONNES_ETUDIANTS: readonly ColonneImport<CleEtudiant>[] = [
   { cle: "anneeEntree", entete: "Année d'entrée", obligatoire: true, aide: "Année de la 1re rentrée à l'IFSPA, ex. 2024 pour 2024-2025. Elle figure dans le matricule.", largeur: 14, alias: ["annee entree"] },
   { cle: "niveau", entete: "Niveau", obligatoire: true, aide: "1, 2 ou 3 : la classe suivie cette année.", largeur: 16, prefixe: true },
   { cle: "redoublant", entete: "Redoublant", obligatoire: false, aide: "oui ou non (non par défaut).", largeur: 11 },
-  { cle: "droitsEnTranches", entete: "Droits en", obligatoire: false, aide: "Droits d'inscription payés en 1, 2 ou 3 fois (1 par défaut).", largeur: 10, alias: ["droits", "tranches"] },
-];
-
-export const COLONNES_PAIEMENTS: readonly ColonneImport<ClePaiement>[] = [
-  { cle: "numeroEtudiant", entete: "N° étudiant", obligatoire: true, aide: "Le N° de l'étudiant dans la feuille Étudiants.", largeur: 11, alias: ["no etudiant", "numero etudiant"] },
-  { cle: "date", entete: "Date", obligatoire: true, aide: "JJ/MM/AAAA.", largeur: 12, alias: ["date du paiement", "date paiement"] },
-  { cle: "montant", entete: "Montant (Ar)", obligatoire: true, aide: "Nombre entier, sans espaces ni « Ar ».", largeur: 13, alias: ["montant", "montant ariary"] },
-  { cle: "mode", entete: "Mode", obligatoire: true, aide: "Espèces ou Mobile Money.", largeur: 14, alias: ["mode de paiement"] },
-  { cle: "operateur", entete: "Opérateur", obligatoire: false, aide: "Mobile Money seulement : MVola, Orange Money ou Airtel Money.", largeur: 14 },
-  { cle: "reference", entete: "Référence", obligatoire: false, aide: "Mobile Money seulement : référence de la transaction.", largeur: 18 },
-  { cle: "recuPapier", entete: "N° reçu papier", obligatoire: false, aide: "En texte : numéro du reçu remis à l'époque, gardé pour mémoire.", largeur: 14, alias: ["no recu papier", "numero recu papier", "recu papier", "n recu"], texte: true },
 ];
 
 /** Ce que le modèle dit de l'année courante ; calculé par `parametresModele`. */
@@ -156,17 +153,6 @@ export const IDENTITES_EXEMPLES = [
   { nom: "ANDRIAMAHEFA", prenoms: "Tojo Niaina", dateNaissance: "2004-06-27" },
 ] as const;
 
-/** Paiements d'exemple reconnus sans leur date (elle suit l'année du modèle). */
-export const PAIEMENTS_EXEMPLES = [
-  { numeroEtudiant: "1", montant: 34000, mode: "ESPECES", recuPapier: "0412" },
-  { numeroEtudiant: "1", montant: 80000, mode: "MOBILE_MONEY", recuPapier: "0413" },
-  { numeroEtudiant: "2", montant: 180000, mode: "ESPECES", recuPapier: "0420" },
-] as const;
-
-function jourModele(jour: number, mois: number, annee: number): string {
-  return `${String(jour).padStart(2, "0")}/${String(mois).padStart(2, "0")}/${annee}`;
-}
-
 export function exemplesEtudiants(p: ParametresModele): LigneModele<CleEtudiant>[] {
   const [a, b, c] = IDENTITES_EXEMPLES;
   const naissance = (jour: string) => jour.split("-").reverse().join("/");
@@ -176,29 +162,20 @@ export function exemplesEtudiants(p: ParametresModele): LigneModele<CleEtudiant>
       numero: "1", nom: a.nom, prenoms: a.prenoms, sexe: "F", dateNaissance: naissance(a.dateNaissance),
       lieuNaissance: "Toamasina", cin: "", telephone: "034 12 345 67", adresse: "Lot II A 12 Tanambao V",
       tuteurNom: "RAKOTO Jean", tuteurTelephone: "033 12 345 67", tuteurProfession: "Commerçant",
-      filiere: p.codesFilieres[0] ?? "IF", anneeEntree: String(p.anneeDebut), niveau: "1", redoublant: "non", droitsEnTranches: "3",
+      filiere: p.codesFilieres[0] ?? "IF", anneeEntree: String(p.anneeDebut), niveau: "1", redoublant: "non",
     },
     {
       numero: "2", nom: b.nom, prenoms: b.prenoms, sexe: "F", dateNaissance: naissance(b.dateNaissance),
       lieuNaissance: "Fénérive-Est", cin: "501 011 012 345", telephone: "032 98 765 43", adresse: "Ankirihiry",
       tuteurNom: "", tuteurTelephone: "", tuteurProfession: "",
-      filiere: p.codesFilieres[1] ?? p.codesFilieres[0] ?? "SF", anneeEntree: String(p.anneeDebut - 1), niveau: String(deux), redoublant: "non", droitsEnTranches: "1",
+      filiere: p.codesFilieres[1] ?? p.codesFilieres[0] ?? "SF", anneeEntree: String(p.anneeDebut - 1), niveau: String(deux), redoublant: "non",
     },
     {
       numero: "3", nom: c.nom, prenoms: c.prenoms, sexe: "M", dateNaissance: naissance(c.dateNaissance),
       lieuNaissance: "Brickaville", cin: "", telephone: "033 45 678 90", adresse: "Morarano",
       tuteurNom: "RASOA Marie", tuteurTelephone: "034 98 765 43", tuteurProfession: "Institutrice",
-      filiere: p.codesFilieres[0] ?? "IF", anneeEntree: String(p.anneeDebut - 2), niveau: String(deux), redoublant: "oui", droitsEnTranches: "1",
+      filiere: p.codesFilieres[0] ?? "IF", anneeEntree: String(p.anneeDebut - 2), niveau: String(deux), redoublant: "oui",
     },
-  ];
-}
-
-export function exemplesPaiements(p: ParametresModele): LigneModele<ClePaiement>[] {
-  const mois = p.moisDebutEcolage;
-  return [
-    { numeroEtudiant: "1", date: jourModele(5, mois, p.anneeDebut), montant: "34000", mode: "Espèces", operateur: "", reference: "", recuPapier: "0412" },
-    { numeroEtudiant: "1", date: jourModele(5, mois, p.anneeDebut), montant: "80000", mode: "Mobile Money", operateur: "MVola", reference: "MP261005.1432.A12345", recuPapier: "0413" },
-    { numeroEtudiant: "2", date: jourModele(8, mois, p.anneeDebut), montant: "180000", mode: "Espèces", operateur: "", reference: "", recuPapier: "0420" },
   ];
 }
 
@@ -219,7 +196,6 @@ export function consignesImport(p: ParametresModele): string[] {
     `Modèle de reprise des données de l'IFSPA — année ${p.libelle}`,
     "",
     `Feuille « ${FEUILLE_ETUDIANTS} » : une ligne par étudiant inscrit en ${p.libelle}.`,
-    `Feuille « ${FEUILLE_PAIEMENTS} » : une ligne par paiement déjà reçu pour ${p.libelle} (droits et mensualités). Les impayés des années précédentes ne sont pas repris.`,
     "Les colonnes marquées * sont obligatoires. Ne renommez pas les colonnes ; la ligne d'aide (ligne 2) peut rester ou être supprimée.",
     "Les lignes d'exemple sont à remplacer par les vôtres : l'import refuse un fichier qui les contient encore.",
     "",
@@ -229,20 +205,18 @@ export function consignesImport(p: ParametresModele): string[] {
     ...anneesAbsentes,
     "",
     "Saisie dans Excel :",
-    "• téléphone et n° de reçu papier en texte (cellule au format Texte, ou valeur précédée d'une apostrophe : '0412) : sinon Excel retire le 0 initial ;",
-    "• dates au format JJ/MM/AAAA ; montants en ariary, nombres entiers sans « Ar » ;",
-    "• Mobile Money : l'opérateur est obligatoire ; sans référence, le paiement est accepté avec un avertissement.",
+    "• téléphones et CIN en texte (cellule au format Texte, ou valeur précédée d'une apostrophe : '0341234567) : sinon Excel retire le 0 initial ;",
+    "• dates au format JJ/MM/AAAA.",
     "",
     "Ce que fait l'import :",
     "• le matricule est attribué automatiquement, par filière et année d'entrée puis dans l'ordre des N° ; il porte l'année d'entrée (ex. SF-2025-0001) ;",
     `• chaque étudiant est inscrit sur ${p.libelle} seulement, au niveau indiqué : droits d'inscription + ${periodeMensualites(p)}, d'après les tarifs de Paramètres ;`,
-    "• chaque paiement est réparti comme au guichet, de l'échéance la plus ancienne à la plus récente ; un montant au-delà du reste dû est refusé ;",
-    "• chaque paiement reçoit un reçu R-…, daté du jour indiqué ; le n° du reçu papier est gardé en observation ;",
+    `• les paiements ne sont pas repris : tout l'écolage de ${p.libelle} est dû, rien n'est dû sur les années précédentes. Un paiement déjà reçu s'encaisse au guichet ;`,
     "• rien n'est enregistré avant votre validation : un rapport liste d'abord les lignes acceptées et refusées, avec la raison ;",
     "• un fichier qui contient une erreur n'importe rien : corrigez-le et déposez-le à nouveau ;",
-    "• un étudiant déjà présent (mêmes nom, prénoms et date de naissance) n'est pas recréé ; un paiement déjà importé ne l'est pas deux fois ;",
-    "• un import ne s'annule pas : un paiement importé à tort s'annule comme les autres, dans Paiements.",
+    "• un étudiant déjà présent (mêmes nom, prénoms et date de naissance) n'est pas recréé : le même fichier peut être déposé deux fois ;",
+    "• un import ne s'annule pas : vérifiez le rapport avant de le lancer.",
     "",
-    `Version CSV : enregistrez chaque feuille séparément (« CSV UTF-8 », séparateur point-virgule), soit etudiants.csv et paiements.csv.`,
+    `Version CSV : enregistrez la feuille « ${FEUILLE_ETUDIANTS} » au format « CSV UTF-8 » (séparateur point-virgule), soit etudiants.csv.`,
   ];
 }

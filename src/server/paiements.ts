@@ -1,9 +1,15 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
-import { anneeCivile, dateHeureMadagascar, jourMadagascar } from "@/lib/dates";
+import { anneeCivile, dateHeureMadagascar, jourMadagascar, lireJour, type Jour } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { repartirPaiement, resteDuTotal, restesApres, type LigneRepartie } from "@/lib/ecolage";
-import { LIBELLE_MODE, LIBELLE_OPERATEUR, MESSAGE_SITUATION_CHANGEE, type Encaissement } from "@/lib/encaissement";
+import {
+  LIBELLE_MODE,
+  LIBELLE_OPERATEUR,
+  MESSAGE_MOIS_CHANGE,
+  MESSAGE_SITUATION_CHANGEE,
+  type Encaissement,
+} from "@/lib/encaissement";
 import {
   anneeDuRecu,
   imputerJusquAuReste,
@@ -31,6 +37,12 @@ export const ID_CLIENT_AUTRE_ETUDIANT =
 const TOLERANCE_HORLOGE_MS = 10 * 60_000;
 
 export type PaiementEnLigne = Encaissement & { saisiParId: string; instant: Date };
+
+function memeMois(a: Jour, b: Jour): boolean {
+  const x = lireJour(a);
+  const y = lireJour(b);
+  return x.annee === y.annee && x.mois === y.mois;
+}
 /** `recuLe` : instant de réception par le serveur, lu une fois par l'appelant. */
 export type PaiementHorsLigne = ElementFile & { recuLe: Date };
 
@@ -174,13 +186,15 @@ export async function enregistrerPaiement(
   const jour = jourMadagascar(date);
   const notes: string[] = horsLigne?.noteHeure ? [horsLigne.noteHeure] : [];
 
-  const nonSoldees = (await echeancesEtudiant(tx, entree.etudiantId))
+  const nonSoldees = (await echeancesEtudiant(tx, entree.etudiantId, jour))
     .map((e) => ({ ...e, reste: Math.max(0, e.montantDu - e.paye) }))
     .filter((e) => e.reste > 0);
   const total = resteDuTotal(nonSoldees);
 
   let lignes: LigneRepartie[];
   if (!horsLigne) {
+    const { jourAffiche } = entree as PaiementEnLigne;
+    if (!memeMois(jourAffiche, jour)) return refus(echecCode("SITUATION_CHANGEE", MESSAGE_MOIS_CHANGE));
     if (total !== entree.resteDuAffiche) return refus(echecCode("SITUATION_CHANGEE", MESSAGE_SITUATION_CHANGEE));
     const repartition = repartirPaiement(nonSoldees, entree.montant);
     if (!repartition.ok) return refus(echec(repartition.erreur, { montant: repartition.erreur }));
@@ -200,6 +214,7 @@ export async function enregistrerPaiement(
     lignes = imputation.lignes;
   }
   const { resteApres, retardApres } = restesApres(nonSoldees, lignes, jour);
+  const libelles = new Map(nonSoldees.map((e) => [e.id, e.libelle]));
 
   let numeroRecu = horsLigne?.numeroRecu ?? null;
   if (!numeroRecu) {
@@ -230,7 +245,12 @@ export async function enregistrerPaiement(
       resteApres,
       retardApres,
       lignes: {
-        create: lignes.map((l) => ({ echeanceId: l.echeanceId, montant: l.montant, resteEcheanceApres: l.resteEcheance })),
+        create: lignes.map((l) => ({
+          echeanceId: l.echeanceId,
+          montant: l.montant,
+          resteEcheanceApres: l.resteEcheance,
+          libelle: libelles.get(l.echeanceId) ?? null,
+        })),
       },
     },
     select: { id: true },

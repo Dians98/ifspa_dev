@@ -1,30 +1,36 @@
 import { describe, expect, it } from "vitest";
 import { construireRecu, type LigneRecuSource, type SourceRecu } from "@/lib/encaissement";
 import { montantEnLettres } from "@/lib/montant-en-lettres";
-import { controleTranchesModifiables, estDoublon, libelleNiveauInscription } from "@/lib/etudiants";
+import type { TypeEcheance } from "@/generated/prisma/enums";
+import { estDoublon, libelleNiveauInscription } from "@/lib/etudiants";
 
 const mois = (iso: string) => new Date(`${iso}T00:00:00Z`);
 
-function ligne(
-  type: "DROITS" | "MENSUALITE",
-  moisIso: string,
-  ordre: number,
-  montant: number,
-  resteEcheanceApres = 0,
-  options: { tranche?: number | null; anneeDebut?: number; droitsEnTranches?: number } = {},
-): LigneRecuSource {
+type OptionsLigne = {
+  anneeDebut?: number;
+  /** Libellé figé sur la ligne à l'émission ; absent : recalculé. */
+  libelle?: string | null;
+  rangFrais?: number | null;
+  /** Libellé courant du frais, tel que la base le porte aujourd'hui. */
+  libelleFrais?: string | null;
+};
+
+let idLigne = 0;
+
+function ligne(type: TypeEcheance, moisIso: string, montant: number, resteEcheanceApres = 0, options: OptionsLigne = {}): LigneRecuSource {
   const anneeDebut = options.anneeDebut ?? 2026;
   return {
     montant,
     resteEcheanceApres,
+    libelle: options.libelle ?? null,
     echeance: {
+      id: `ech-${++idLigne}`,
       type,
-      tranche: options.tranche ?? (type === "DROITS" ? 1 : null),
       mois: mois(moisIso),
-      ordre,
-      droitsEnTranches: options.droitsEnTranches ?? 1,
       anneeDebut,
       anneeLibelle: `${anneeDebut}-${anneeDebut + 1}`,
+      rangFrais: options.rangFrais ?? null,
+      libelleFrais: options.libelleFrais ?? null,
     },
   };
 }
@@ -51,9 +57,9 @@ function source(lignes: LigneRecuSource[], surcharge: Partial<SourceRecu> = {}):
 
 describe("construireRecu", () => {
   const trois = [
-    ligne("MENSUALITE", "2026-11-01", 4, 20_000, 60_000),
-    ligne("DROITS", "2026-10-01", 1, 100_000),
-    ligne("MENSUALITE", "2026-10-01", 2, 80_000),
+    ligne("MENSUALITE", "2026-11-01", 20_000, 60_000),
+    ligne("DROITS", "2026-12-01", 100_000),
+    ligne("MENSUALITE", "2026-10-01", 80_000),
   ];
 
   it("trie les lignes dans l'ordre de solde et marque l'acompte avec le reste de l'échéance", () => {
@@ -94,24 +100,61 @@ describe("construireRecu", () => {
     expect(b).toEqual(a);
   });
 
-  it("tranches de droits : « Droits — tranche 2/3 » placée entre les mensualités de son mois", () => {
+  it("droits payés en plusieurs fois : chaque ligne s'appelle « Droits d'inscription », sans tranche", () => {
+    const r = construireRecu(source([ligne("DROITS", "2026-12-01", 40_000, 60_000)]));
+    expect(r.lignes).toEqual([{ libelle: "Droits d'inscription", montant: 40_000, acompte: true, resteEcheance: 60_000 }]);
+    expect(JSON.stringify(r)).not.toMatch(/tranche/i);
+  });
+
+  it("frais : ordre de solde du jour du paiement, mensualité due, puis frais dû, puis mensualité à venir", () => {
     const lignes = [
-      ligne("MENSUALITE", "2026-11-01", 4, 80_000, 0, { droitsEnTranches: 3 }),
-      ligne("DROITS", "2026-11-01", 3, 33_000, 0, { tranche: 2, droitsEnTranches: 3 }),
-      ligne("DROITS", "2026-10-01", 1, 34_000, 0, { tranche: 1, droitsEnTranches: 3 }),
+      ligne("MENSUALITE", "2027-04-01", 10_000, 70_000),
+      ligne("FRAIS", "2027-03-01", 15_000, 0, { libelle: "Frais d'examen", rangFrais: 1 }),
+      ligne("MENSUALITE", "2027-03-01", 80_000),
     ];
-    expect(construireRecu(source(lignes)).lignes.map((l) => l.libelle)).toEqual([
-      "Droits — tranche 1/3",
-      "Droits — tranche 2/3",
-      "Novembre 2026",
-    ]);
+    const r = construireRecu(source(lignes, { instant: new Date("2027-03-10T07:00:00Z") }));
+    expect(r.lignes.map((l) => l.libelle)).toEqual(["Mars 2027", "Frais d'examen", "Avril 2027"]);
+  });
+
+  it("le même paiement émis le 1er avril place la mensualité d'avril, devenue exigible, avant le frais", () => {
+    const lignes = [
+      ligne("FRAIS", "2027-03-01", 15_000, 0, { libelle: "Frais d'examen", rangFrais: 1 }),
+      ligne("MENSUALITE", "2027-04-01", 80_000),
+    ];
+    const r = construireRecu(source(lignes, { instant: new Date("2027-04-01T07:00:00Z") }));
+    expect(r.lignes.map((l) => l.libelle)).toEqual(["Avril 2027", "Frais d'examen"]);
+  });
+
+  it("deux frais du même mois : dans l'ordre de création", () => {
+    const lignes = [
+      ligne("FRAIS", "2027-03-01", 5_000, 0, { libelle: "Second", rangFrais: 9 }),
+      ligne("FRAIS", "2027-03-01", 5_000, 0, { libelle: "Premier", rangFrais: 2 }),
+    ];
+    expect(construireRecu(source(lignes)).lignes.map((l) => l.libelle)).toEqual(["Premier", "Second"]);
+  });
+
+  it("libellé figé à l'émission : un frais renommé ensuite ne change pas le reçu réimprimé", () => {
+    const lignes = [ligne("FRAIS", "2027-03-01", 15_000, 0, { libelle: "Frais de stage", libelleFrais: "Stage hospitalier", rangFrais: 1 })];
+    expect(construireRecu(source(lignes)).lignes[0].libelle).toBe("Frais de stage");
+  });
+
+  it("ligne sans libellé figé (reçu ancien) : libellé courant du frais, « Frais » à défaut", () => {
+    const avec = [ligne("FRAIS", "2027-03-01", 15_000, 0, { libelleFrais: "Frais d'examen", rangFrais: 1 })];
+    const sans = [ligne("FRAIS", "2027-03-01", 15_000, 0, { rangFrais: 1 })];
+    expect(construireRecu(source(avec)).lignes[0].libelle).toBe("Frais d'examen");
+    expect(construireRecu(source(sans)).lignes[0].libelle).toBe("Frais");
+  });
+
+  it("frais payé en partie : acompte avec le reste du frais", () => {
+    const r = construireRecu(source([ligne("FRAIS", "2027-03-01", 5_000, 10_000, { libelle: "Frais d'examen", rangFrais: 1 })]));
+    expect(r.lignes).toEqual([{ libelle: "Frais d'examen", montant: 5_000, acompte: true, resteEcheance: 10_000 }]);
   });
 
   it("deux années sur un reçu : les droits portent l'année, les mensualités gardent leur mois", () => {
     const lignes = [
-      ligne("DROITS", "2026-10-01", 1, 50_000, 50_000),
-      ligne("MENSUALITE", "2026-07-01", 11, 70_000, 0, { anneeDebut: 2025 }),
-      ligne("DROITS", "2025-10-01", 1, 100_000, 0, { anneeDebut: 2025 }),
+      ligne("DROITS", "2026-12-01", 50_000, 50_000),
+      ligne("MENSUALITE", "2026-07-01", 70_000, 0, { anneeDebut: 2025 }),
+      ligne("DROITS", "2025-12-01", 100_000, 0, { anneeDebut: 2025 }),
     ];
     const r = construireRecu(source(lignes, { inscription: { niveau: 2, redoublement: false, anneeLibelle: "2026-2027" } }));
     expect(r.lignes.map((l) => l.libelle)).toEqual([
@@ -123,7 +166,7 @@ describe("construireRecu", () => {
   });
 
   it("une seule année : les droits restent sans année", () => {
-    expect(construireRecu(source([ligne("DROITS", "2026-10-01", 1, 100_000)])).lignes[0].libelle).toBe("Droits d'inscription");
+    expect(construireRecu(source([ligne("DROITS", "2026-12-01", 100_000)])).lignes[0].libelle).toBe("Droits d'inscription");
   });
 
   it("Mobile Money : libellés du mode et de l'opérateur, référence conservée", () => {
@@ -170,23 +213,6 @@ describe("estDoublon", () => {
 
   it("l'heure de la date est ignorée : seul le jour compte", () => {
     expect(estDoublon(base, { ...base, dateNaissance: new Date("2005-03-14T10:00:00Z") })).toBe(true);
-  });
-});
-
-describe("controleTranchesModifiables", () => {
-  it("modifiable : année ouverte et aucune ligne de paiement sur les droits", () => {
-    expect(controleTranchesModifiables({ lignesPaiementDroits: 0, anneeLibelle: "2026-2027", anneeCloturee: false })).toBeNull();
-  });
-
-  it("refusé dès une ligne de paiement sur les droits (même annulée)", () => {
-    expect(controleTranchesModifiables({ lignesPaiementDroits: 1, anneeLibelle: "2026-2027", anneeCloturee: false })).toMatch(/même annulés/);
-  });
-
-  it("refusé sur une année clôturée, avec son libellé ; la clôture est annoncée avant les paiements", () => {
-    expect(controleTranchesModifiables({ lignesPaiementDroits: 0, anneeLibelle: "2025-2026", anneeCloturee: true })).toBe(
-      "L'année 2025-2026 est clôturée : son échéancier ne se modifie plus.",
-    );
-    expect(controleTranchesModifiables({ lignesPaiementDroits: 3, anneeLibelle: "2025-2026", anneeCloturee: true })).toMatch(/clôturée/);
   });
 });
 

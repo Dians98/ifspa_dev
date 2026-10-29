@@ -27,7 +27,7 @@ type Entree = z.input<typeof schemaCreationEtudiant>;
 type Sortie = z.output<typeof schemaCreationEtudiant>;
 type Filiere = ContexteInscription["filieres"][number];
 
-const CHAMPS = [...CHAMPS_IDENTITE, "filiereId", "niveau", "droitsEnTranches"] as const;
+const CHAMPS = [...CHAMPS_IDENTITE, "filiereId", "niveau"] as const;
 
 /** Pas d'année courante, année clôturée ou aucune filière : rien à saisir, on explique quoi faire. */
 function InscriptionImpossible({ message, estAdmin, lien, libelleLien }: { message: string; estAdmin: boolean; lien: string; libelleLien: string }) {
@@ -102,12 +102,11 @@ function FormulaireInscription({
       tuteurProfession: "",
       filiereId: contexte.filieres.length === 1 ? contexte.filieres[0].id : "",
       niveau: 1,
-      droitsEnTranches: 1,
       confirmerDoublon: false,
     },
   });
   const { errors, isSubmitting } = form.formState;
-  const [filiereId, niveau, droitsEnTranches] = useWatch({ control: form.control, name: ["filiereId", "niveau", "droitsEnTranches"] });
+  const [filiereId, niveau] = useWatch({ control: form.control, name: ["filiereId", "niveau"] });
 
   const filiere: Filiere | undefined = contexte.filieres.find((f) => f.id === filiereId);
   const niveauChoisi = filiere?.niveaux.find((n) => n.niveau === niveau);
@@ -126,14 +125,11 @@ function FormulaireInscription({
     if (doublon) alerteDoublon.current?.focus();
   }, [doublon]);
 
-  /** Garde une valeur valable quand la filière ou le niveau change : niveau existant, découpage des droits possible. */
+  /** Garde un niveau existant quand la filière change. */
   function ajuster(f: Filiere | undefined, n: number) {
     if (!f) return;
     const niveauFinal = n > f.dureeAnnees ? 1 : n;
     if (niveauFinal !== n) form.setValue("niveau", niveauFinal);
-    const t = f.niveaux.find((x) => x.niveau === niveauFinal)?.tarif;
-    const actuel = form.getValues("droitsEnTranches");
-    if (t?.tranches.find((x) => x.n === actuel)?.refus) form.setValue("droitsEnTranches", 1);
   }
 
   async function enregistrer(confirmer: boolean) {
@@ -156,7 +152,6 @@ function FormulaireInscription({
   const soumettreConfirme = form.handleSubmit(() => enregistrer(true));
 
   const occupe = isSubmitting || redirige;
-  const droitsChoisis = tarif?.tranches.find((t) => t.n === droitsEnTranches);
 
   return (
     <FormProvider {...form}>
@@ -275,49 +270,6 @@ function FormulaireInscription({
                 />
               </ChampFormulaire>
 
-              <FieldSet>
-                <FieldLegend variant="label">Paiement des droits d&apos;inscription</FieldLegend>
-                <Controller
-                  control={form.control}
-                  name="droitsEnTranches"
-                  render={({ field }) => (
-                    <RadioGroup
-                      value={String(field.value ?? 1)}
-                      onValueChange={(v) => field.onChange(Number(v))}
-                      onBlur={field.onBlur}
-                      aria-invalid={errors.droitsEnTranches ? true : undefined}
-                      aria-describedby="creation-droits-aide"
-                      className="flex flex-wrap gap-2"
-                    >
-                      {[1, 2, 3].map((n) => (
-                        <ChoixRadio
-                          key={n}
-                          id={`creation-droits-${n}`}
-                          valeur={String(n)}
-                          disabled={Boolean(tarif?.tranches.find((t) => t.n === n)?.refus)}
-                        >
-                          En {n} fois
-                        </ChoixRadio>
-                      ))}
-                    </RadioGroup>
-                  )}
-                />
-                <p id="creation-droits-aide" aria-live="polite" className="text-sm text-muted-foreground">
-                  {droitsChoisis?.montants
-                    ? droitsEnTranches === 1
-                      ? `${formaterAriary(droitsChoisis.montants[0])} à payer à l'inscription (${annee.libelleMoisDebut}).`
-                      : droitsChoisis.montants
-                          .map((m, k) => `${formaterAriary(m)} ${k === 0 ? `à l'inscription (${annee.moisTranches[0]})` : `en ${annee.moisTranches[k]}`}`)
-                          .join(" · ")
-                    : "Choisissez une filière et un niveau pour voir les montants."}
-                </p>
-                {tarif?.tranches.some((t) => t.refus) && (
-                  <p className="text-sm text-muted-foreground">
-                    {tarif.tranches.find((t) => t.refus)?.refus}
-                  </p>
-                )}
-                {errors.droitsEnTranches?.message && <FieldError>{errors.droitsEnTranches.message}</FieldError>}
-              </FieldSet>
             </div>
           </PanneauParametre>
         </div>
@@ -341,15 +293,13 @@ function FormulaireInscription({
             <h3 className="text-sm font-medium text-muted-foreground">Écolage {annee.libelle}</h3>
             {tarif ? (
               <dl className="mt-2 grid gap-1.5 text-sm tabular-nums">
-                {droitsChoisis?.montants?.map((m, k) => (
-                  <div key={k} className="flex justify-between gap-3">
-                    <dt>
-                      {droitsEnTranches === 1 ? "Droits d'inscription" : `Droits ${k + 1}/${droitsEnTranches}`}
-                      <span className="text-muted-foreground"> · {annee.moisTranches[k]}</span>
-                    </dt>
-                    <dd>{formaterAriary(m)}</dd>
-                  </div>
-                ))}
+                <div className="flex justify-between gap-3">
+                  <dt>
+                    Droits d&apos;inscription
+                    <span className="block text-xs text-muted-foreground">exigibles en {annee.moisDroits}</span>
+                  </dt>
+                  <dd>{formaterAriary(tarif.droitsInscription)}</dd>
+                </div>
                 <div className="flex justify-between gap-3">
                   <dt>{tarif.nombreMois} mensualités de</dt>
                   <dd>{formaterAriary(tarif.montantMensuel)}</dd>
@@ -376,6 +326,23 @@ function FormulaireInscription({
               </p>
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">Le détail apparaît dès que la filière est choisie.</p>
+            )}
+            {niveauChoisi && niveauChoisi.frais.length > 0 && (
+              <div className="mt-4 border-t pt-3">
+                <h4 className="text-sm font-medium text-muted-foreground">Frais déjà prévus pour cette classe</h4>
+                <ul className="mt-2 grid gap-1.5 text-sm tabular-nums">
+                  {niveauChoisi.frais.map((f) => (
+                    <li key={f.id} className="flex justify-between gap-3">
+                      <span>
+                        {f.libelle}
+                        <span className="block text-xs text-muted-foreground">exigible en {f.libelleMois}</span>
+                      </span>
+                      <span>{formaterAriary(f.montant)}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-muted-foreground">Ajoutés à l&apos;écolage de l&apos;étudiant, en plus du total de l&apos;année.</p>
+              </div>
             )}
             <p className="mt-3 text-xs text-muted-foreground">
               Les montants sont copiés du tarif d&apos;aujourd&apos;hui : un changement de tarif ne modifiera pas cet échéancier.

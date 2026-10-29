@@ -1,13 +1,6 @@
 import type { ContexteReprise, EtudiantEnBase } from "@/lib/import-analyse";
-import { genererEcheances, type EcheancePayee } from "@/lib/ecolage";
 import { lireReprise, type Cellule, type FeuilleLue, type RepriseLue } from "@/lib/import-lecture";
-import {
-  COLONNES_PAIEMENTS,
-  colonnesEtudiantsModele,
-  PARAMETRES_MODELE_EXEMPLE,
-  type CleEtudiant,
-  type ClePaiement,
-} from "@/lib/import-modele";
+import { colonnesEtudiantsModele, PARAMETRES_MODELE_EXEMPLE, type CleEtudiant } from "@/lib/import-modele";
 
 // Données de la reprise sans base : tableaux de cellules, contexte d'analyse et étudiants « en base » écrits à la main.
 
@@ -32,21 +25,12 @@ const ETUDIANT_PAR_DEFAUT: Record<CleEtudiant, Valeur> = {
   anneeEntree: "2026",
   niveau: "1",
   redoublant: "non",
-  droitsEnTranches: "1",
-};
-
-const PAIEMENT_PAR_DEFAUT: Record<ClePaiement, Valeur> = {
-  numeroEtudiant: "1",
-  date: "05/10/2026",
-  montant: "100000",
-  mode: "Espèces",
-  operateur: null,
-  reference: null,
-  recuPapier: null,
 };
 
 const ENTETES_ETUDIANTS = colonnesEtudiantsModele(PARAMETRES_MODELE_EXEMPLE).map((c) => ({ cle: c.cle, entete: c.obligatoire ? `${c.entete} *` : c.entete }));
-const ENTETES_PAIEMENTS = COLONNES_PAIEMENTS.map((c) => ({ cle: c.cle, entete: c.obligatoire ? `${c.entete} *` : c.entete }));
+
+/** En-têtes de la feuille Paiements des anciens modèles, avant le 29/10/2026. */
+export const ENTETES_ANCIENS_PAIEMENTS = ["N° étudiant *", "Date *", "Montant (Ar) *", "Mode *", "Opérateur", "Référence", "N° reçu papier"];
 
 /** En-têtes du modèle puis une ligne par élément ; `enteteNiveau` remplace « Niveau 2026-2027 * ». */
 export function tableauEtudiants(
@@ -60,17 +44,14 @@ export function tableauEtudiants(
   ];
 }
 
-export function tableauPaiements(lignes: Partial<Record<ClePaiement, Valeur>>[]): Valeur[][] {
-  return [ENTETES_PAIEMENTS.map((c) => c.entete), ...lignes.map((l) => ENTETES_PAIEMENTS.map((c) => (c.cle in l ? l[c.cle]! : PAIEMENT_PAR_DEFAUT[c.cle])))];
+/** Feuille Paiements d'un ancien modèle, `n` lignes remplies : la reprise doit l'ignorer. */
+export function tableauAnciensPaiements(n = 1): Valeur[][] {
+  return [ENTETES_ANCIENS_PAIEMENTS, ...Array.from({ length: n }, (_, i) => ["1", "05/10/2026", String(100_000 + i), "Espèces", null, null, null])];
 }
 
-/** Fichier lu comme le fait `lireReprise` ; `paiements` omis : aucun paiement ; null : pas de fichier de paiements. */
-export function reprise(
-  etudiants: Partial<Record<CleEtudiant, Valeur>>[],
-  paiements: Partial<Record<ClePaiement, Valeur>>[] | null = [],
-  options: Parameters<typeof tableauEtudiants>[1] = {},
-): RepriseLue {
-  return lireReprise({ etudiants: tableauEtudiants(etudiants, options), paiements: paiements ? tableauPaiements(paiements) : null });
+/** Fichier lu comme le fait `lireReprise`. */
+export function reprise(etudiants: Partial<Record<CleEtudiant, Valeur>>[], options: Parameters<typeof tableauEtudiants>[1] = {}): RepriseLue {
+  return lireReprise(tableauEtudiants(etudiants, options));
 }
 
 /** Feuille déjà lue à partir de cellules simples, pour tester la validation sans passer par les en-têtes. */
@@ -101,7 +82,7 @@ export const TARIF_STANDARD = { droitsInscription: 100_000, montantMensuel: 80_0
 /** Année 2026-2027 courante ; IF (niveaux 1 à 3) et SF (niveau 1) tarifées ; OLD désactivée ; 2024 et 2025 clôturées. */
 export function contexteReprise(surcharge: Partial<ContexteReprise> = {}): ContexteReprise {
   return {
-    anneeCourante: { id: "annee-2026", anneeDebut: 2026, libelle: "2026-2027", cloturee: false, moisDebutEcolage: 10, dateDebut: "2026-10-01" },
+    anneeCourante: { id: "annee-2026", anneeDebut: 2026, libelle: "2026-2027", cloturee: false, moisDebutEcolage: 10 },
     filieres: [
       { id: "fil-if", code: "IF", nom: "Infirmier(e)s", dureeAnnees: 3, actif: true },
       { id: "fil-sf", code: "SF", nom: "Sage-femmes", dureeAnnees: 3, actif: true },
@@ -118,23 +99,10 @@ export function contexteReprise(surcharge: Partial<ContexteReprise> = {}): Conte
       { filiereId: "fil-if", niveau: 3, ...TARIF_STANDARD },
       { filiereId: "fil-sf", niveau: 1, ...TARIF_STANDARD },
     ],
+    frais: [],
     etudiantsEnBase: [],
-    clesReprise: new Set(),
-    compteursRecu: {},
     ...surcharge,
   };
-}
-
-/** Échéances d'une année générées comme en production ; `paye` donne ce qui est déjà payé sur chacune (ordre 1 = droits). */
-export function echeancesPayees(anneeDebut: number, paye: (ordre: number) => number = () => 0, droitsEnTranches = 1): EcheancePayee[] {
-  return genererEcheances(TARIF_STANDARD, { anneeDebut, moisDebutEcolage: 10 }, droitsEnTranches).map((e) => ({
-    id: `e${anneeDebut}-${e.ordre}`,
-    anneeDebut,
-    mois: e.mois,
-    ordre: e.ordre,
-    montantDu: e.montantDu,
-    paye: paye(e.ordre),
-  }));
 }
 
 /** Même identité que la ligne par défaut du fichier (RAKOTO Jean, né le 10/05/2004), inscrit en 1re année IF. */
@@ -148,9 +116,7 @@ export function etudiantEnBase(surcharge: Partial<EtudiantEnBase> = {}): Etudian
     filiereId: "fil-if",
     anneeEntree: 2026,
     statut: "ACTIF",
-    inscriptionCourante: { niveau: 1, redoublement: false, droitsEnTranches: 1 },
-    echeances: echeancesPayees(2026),
-    paiementsHorsReprise: 0,
+    inscriptionCourante: { niveau: 1, redoublement: false },
     ...surcharge,
   };
 }
@@ -171,20 +137,24 @@ export function versCsv(tableau: Tableau): string {
 
 export type Depot = { nom: string; contenu: string | Uint8Array }[];
 
-export function depotCsv(etudiants: Parameters<typeof tableauEtudiants>[0], paiements: Parameters<typeof tableauPaiements>[0] | null = []): Depot {
+/** `anciensPaiements` : ajoute le paiements.csv d'un ancien modèle, avec ce nombre de lignes. */
+export function depotCsv(etudiants: Parameters<typeof tableauEtudiants>[0], anciensPaiements?: number): Depot {
   return [
     { nom: "etudiants.csv", contenu: versCsv(tableauEtudiants(etudiants)) },
-    ...(paiements ? [{ nom: "paiements.csv", contenu: versCsv(tableauPaiements(paiements)) }] : []),
+    ...(anciensPaiements !== undefined ? [{ nom: "paiements.csv", contenu: versCsv(tableauAnciensPaiements(anciensPaiements)) }] : []),
   ];
 }
 
-export async function depotXlsx(etudiants: Parameters<typeof tableauEtudiants>[0], paiements: Parameters<typeof tableauPaiements>[0] = []): Promise<Depot> {
+/** `anciensPaiements` : ajoute la feuille Paiements d'un ancien modèle, avec ce nombre de lignes. */
+export async function depotXlsx(etudiants: Parameters<typeof tableauEtudiants>[0], anciensPaiements?: number): Promise<Depot> {
   const { default: writeXlsxFile } = await import("write-excel-file/node");
   const feuille = (sheet: string, t: Tableau) => ({
     sheet,
     data: t.map((r) => r.map((v) => (v === null ? null : { value: String(v), type: String }))),
   });
-  const classeur = await writeXlsxFile([feuille("Étudiants", tableauEtudiants(etudiants)), feuille("Paiements", tableauPaiements(paiements))]).toBuffer();
+  const feuilles = [feuille("Étudiants", tableauEtudiants(etudiants))];
+  if (anciensPaiements !== undefined) feuilles.push(feuille("Paiements", tableauAnciensPaiements(anciensPaiements)));
+  const classeur = await writeXlsxFile(feuilles).toBuffer();
   return [{ nom: "reprise.xlsx", contenu: new Uint8Array(classeur) }];
 }
 

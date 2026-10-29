@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ModePaiement, OperateurMobile, type TypeEcheance } from "@/generated/prisma/enums";
-import { dateHeureMadagascar } from "@/lib/dates";
+import { dateHeureMadagascar, lireJour } from "@/lib/dates";
 import { libelleEcheance, trierPourSolde } from "@/lib/ecolage";
 import { libelleNiveauInscription } from "@/lib/etudiants";
 import { montantEnLettres } from "@/lib/montant-en-lettres";
@@ -73,13 +73,29 @@ export function controleMobileMoney(
   }
 }
 
-export const schemaEncaissement = z.object(champsEncaissement, DONNEES_INVALIDES).superRefine(controleMobileMoney);
+/** Jour de la situation affichée (`SituationGuichet.jour`) : l'ordre de solde et les retards changent avec le mois. */
+const champJourAffiche = z.string(DONNEES_INVALIDES).refine((v) => {
+  try {
+    lireJour(v);
+    return true;
+  } catch {
+    return false;
+  }
+}, DONNEES_INVALIDES.error);
+
+export const schemaEncaissement = z
+  .object({ ...champsEncaissement, jourAffiche: champJourAffiche }, DONNEES_INVALIDES)
+  .superRefine(controleMobileMoney);
 export type EntreeEncaissement = z.input<typeof schemaEncaissement>;
 export type Encaissement = z.output<typeof schemaEncaissement>;
 
 /** Deux postes en ligne sur le même étudiant : le second est refusé plutôt que réparti sur ce qui reste. */
 export const MESSAGE_SITUATION_CHANGEE =
   "La situation de l'étudiant a changé (paiement saisi sur un autre poste). Vérifiez avant d'encaisser.";
+
+/** Page ouverte avant un changement de mois : ordre de solde et retards ne sont plus ceux affichés. */
+export const MESSAGE_MOIS_CHANGE =
+  "Le mois a changé depuis l'affichage de cette situation : rouvrez l'étudiant pour voir ce qu'il doit aujourd'hui.";
 
 export const MOTIF_MIN = 5;
 
@@ -105,7 +121,7 @@ export const schemaVerificationPaiement = z.object(
 export type EntreeVerificationPaiement = z.input<typeof schemaVerificationPaiement>;
 
 export type LigneRecu = {
-  /** « Droits d'inscription », « Droits — tranche 2/3 », « Octobre 2026 ». */
+  /** « Droits d'inscription », « Octobre 2026 », ou le libellé du frais au jour du paiement. */
   libelle: string;
   montant: number;
   /** Échéance payée en partie par ce paiement : mention « acompte » et `resteEcheance`. */
@@ -153,15 +169,18 @@ export type DonneesRecu = {
 export type LigneRecuSource = {
   montant: number;
   resteEcheanceApres: number;
+  /** Libellé figé à l'émission (`PaiementLigne.libelle`) ; null sur une ligne plus ancienne, recalculé. */
+  libelle: string | null;
   echeance: {
+    id: string;
     type: TypeEcheance;
-    tranche: number | null;
     mois: Date;
-    ordre: number;
-    droitsEnTranches: number;
     anneeDebut: number;
     /** « 2026-2027 » */
     anneeLibelle: string;
+    rangFrais: number | null;
+    /** Libellé courant du frais, pour une ligne sans libellé figé. */
+    libelleFrais: string | null;
   };
 };
 
@@ -186,13 +205,15 @@ export type SourceRecu = {
 
 /** Même fonction à l'émission et à la réimpression : le ticket réimprimé est identique à l'original. */
 export function construireRecu(s: SourceRecu): DonneesRecu {
-  const { date, heure } = dateHeureMadagascar(s.instant);
+  const { jour, date, heure } = dateHeureMadagascar(s.instant);
   const plusieursAnnees = new Set(s.lignes.map((l) => l.echeance.anneeDebut)).size > 1;
+  // Trié au jour du paiement, pas au jour de la réimpression : le ticket réimprimé garde l'ordre d'origine.
   const triees = trierPourSolde(
-    s.lignes.map((l) => ({ ...l, mois: l.echeance.mois, anneeDebut: l.echeance.anneeDebut, ordre: l.echeance.ordre })),
+    s.lignes.map((l) => ({ ...l, ...l.echeance })),
+    jour,
   );
   const lignes: LigneRecu[] = triees.map((l) => {
-    const libelle = libelleEcheance(l.echeance, l.echeance.droitsEnTranches);
+    const libelle = l.libelle ?? libelleEcheance(l.echeance);
     // Deux années sur un même reçu : « Droits d'inscription » seul serait ambigu.
     const precise = plusieursAnnees && l.echeance.type === "DROITS" ? `${libelle} ${l.echeance.anneeLibelle}` : libelle;
     return { libelle: precise, montant: l.montant, acompte: l.resteEcheanceApres > 0, resteEcheance: l.resteEcheanceApres };

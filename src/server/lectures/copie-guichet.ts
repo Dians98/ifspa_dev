@@ -18,9 +18,10 @@ import { SELECT_SOURCE_GUICHET, sourceGuichet } from "@/server/lectures/paiement
  * leurs échéances élaguées par `elaguerPourCopie`, sans tarifs (décisions 38 et 39). Trois requêtes, quel que soit l'effectif.
  */
 export async function copieGuichet(maintenant: Date = new Date()): Promise<CopieGuichet> {
+  const jour = jourMadagascar(maintenant);
   const sortisQuiDoivent = await db.$queryRaw<{ id: string }[]>`
     SELECT e.id FROM etudiant e
-    JOIN (${sqlRestes(dateLimiteRetard(jourMadagascar(maintenant)), null)}) r ON r."etudiantId" = e.id
+    JOIN (${sqlRestes(dateLimiteRetard(jour), null)}) r ON r."etudiantId" = e.id
     WHERE e.statut <> 'ACTIF' AND r."resteDu" > 0`;
   const population: Prisma.EtudiantWhereInput = {
     OR: [{ statut: "ACTIF" }, { id: { in: sortisQuiDoivent.map((s) => s.id) } }],
@@ -28,10 +29,9 @@ export async function copieGuichet(maintenant: Date = new Date()): Promise<Copie
 
   const [etudiants, echeances] = await Promise.all([
     db.etudiant.findMany({ where: population, orderBy: [{ nom: "asc" }, { prenoms: "asc" }], select: SELECT_SOURCE_GUICHET }),
-    echeancesDesEtudiants(db, population),
+    echeancesDesEtudiants(db, population, jour),
   ]);
 
-  const jour = jourMadagascar(maintenant);
   const copie: EtudiantCopie[] = [];
   for (const e of etudiants) {
     const complet: EtudiantCopie = { ...sourceGuichet(e), echeances: (echeances.get(e.id) ?? []).map(echeanceCopie) };

@@ -1,6 +1,5 @@
-import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fabriquerAnnee, fabriquerPaiement } from "../factories";
+import { fabriquerAnnee, fabriquerFrais } from "../factories";
 import {
   connecter,
   fabriquerEtudiantInscrit,
@@ -16,10 +15,11 @@ const { getSession, revaliderPagesEcolage } = vi.hoisted(() => ({ getSession: vi
 vi.mock("@/lib/auth", () => ({ auth: { api: { getSession } } }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("@/server/ecolage-revalidation", () => ({ revaliderPagesEcolage }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 const { db } = await import("@/lib/db");
 const actions = await import("@/server/actions/etudiants");
-const paiements = await import("@/server/actions/paiements");
+const fraisActions = await import("@/server/actions/frais");
 const { lireEtudiants, lireFicheEtudiant } = await import("@/server/lectures/etudiants");
 
 let m: Monde;
@@ -34,8 +34,11 @@ beforeEach(async () => {
 
 afterEach(() => vi.useRealTimers());
 
-const echeancesDe = (etudiantId: string) =>
-  db.echeance.findMany({ where: { inscription: { etudiantId } }, orderBy: { ordre: "asc" } });
+/** Ordre de lecture : les droits, puis mois par mois (index 1 = octobre). */
+const echeancesDe = async (etudiantId: string) => {
+  const lignes = await db.echeance.findMany({ where: { inscription: { etudiantId } }, orderBy: [{ mois: "asc" }, { type: "asc" }] });
+  return [...lignes.filter((e) => e.type === "DROITS"), ...lignes.filter((e) => e.type !== "DROITS")];
+};
 
 const compteurs = async () =>
   Object.fromEntries((await db.compteur.findMany()).map((c) => [c.cle, c.valeur]));
@@ -105,12 +108,12 @@ describe("creerEtudiant : matricule", () => {
 });
 
 describe("creerEtudiant : échéances", () => {
-  it("copie les montants du tarif : droits puis 10 mensualités d'octobre à juillet", async () => {
+  it("copie les montants du tarif : une échéance de droits (octobre, 1er mois) et 10 mensualités d'octobre à juillet", async () => {
     const { id } = reussi(await actions.creerEtudiant(saisieEtudiant(m.ifs.id)));
 
     const echeances = await echeancesDe(id);
     expect(echeances).toHaveLength(11);
-    expect(echeances[0]).toMatchObject({ type: "DROITS", tranche: 1, montantDu: 100_000, ordre: 1 });
+    expect(echeances[0]).toMatchObject({ type: "DROITS", montantDu: 100_000, fraisId: null, nonDueSortie: false });
     expect(echeances[0].mois.toISOString().slice(0, 10)).toBe("2026-10-01");
     const mensualites = echeances.filter((e) => e.type === "MENSUALITE");
     expect(mensualites.every((e) => e.montantDu === 80_000)).toBe(true);
@@ -132,27 +135,20 @@ describe("creerEtudiant : échéances", () => {
     expect(nouvelles[1].montantDu).toBe(95_000);
   });
 
-  it.each([
-    [1 as const, 11, [100_000]],
-    [2 as const, 12, [50_000, 50_000]],
-    [3 as const, 13, [34_000, 33_000, 33_000]],
-  ])("droits en %i tranche(s) : %i échéances, tranches %j", async (tranches, total, montants) => {
-    const { id } = reussi(await actions.creerEtudiant(saisieEtudiant(m.ifs.id, { droitsEnTranches: tranches as 1 | 2 | 3 })));
+  it("une seule échéance de droits, quel que soit le tarif, et aucune trace de tranches", async () => {
+    const { id } = reussi(await actions.creerEtudiant(saisieEtudiant(m.ifs.id)));
 
     const echeances = await echeancesDe(id);
-    expect(echeances).toHaveLength(total);
-    expect(echeances.map((e) => e.ordre)).toEqual(Array.from({ length: total }, (_, i) => i + 1));
-    const droits = echeances.filter((e) => e.type === "DROITS");
-    expect(droits.map((e) => e.montantDu)).toEqual(montants);
-    expect(droits.map((e) => e.mois.toISOString().slice(0, 7))).toEqual(["2026-10", "2026-11", "2026-12"].slice(0, tranches));
+    expect(echeances).toHaveLength(11);
+    expect(echeances.filter((e) => e.type === "DROITS")).toHaveLength(1);
     expect(echeances.filter((e) => e.type === "MENSUALITE")).toHaveLength(10);
-    expect((await db.inscription.findFirstOrThrow({ where: { etudiantId: id } })).droitsEnTranches).toBe(tranches);
+    expect(echeances.filter((e) => e.type === "FRAIS")).toHaveLength(0);
+    expect(await db.inscription.findFirstOrThrow({ where: { etudiantId: id } })).not.toHaveProperty("droitsEnTranches");
   });
 
-  it("pour chaque mois, la tranche de droits précède la mensualité", async () => {
-    const { id } = reussi(await actions.creerEtudiant(saisieEtudiant(m.ifs.id, { droitsEnTranches: 3 })));
-    const types = (await echeancesDe(id)).slice(0, 7).map((e) => `${e.type[0]}${e.mois.toISOString().slice(5, 7)}`);
-    expect(types).toEqual(["D10", "M10", "D11", "M11", "D12", "M12", "M01"]);
+  it("un ancien client qui envoie encore droitsEnTranches : le champ est ignoré, une seule échéance de droits", async () => {
+    const { id } = reussi(await actions.creerEtudiant({ ...saisieEtudiant(m.ifs.id), droitsEnTranches: 3 } as never));
+    expect((await echeancesDe(id)).filter((e) => e.type === "DROITS").map((e) => e.montantDu)).toEqual([100_000]);
   });
 });
 
@@ -210,15 +206,17 @@ describe("creerEtudiant : refus sans numéro consommé", () => {
     expect(await db.etudiant.count()).toBe(0);
   });
 
-  it("droits trop faibles pour 3 tranches : refusé ; en une fois, accepté", async () => {
-    await db.tarif.update({ where: { id: m.tarifIF.id }, data: { droitsInscription: 2_000 } });
+  it("droits du tarif invalides : refusé sans numéro consommé ; de petits droits sont acceptés", async () => {
+    await db.tarif.update({ where: { id: m.tarifIF.id }, data: { droitsInscription: 0 } });
 
-    expect(await actions.creerEtudiant(saisieEtudiant(m.ifs.id, { droitsEnTranches: 3 }))).toMatchObject({
+    expect(await actions.creerEtudiant(saisieEtudiant(m.ifs.id))).toMatchObject({
       statut: "erreur",
-      message: expect.stringMatching(/trop faibles/),
+      message: expect.stringMatching(/droits d'inscription du tarif sont invalides/),
     });
     expect(await db.compteur.count()).toBe(0);
-    expect(reussi(await actions.creerEtudiant(saisieEtudiant(m.ifs.id, { droitsEnTranches: 1 }))).matricule).toBe("IF-2026-0001");
+
+    await db.tarif.update({ where: { id: m.tarifIF.id }, data: { droitsInscription: 2_000 } });
+    expect(reussi(await actions.creerEtudiant(saisieEtudiant(m.ifs.id))).matricule).toBe("IF-2026-0001");
   });
 
   it("tarif invalide en base (mensualité nulle) : refusé proprement, rien d'écrit", async () => {
@@ -413,150 +411,65 @@ describe("modifierEtudiant", () => {
   });
 });
 
-describe("modifierTranchesDroits", () => {
-  async function etudiantCree(tranches: 1 | 2 | 3 = 1) {
-    const { id } = reussi(await actions.creerEtudiant(saisieEtudiant(m.ifs.id, { droitsEnTranches: tranches })));
-    const inscription = await db.inscription.findFirstOrThrow({ where: { etudiantId: id } });
-    return { id, inscriptionId: inscription.id };
-  }
+describe("creerEtudiant : frais copiés automatiquement", () => {
+  const classeIF1 = () => [{ filiereId: m.ifs.id, niveau: 1 }];
+  const mars = new Date(Date.UTC(2027, 2, 1));
 
-  it("1 → 3 tranches : même total dû, mêmes mensualités (ids), ordres contigus 1 à 13", async () => {
-    const { id, inscriptionId } = await etudiantCree(1);
-    const avant = await echeancesDe(id);
-    const idsMensualites = avant.filter((e) => e.type === "MENSUALITE").map((e) => e.id);
-    const total = avant.reduce((s, e) => s + e.montantDu, 0);
+  it("l'étudiant inscrit après la création d'un frais pour sa classe reçoit son échéance FRAIS, au montant et au mois du frais", async () => {
+    const { frais } = await fabriquerFrais(m.annee.id, { classes: classeIF1(), montant: 15_000, mois: mars });
 
-    const r = await actions.modifierTranchesDroits({ inscriptionId, droitsEnTranches: 3 });
+    const { id } = reussi(await actions.creerEtudiant(saisieEtudiant(m.ifs.id)));
 
-    expect(r.statut).toBe("succes");
-    const apres = await echeancesDe(id);
-    expect(apres).toHaveLength(13);
-    expect(apres.map((e) => e.ordre)).toEqual(Array.from({ length: 13 }, (_, i) => i + 1));
-    expect(apres.reduce((s, e) => s + e.montantDu, 0)).toBe(total);
-    expect(apres.filter((e) => e.type === "MENSUALITE").map((e) => e.id)).toEqual(idsMensualites);
-    expect(apres.filter((e) => e.type === "DROITS").map((e) => [e.tranche, e.montantDu])).toEqual([
-      [1, 34_000],
-      [2, 33_000],
-      [3, 33_000],
-    ]);
-    expect(apres.slice(0, 6).map((e) => `${e.type[0]}${e.mois.toISOString().slice(5, 7)}`)).toEqual(["D10", "M10", "D11", "M11", "D12", "M12"]);
-    expect((await db.inscription.findUniqueOrThrow({ where: { id: inscriptionId } })).droitsEnTranches).toBe(3);
+    const echeances = await echeancesDe(id);
+    expect(echeances).toHaveLength(12);
+    expect(echeances.filter((e) => e.type === "FRAIS")).toMatchObject([{ fraisId: frais.id, montantDu: 15_000, nonDueSortie: false }]);
+    expect(echeances.find((e) => e.type === "FRAIS")!.mois.toISOString().slice(0, 10)).toBe("2027-03-01");
   });
 
-  it("3 → 1 puis 1 → 2 : le total dû reste celui du tarif d'origine, même si le tarif a changé depuis", async () => {
-    const { id, inscriptionId } = await etudiantCree(3);
-    await db.tarif.update({ where: { id: m.tarifIF.id }, data: { droitsInscription: 300_000, montantMensuel: 1 } });
+  it("rien hors des classes visées : autre filière, autre niveau, autre année", async () => {
+    const autreAnnee = await fabriquerAnnee({ anneeDebut: 2031 });
+    await fabriquerFrais(m.annee.id, { classes: [{ filiereId: m.sf.id, niveau: 1 }] });
+    await fabriquerFrais(m.annee.id, { classes: [{ filiereId: m.ifs.id, niveau: 2 }] });
+    await fabriquerFrais(autreAnnee.id, { classes: classeIF1(), mois: new Date(Date.UTC(2031, 11, 1)) });
 
-    expect((await actions.modifierTranchesDroits({ inscriptionId, droitsEnTranches: 1 })).statut).toBe("succes");
-    let echeances = await echeancesDe(id);
-    expect(echeances).toHaveLength(11);
-    expect(echeances.find((e) => e.type === "DROITS")?.montantDu).toBe(100_000);
+    const { id } = reussi(await actions.creerEtudiant(saisieEtudiant(m.ifs.id)));
 
-    expect((await actions.modifierTranchesDroits({ inscriptionId, droitsEnTranches: 2 })).statut).toBe("succes");
-    echeances = await echeancesDe(id);
-    expect(echeances.filter((e) => e.type === "DROITS").map((e) => e.montantDu)).toEqual([50_000, 50_000]);
-    expect(echeances.reduce((s, e) => s + e.montantDu, 0)).toBe(900_000);
+    expect((await echeancesDe(id)).filter((e) => e.type === "FRAIS")).toEqual([]);
   });
 
-  it("garde les paiements déjà faits sur les mensualités", async () => {
-    const { id, inscriptionId } = await etudiantCree(1);
-    const mensualite = (await echeancesDe(id)).filter((e) => e.type === "MENSUALITE")[1];
-    const p = await fabriquerPaiement(id, m.user.id, [{ echeanceId: mensualite.id, montant: 30_000, resteEcheanceApres: 50_000 }]);
+  it("deux frais pour la même classe : deux échéances, chacune liée à son frais", async () => {
+    const a = await fabriquerFrais(m.annee.id, { classes: classeIF1(), libelle: "Stage", mois: new Date(Date.UTC(2027, 4, 1)) });
+    const b = await fabriquerFrais(m.annee.id, { classes: classeIF1(), libelle: "Examen", mois: mars });
 
-    expect((await actions.modifierTranchesDroits({ inscriptionId, droitsEnTranches: 2 })).statut).toBe("succes");
+    const { id } = reussi(await actions.creerEtudiant(saisieEtudiant(m.ifs.id)));
 
-    const ligne = await db.paiementLigne.findFirstOrThrow({ where: { paiementId: p.id }, include: { echeance: true } });
-    expect(ligne.echeanceId).toBe(mensualite.id);
-    expect(ligne.echeance.ordre).toBe(4);
+    const frais = (await echeancesDe(id)).filter((e) => e.type === "FRAIS");
+    expect(frais.map((e) => e.fraisId).sort()).toEqual([a.frais.id, b.frais.id].sort());
   });
 
-  it("refusé après un paiement sur les droits, et rien n'est modifié", async () => {
-    const { id, inscriptionId } = await etudiantCree(1);
-    const avant = await echeancesDe(id);
-    const sit = await paiements.chargerSituationGuichet(id);
-    reussi(
-      await paiements.encaisser({
-        etudiantId: id, montant: 40_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: sit!.resteDuTotal,
-      }),
-    );
+  it("le frais compte dans le reste dû de la fiche et dans le guichet de l'étudiant créé", async () => {
+    await fabriquerFrais(m.annee.id, { classes: classeIF1(), libelle: "Frais d'examen", montant: 15_000, mois: mars });
 
-    const r = await actions.modifierTranchesDroits({ inscriptionId, droitsEnTranches: 3 });
+    const { id } = reussi(await actions.creerEtudiant(saisieEtudiant(m.ifs.id)));
 
-    expect(r).toMatchObject({ statut: "erreur", message: expect.stringMatching(/ne peut plus être redécoupé/) });
-    expect(await echeancesDe(id)).toEqual(avant);
-    expect((await db.inscription.findUniqueOrThrow({ where: { id: inscriptionId } })).droitsEnTranches).toBe(1);
+    const fiche = (await lireFicheEtudiant(id, "2027-03-10"))!;
+    expect(fiche.situation.reste).toBe(915_000);
+    expect(fiche.parcours[0].echeances.find((e) => e.type === "FRAIS")).toMatchObject({ libelle: "Frais d'examen", montantDu: 15_000, statut: "a_venir" });
   });
 
-  it("refusé même quand le paiement sur les droits a été annulé", async () => {
-    const { id, inscriptionId } = await etudiantCree(1);
-    const droits = (await echeancesDe(id)).find((e) => e.type === "DROITS")!;
-    await fabriquerPaiement(
-      id,
-      m.user.id,
-      [{ echeanceId: droits.id, montant: 100_000 }],
-      { annule: true, annuleParId: m.admin.id, dateAnnulation: new Date(), motifAnnulation: "erreur de saisie" },
-    );
+  it("création d'étudiants et création du frais simultanées : chaque étudiant de la classe a exactement un frais, aucun doublon", async () => {
+    const admin = m.admin;
+    const creations = Array.from({ length: 4 }, () => actions.creerEtudiant(saisieEtudiant(m.ifs.id)));
+    connecter(getSession, admin);
+    const frais = fraisActions.creerFrais({ libelle: "Frais d'examen", montant: 15_000, mois: "2027-03", anneeScolaireId: m.annee.id, classes: classeIF1() });
 
-    expect(await actions.modifierTranchesDroits({ inscriptionId, droitsEnTranches: 2 })).toMatchObject({
-      statut: "erreur",
-      message: expect.stringMatching(/même annulés/),
-    });
-    expect(await db.echeance.count({ where: { inscriptionId, type: "DROITS" } })).toBe(1);
-  });
+    const etats = await Promise.all([...creations, frais]);
 
-  it("refusé après un paiement annulé via les actions (encaisser puis annulerPaiement)", async () => {
-    const { id, inscriptionId } = await etudiantCree(1);
-    const sit = await paiements.chargerSituationGuichet(id);
-    const recu = reussi(
-      await paiements.encaisser({
-        etudiantId: id, montant: 100_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: sit!.resteDuTotal,
-      }),
-    );
-    connecter(getSession, m.admin);
-    reussi(await paiements.annulerPaiement({ paiementId: recu.paiementId!, motif: "saisi par erreur" }));
-
-    expect((await actions.modifierTranchesDroits({ inscriptionId, droitsEnTranches: 3 })).statut).toBe("erreur");
-    const fiche = await lireFicheEtudiant(id, "2026-11-15");
-    expect(fiche?.parcours[0]).toMatchObject({ tranchesModifiables: false, droitsEnTranches: 1 });
-  });
-
-  it("même nombre de tranches, inscription inconnue, année clôturée, droits trop faibles : refusés", async () => {
-    const { id, inscriptionId } = await etudiantCree(1);
-
-    expect(await actions.modifierTranchesDroits({ inscriptionId, droitsEnTranches: 1 })).toMatchObject({
-      statut: "erreur",
-      message: expect.stringMatching(/déjà payables en une fois/),
-    });
-    expect(await actions.modifierTranchesDroits({ inscriptionId: "inconnue", droitsEnTranches: 2 })).toMatchObject({
-      code: "INTROUVABLE",
-    });
-    expect(await actions.modifierTranchesDroits({ inscriptionId, droitsEnTranches: 4 as never })).toMatchObject({
-      statut: "erreur",
-    });
-
-    await db.anneeScolaire.update({ where: { id: m.annee.id }, data: { cloturee: true } });
-    expect(await actions.modifierTranchesDroits({ inscriptionId, droitsEnTranches: 2 })).toMatchObject({
-      message: expect.stringMatching(/2026-2027 est clôturée/),
-    });
-    expect(await echeancesDe(id)).toHaveLength(11);
-  });
-
-  it("droits trop faibles pour 3 tranches : refusé sans rien modifier", async () => {
-    const annee = await fabriquerAnnee({ anneeDebut: 2027 });
-    const { etudiant, inscription } = await fabriquerEtudiantInscrit(
-      m.ifs.id, annee, { niveau: 1, droitsInscription: 2_000, montantMensuel: 80_000, nombreMois: 10 },
-    );
-    const avant = await echeancesDe(etudiant.id);
-
-    const r = await actions.modifierTranchesDroits({ inscriptionId: inscription.id, droitsEnTranches: 3 });
-
-    expect(r).toMatchObject({ statut: "erreur", message: expect.stringMatching(/trop faibles/) });
-    expect(await echeancesDe(etudiant.id)).toEqual(avant);
-  });
-
-  it("sans session : redirigé", async () => {
-    const { inscriptionId } = await etudiantCree(1);
-    getSession.mockResolvedValue(null);
-    await expect(actions.modifierTranchesDroits({ inscriptionId, droitsEnTranches: 2 })).rejects.toThrow(/NEXT_REDIRECT/);
+    expect(etats.every((e) => e.statut === "succes")).toBe(true);
+    const etudiants = await db.etudiant.findMany({ select: { id: true } });
+    expect(etudiants).toHaveLength(4);
+    for (const e of etudiants) {
+      expect((await echeancesDe(e.id)).filter((x) => x.type === "FRAIS"), e.id).toHaveLength(1);
+    }
   });
 });

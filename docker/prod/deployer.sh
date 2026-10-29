@@ -44,7 +44,8 @@ for dossier in $(ls -1d "$neuve"/deploy/migrations/*/ 2>/dev/null | sort); do
   nom=$(basename "$dossier")
   [ "$(psql "$BASE" -Atc "SELECT 1 FROM _prisma_migrations WHERE migration_name = '$nom' AND finished_at IS NOT NULL")" = 1 ] && continue
   echo "Migration $nom"
-  psql "$BASE" -q -v ON_ERROR_STOP=1 -f "$dossier/migration.sql" \
+  # Une migration qui échoue au milieu est annulée entière : la base reste sur l'ancien schéma.
+  psql "$BASE" -q -v ON_ERROR_STOP=1 --single-transaction -f "$dossier/migration.sql" \
     || echouer "Migration $nom en échec : version non installée. Sauvegarde : sauvegardes/avant-$version.sql.gz"
   psql "$BASE" -q -v ON_ERROR_STOP=1 -c "INSERT INTO _prisma_migrations (id, checksum, finished_at, migration_name, started_at, applied_steps_count)
     VALUES ('$(cat /proc/sys/kernel/random/uuid)', '$(sha256sum "$dossier/migration.sql" | cut -d' ' -f1)', now(), '$nom', now(), 1)" \

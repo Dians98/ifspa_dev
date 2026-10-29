@@ -266,9 +266,10 @@ function minuscule(texte: string): string {
   return texte.charAt(0).toLowerCase() + texte.slice(1);
 }
 
-/** « avril » ; « avril 2027 » quand plusieurs années sont à payer ; « les droits d'inscription » pour une tranche. */
+/** « avril » ; « avril 2027 » quand plusieurs années sont à payer ; « les droits d'inscription » ; le libellé d'un frais tel quel. */
 function nomPourPhrase(e: EcheanceGuichet, plusieursAnnees: boolean): string {
   if (e.type === "DROITS") return `les ${minuscule(e.libelle)}`;
+  if (e.type === "FRAIS") return `« ${e.libelle} »${plusieursAnnees ? ` ${e.mois.slice(0, 4)}` : ""}`;
   const [mois, annee] = e.libelle.split(" ");
   return plusieursAnnees ? `${minuscule(mois)} ${annee}` : minuscule(mois);
 }
@@ -403,6 +404,7 @@ function FormulaireEncaissement({
         observation: note?.trim() ? note.trim() : null,
         idClient,
         resteDuAffiche: situation.resteDuTotal,
+        jourAffiche: situation.jour,
       });
       if (etat.statut === "succes") {
         onSucces(etat.donnees, etat.message);

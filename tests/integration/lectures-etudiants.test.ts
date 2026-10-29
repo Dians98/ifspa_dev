@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { situation, suivreEcheance } from "@/lib/ecolage";
 import { echeancesEtudiant, restesParEtudiant, sqlRestes } from "@/server/ecolage";
 import { lireEtudiants, lireFicheEtudiant, TAILLE_PAGE_ETUDIANTS } from "@/server/lectures/etudiants";
-import { fabriquerAnnee, fabriquerEtudiant, fabriquerFiliere, fabriquerInscription, fabriquerPaiement } from "../factories";
+import { fabriquerAnnee, fabriquerEtudiant, fabriquerFiliere, fabriquerFrais, fabriquerInscription, fabriquerPaiement } from "../factories";
 import { fabriquerEtudiantInscrit, fabriquerMonde, type Monde } from "../factories/scenarios";
 
 const TARIF = { niveau: 1, droitsInscription: 100_000, montantMensuel: 80_000, nombreMois: 10 };
@@ -28,7 +28,7 @@ const annule = { annule: true, annuleParId: "", dateAnnulation: new Date("2026-1
 
 /** Ce que `situation()` de la logique pure dit d'un étudiant à un jour donné : la référence des requêtes SQL. */
 async function attendu(id: string, jour: string) {
-  const echeances = await echeancesEtudiant(db, id);
+  const echeances = await echeancesEtudiant(db, id, jour);
   const s = situation(echeances, jour);
   const annees = echeances
     .map((e) => ({ ...e, ...suivreEcheance(e, jour) }))
@@ -72,14 +72,35 @@ const JOURS = [
 ];
 
 describe("filtre « en retard » et restes SQL : cohérence avec situation()", () => {
-  it("la limite : octobre est « à venir » le 31/10 et « en retard » le 1er novembre", async () => {
+  it("la limite : droits et octobre sont « à venir » le 31/10 et « en retard » le 1er novembre", async () => {
     const e = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF);
 
     const veille = await lireEtudiants({ enRetard: "1" }, "2026-10-31");
     const lendemain = await lireEtudiants({ enRetard: "1" }, "2026-11-01");
 
     expect(veille.lignes).toEqual([]);
-    expect(lendemain.lignes).toMatchObject([{ id: e.etudiant.id, resteEnRetard: 180_000, moisEnRetard: 1, resteDu: 900_000 }]);
+    expect(lendemain.lignes).toMatchObject([{ id: e.etudiant.id, resteEnRetard: 100_000 + 80_000, moisEnRetard: 1, resteDu: 900_000 }]);
+  });
+
+  it("les droits (1er mois) mettent en retard au 1er du 2e mois à eux seuls : le filtre « en retard » suit situation()", async () => {
+    const e = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF);
+    await payerLignes(e, [[1, 80_000]]);
+
+    expect((await lireEtudiants({ enRetard: "1" }, "2026-10-31")).lignes).toEqual([]);
+    expect((await lireEtudiants({ enRetard: "1" }, "2026-11-01")).lignes).toMatchObject([
+      { id: e.etudiant.id, resteEnRetard: 100_000, moisEnRetard: 1 },
+    ]);
+  });
+
+  it("un frais impayé met en retard le 1er du mois suivant son mois, à lui seul", async () => {
+    const e = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF);
+    await fabriquerFrais(m.annee.id, { classes: [{ filiereId: m.ifs.id, niveau: 1 }], montant: 15_000, mois: new Date(Date.UTC(2027, 2, 1)), inscriptionIds: [e.inscription.id] });
+    await payerLignes(e, e.inscription.echeances.map((x, i): [number, number] => [i, x.montantDu]));
+
+    expect((await lireEtudiants({ enRetard: "1" }, "2027-03-31")).lignes).toEqual([]);
+    const avril = await lireEtudiants({ enRetard: "1" }, "2027-04-01");
+    expect(avril.lignes).toMatchObject([{ id: e.etudiant.id, resteEnRetard: 15_000, moisEnRetard: 1, resteDu: 15_000 }]);
+    expect(await attendu(e.etudiant.id, "2027-04-01")).toMatchObject({ resteDu: 15_000, resteEnRetard: 15_000, moisEnRetard: 1 });
   });
 
   it("un acompte sur un mois non échu ne met pas en retard ; échu et non soldé, si", async () => {
@@ -153,8 +174,8 @@ describe("sqlRestes", () => {
     expect(tous.map((r) => r.etudiantId).sort()).toEqual([a.etudiant.id, b.etudiant.id].sort());
   });
 
-  it("tranche de droits et mensualité du même mois comptent pour un seul mois en retard", async () => {
-    const e = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF, {}, 3);
+  it("droits et mensualité du même mois (octobre) comptent pour un seul mois en retard, frais compris", async () => {
+    const e = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF);
 
     const restes = await restesParEtudiant([e.etudiant.id], new Date("2027-01-01T00:00:00Z"));
 
@@ -172,9 +193,9 @@ describe("sqlRestes", () => {
     await payerLignes(e, [[1, 80_000]]);
     await payerLignes(e, [[1, 80_000]]);
 
-    const restes = await restesParEtudiant([e.etudiant.id], new Date("2026-11-01T00:00:00Z"));
+    const restes = await restesParEtudiant([e.etudiant.id], new Date("2027-01-01T00:00:00Z"));
 
-    expect(restes.get(e.etudiant.id)).toMatchObject({ resteDu: 900_000 - 80_000, resteEnRetard: 100_000 });
+    expect(restes.get(e.etudiant.id)).toMatchObject({ resteDu: 900_000 - 80_000, resteEnRetard: 100_000 + 80_000 + 80_000 });
   });
 
   it("aucun identifiant : table vide sans requête", async () => {
@@ -212,7 +233,7 @@ describe("lireEtudiants : filtres, tri et pagination", () => {
       statut: "ACTIF",
       libelleStatut: "Active",
       resteDu: 900_000,
-      resteEnRetard: 180_000,
+      resteEnRetard: 100_000 + 80_000,
       moisEnRetard: 1,
     });
     expect(liste.lignes[1].libelleNiveau).toBe("2e année (redoublant)");
@@ -296,9 +317,8 @@ describe("lireFicheEtudiant", () => {
     const e = await fabriquerEtudiantInscrit(
       m.ifs.id, m.annee, TARIF,
       { nom: "RAKOTO", telephone: "0341234567", dateNaissance: new Date("2005-03-14T00:00:00Z"), creeParId: m.user.id },
-      3,
     );
-    await payerLignes(e, [[0, 34_000], [1, 80_000], [2, 10_000]]);
+    await payerLignes(e, [[0, 100_000], [1, 80_000], [2, 10_000]]);
 
     const f = (await lireFicheEtudiant(e.etudiant.id, "2026-11-15"))!;
 
@@ -317,16 +337,16 @@ describe("lireFicheEtudiant", () => {
     });
     expect(f.parcours).toHaveLength(1);
     const p = f.parcours[0];
-    expect(p).toMatchObject({ annee: "2026-2027", niveau: 1, droitsEnTranches: 3, libelleNiveau: "1re année", libelleStatut: "En cours" });
-    expect(p.echeances).toHaveLength(13);
-    expect(p.echeances.slice(0, 5).map((x) => [x.libelle, x.paye, x.statut])).toEqual([
-      ["Droits — tranche 1/3", 34_000, "paye"],
-      ["Octobre 2026", 80_000, "paye"],
-      ["Droits — tranche 2/3", 10_000, "partiel"],
-      ["Novembre 2026", 0, "a_venir"],
-      ["Droits — tranche 3/3", 0, "a_venir"],
+    expect(p).toMatchObject({ annee: "2026-2027", niveau: 1, libelleNiveau: "1re année", libelleStatut: "En cours" });
+    expect(p).not.toHaveProperty("droitsEnTranches");
+    expect(p).not.toHaveProperty("tranchesModifiables");
+    expect(p.echeances).toHaveLength(11);
+    expect(p.echeances.slice(0, 3).map((x) => [x.libelle, x.type, x.paye, x.statut])).toEqual([
+      ["Droits d'inscription", "DROITS", 100_000, "paye"],
+      ["Octobre 2026", "MENSUALITE", 80_000, "paye"],
+      ["Novembre 2026", "MENSUALITE", 10_000, "partiel"],
     ]);
-    expect(f.situation).toEqual({ du: 900_000, paye: 124_000, reste: 776_000, resteEnRetard: 0, moisEnRetard: 0, duEchu: 114_000, payeEchu: 114_000 });
+    expect(f.situation).toEqual({ du: 900_000, paye: 190_000, reste: 710_000, resteEnRetard: 0, moisEnRetard: 0, duEchu: 180_000, payeEchu: 180_000 });
     expect(p.totaux).toEqual(f.situation);
     expect(f.paiements).toHaveLength(1);
   });
@@ -368,20 +388,40 @@ describe("lireFicheEtudiant", () => {
     expect(f.situation).toMatchObject({ du: 1_800_000, paye: 900_000, reste: 900_000, resteEnRetard: 180_000 });
   });
 
-  it("tranchesModifiables : faux dès une ligne de paiement sur les droits, annulée comprise ; année clôturée", async () => {
-    const libre = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF);
-    const paye = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF);
-    await payerLignes(paye, [[0, 10_000]], { ...annule, annuleParId: m.admin.id });
-    const surMensualite = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF);
-    await payerLignes(surMensualite, [[1, 10_000]]);
+  it("frais : une échéance FRAIS à sa place chronologique, au libellé courant du frais, comptée dans la situation", async () => {
+    const e = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF);
+    const { frais, echeances } = await fabriquerFrais(m.annee.id, {
+      classes: [{ filiereId: m.ifs.id, niveau: 1 }], libelle: "Frais d'examen", montant: 15_000, mois: new Date(Date.UTC(2026, 10, 1)), inscriptionIds: [e.inscription.id],
+    });
+    await payerLignes(e, [[0, 100_000], [1, 80_000], [2, 80_000]]);
+    await db.frais.update({ where: { id: frais.id }, data: { libelle: "Examen final" } });
 
-    const lire = async (e: Inscrit) => (await lireFicheEtudiant(e.etudiant.id, "2026-11-15"))!.parcours[0];
+    const f = (await lireFicheEtudiant(e.etudiant.id, "2026-12-01"))!;
 
-    expect(await lire(libre)).toMatchObject({ tranchesModifiables: true, refusTranches: null });
-    expect(await lire(paye)).toMatchObject({ tranchesModifiables: false, refusTranches: expect.stringMatching(/même annulés/) });
-    expect((await lire(surMensualite)).tranchesModifiables).toBe(true);
+    const lignes = f.parcours[0].echeances;
+    expect(lignes).toHaveLength(12);
+    expect(lignes.slice(0, 4).map((x) => [x.libelle, x.type])).toEqual([
+      ["Droits d'inscription", "DROITS"],
+      ["Octobre 2026", "MENSUALITE"],
+      ["Novembre 2026", "MENSUALITE"],
+      ["Examen final", "FRAIS"],
+    ]);
+    expect(lignes[3]).toMatchObject({ id: echeances[0].id, fraisId: frais.id, montantDu: 15_000, reste: 15_000, statut: "retard", echue: true });
+    expect(lignes.filter((x) => x.type !== "FRAIS").every((x) => x.fraisId === null)).toBe(true);
+    expect(f.situation).toMatchObject({ du: 915_000, reste: 655_000, resteEnRetard: 15_000, moisEnRetard: 1 });
+  });
 
-    await db.anneeScolaire.update({ where: { id: m.annee.id }, data: { cloturee: true } });
-    expect(await lire(libre)).toMatchObject({ tranchesModifiables: false, anneeCloturee: true, refusTranches: expect.stringMatching(/clôturée/) });
+  it("un frais payé en partie est « partiel » tant que son mois n'est pas échu, « en retard » ensuite", async () => {
+    const e = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF);
+    const { echeances } = await fabriquerFrais(m.annee.id, {
+      classes: [{ filiereId: m.ifs.id, niveau: 1 }], montant: 15_000, mois: new Date(Date.UTC(2027, 2, 1)), inscriptionIds: [e.inscription.id],
+    });
+    await fabriquerPaiement(e.etudiant.id, m.user.id, [{ echeanceId: echeances[0].id, montant: 5_000, resteEcheanceApres: 10_000 }]);
+
+    const statutFrais = async (jour: string) =>
+      (await lireFicheEtudiant(e.etudiant.id, jour))!.parcours[0].echeances.find((x) => x.type === "FRAIS")!.statut;
+
+    expect(await statutFrais("2027-03-31")).toBe("partiel");
+    expect(await statutFrais("2027-04-01")).toBe("retard");
   });
 });

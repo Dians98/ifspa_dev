@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { animate, stagger } from "motion/react";
 import Image, { type StaticImageData } from "next/image";
 import { cn } from "@/lib/utils";
+import { EASE_REVELATION } from "@/components/motion/reveal";
+import { useRevelation } from "@/components/motion/use-reveal";
 import {
   Carousel,
   CarouselContent,
@@ -39,21 +42,49 @@ export function Galerie({ photos }: { photos: PhotoGalerie[] }) {
 
   const photo = photos[courante];
 
+  // Arrivée en cascade : la grande photo, puis les vignettes une à une.
+  const racine = useRef<HTMLDivElement>(null);
+  const construire = useCallback((el: HTMLElement) => {
+    const grande = el.querySelector<HTMLElement>("[data-grande]")!;
+    const vignettesEl = Array.from(el.querySelectorAll<HTMLElement>("[data-vignette]"));
+    return {
+      cacher: () => {
+        grande.style.opacity = "0";
+        vignettesEl.forEach((v) => {
+          v.style.opacity = "0";
+          v.style.transform = "translateY(10px)";
+        });
+      },
+      montrer: () => {
+        animate(grande, { opacity: 1 }, { duration: 0.8, ease: EASE_REVELATION }).then(() => {
+          grande.style.opacity = "";
+        });
+        animate(vignettesEl, { opacity: 1, y: 0 }, { duration: 0.6, ease: EASE_REVELATION, delay: stagger(0.06, { startDelay: 0.25 }) }).then(() => {
+          vignettesEl.forEach((v) => {
+            v.style.opacity = "";
+            v.style.transform = "";
+          });
+        });
+      },
+    };
+  }, []);
+  useRevelation(racine, construire);
+
   return (
-    <div>
-      <Carousel setApi={setPrincipal} opts={{ loop: true }} aria-label="Galerie de photos" className="group">
+    <div ref={racine}>
+      <Carousel setApi={setPrincipal} opts={{ loop: true }} aria-label="Galerie de photos" className="group" data-grande>
         <CarouselContent>
           {photos.map((p) => (
             <CarouselItem key={p.legende}>
               {/* Pleine largeur : d'un bord à l'autre de l'écran */}
-              <div className="relative h-[60svh] min-h-80 overflow-hidden bg-muted sm:h-[72svh] sm:max-h-205">
+              <div className="group/photo relative h-[60svh] min-h-80 overflow-hidden bg-muted sm:h-[72svh] sm:max-h-205">
                 <Image
                   src={p.src}
                   alt={p.alt}
                   fill
                   placeholder="blur"
                   sizes="100vw"
-                  className="object-cover"
+                  className="object-cover transition-transform duration-700 ease-out group-hover/photo:scale-104 motion-reduce:transition-none motion-reduce:group-hover/photo:scale-100"
                 />
               </div>
             </CarouselItem>
@@ -85,18 +116,26 @@ export function Galerie({ photos }: { photos: PhotoGalerie[] }) {
         <CarouselContent className="-ml-3">
           {photos.map((p, i) => (
             <CarouselItem key={p.legende} className="basis-1/3 pl-3 sm:basis-1/5 lg:basis-1/8">
+              <div data-vignette>
               <button
                 type="button"
                 onClick={() => principal?.scrollTo(i)}
                 aria-label={`Afficher la photo ${i + 1} : ${p.legende}`}
                 aria-current={i === courante}
                 className={cn(
-                  "relative block aspect-4/3 w-full overflow-hidden rounded-lg ring-offset-2 transition-[opacity,box-shadow]",
+                  "group/vignette relative block aspect-4/3 w-full overflow-hidden rounded-lg ring-offset-2 transition-[opacity,box-shadow]",
                   i === courante ? "ring-2 ring-rose" : "opacity-60 hover:opacity-100",
                 )}
               >
-                <Image src={p.src} alt="" fill sizes="160px" className="object-cover" />
+                <Image
+                  src={p.src}
+                  alt=""
+                  fill
+                  sizes="160px"
+                  className="object-cover transition-transform duration-500 ease-out group-hover/vignette:scale-104 group-focus-visible/vignette:scale-104 motion-reduce:transition-none motion-reduce:group-hover/vignette:scale-100 motion-reduce:group-focus-visible/vignette:scale-100"
+                />
               </button>
+              </div>
             </CarouselItem>
           ))}
         </CarouselContent>

@@ -1,13 +1,10 @@
 import type writeXlsxFile from "write-excel-file/node";
 import {
-  COLONNES_PAIEMENTS,
   colonnesEtudiantsModele,
   consignesImport,
   exemplesEtudiants,
-  exemplesPaiements,
   FEUILLE_ETUDIANTS,
   FEUILLE_LISEZ_MOI,
-  FEUILLE_PAIEMENTS,
   type ColonneImport,
   type LigneModele,
   type ParametresModele,
@@ -17,7 +14,7 @@ import {
 
 export type FeuillesModele = Parameters<typeof writeXlsxFile>[0];
 
-export const FORMATS_MODELE = ["xlsx", "etudiants.csv", "paiements.csv"] as const;
+export const FORMATS_MODELE = ["xlsx", "etudiants.csv"] as const;
 export type FormatModele = (typeof FORMATS_MODELE)[number];
 
 export function estFormatModele(v: string | null): v is FormatModele {
@@ -51,7 +48,6 @@ export function feuillesModele(p: ParametresModele): FeuillesModele {
       columns: [{ width: 120 }],
     },
     { sheet: FEUILLE_ETUDIANTS, ...feuille(colonnesEtudiantsModele(p), exemplesEtudiants(p)) },
-    { sheet: FEUILLE_PAIEMENTS, ...feuille(COLONNES_PAIEMENTS, exemplesPaiements(p)) },
   ];
 }
 
@@ -67,8 +63,4 @@ function csv<K extends string>(colonnes: readonly ColonneImport<K>[], lignes: Li
 
 export function csvEtudiants(p: ParametresModele): string {
   return csv(colonnesEtudiantsModele(p), exemplesEtudiants(p));
-}
-
-export function csvPaiements(p: ParametresModele): string {
-  return csv(COLONNES_PAIEMENTS, exemplesPaiements(p));
 }

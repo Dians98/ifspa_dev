@@ -275,6 +275,17 @@
     animation-delay: calc(150ms + var(--rang, 0) * 120ms);
   }
 }
+/* Photo d'accueil : dézoom lent, sur un conteneur distinct de ceux animés au défilement. */
+@keyframes accueil-dezoom {
+  from {
+    transform: scale(1.06);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .accueil-dezoom {
+    animation: accueil-dezoom 6s ease-out both;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .arrivee {
     animation: arrivee-fondu 0.4s ease-out both;
@@ -283,17 +294,10 @@
 
 /* ── Landing : au défilement ──
    Liées à la position de l'élément dans l'écran (sans JavaScript). Les navigateurs qui ne les
-   gèrent pas affichent tout normalement. Le trait rose sous les titres se trace et les arrêtés
-   arrivent dans l'ordre chronologique. */
+   gèrent pas affichent tout normalement. Le trait rose sous les titres se trace. */
 @keyframes trait-trace {
   from {
     transform: scaleX(0);
-  }
-}
-@keyframes sequence-entree {
-  from {
-    opacity: 0;
-    transform: translate3d(-0.75rem, 0, 0);
   }
 }
 @supports (animation-timeline: view()) {
@@ -306,11 +310,6 @@
       animation: trait-trace linear both;
       animation-timeline: --titre-section;
       animation-range: entry 60% cover 40%;
-    }
-    .sequence > li {
-      animation: sequence-entree linear both;
-      animation-timeline: view();
-      animation-range: entry 20% entry 100%;
     }
   }
 }

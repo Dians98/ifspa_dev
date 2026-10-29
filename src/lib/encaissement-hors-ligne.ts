@@ -112,11 +112,13 @@ const schemaEcheanceCopie = z.object({
   anneeDebut: entierNaturel,
   anneeLibelle: z.string(DONNEES_INVALIDES),
   type: z.enum(TypeEcheance, DONNEES_INVALIDES),
-  tranche: entierNaturel.nullable(),
-  droitsEnTranches: entierNaturel,
   /** 1er du mois d'exigibilité, « 2026-10-01 ». */
   mois: champJour,
-  ordre: entierNaturel,
+  // Facultatifs : une copie faite avant les frais reste lisible (libellé recalculé, aucun frais).
+  /** Libellé calculé par le serveur (celui du frais pour une échéance FRAIS). */
+  libelle: z.string(DONNEES_INVALIDES).optional(),
+  /** `Frais.rang` d'une échéance FRAIS, pour le même ordre de solde qu'au serveur. */
+  rangFrais: entierNaturel.nullish(),
   montantDu: entierNaturel,
   /** Somme des lignes de paiements non annulés, au moment de la copie. */
   paye: entierNaturel,
@@ -165,8 +167,16 @@ function inscriptionsRecentesDabord(inscriptions: readonly InscriptionCopie[]): 
 
 type EcheanceDatee = Omit<EcheanceCopie, "mois"> & { mois: Date; jourMois: Jour };
 
-function dater(echeances: readonly EcheanceCopie[]): EcheanceDatee[] {
-  return trierPourSolde(echeances.map((e) => ({ ...e, mois: dateDuJour(e.mois), jourMois: e.mois })));
+/** Échéances datées, dans l'ordre de solde du jour donné (le même qu'au serveur). */
+function dater(echeances: readonly EcheanceCopie[], jour: Jour): EcheanceDatee[] {
+  return trierPourSolde(
+    echeances.map((e) => ({ ...e, mois: dateDuJour(e.mois), jourMois: e.mois })),
+    jour,
+  );
+}
+
+function libelleCopie(e: EcheanceDatee): string {
+  return e.libelle ?? libelleEcheance(e);
 }
 
 export function resultatGuichet(
@@ -193,7 +203,7 @@ export function resultatGuichet(
 export function restesLocaux(echeances: readonly EcheanceCopie[], jour: Jour): { resteDu: number; resteEnRetard: number } {
   let resteDu = 0;
   let resteEnRetard = 0;
-  for (const e of dater(echeances)) {
+  for (const e of dater(echeances, jour)) {
     const s = suivreEcheance(e, jour);
     resteDu += s.reste;
     if (s.echue) resteEnRetard += s.reste;
@@ -210,7 +220,7 @@ export function construireSituationGuichet(
   echeances: readonly EcheanceCopie[],
   jour: Jour,
 ): SituationGuichet {
-  const toutes = dater(echeances);
+  const toutes = dater(echeances, jour);
   const nonSoldees = toutes.map((x) => suivreEcheance(x, jour)).filter((x) => x.reste > 0);
   const inscriptions = inscriptionsRecentesDabord(etudiant.inscriptions);
   const derniere = inscriptions[0];
@@ -219,7 +229,7 @@ export function construireSituationGuichet(
     : undefined;
   const lignes: EcheanceGuichet[] = nonSoldees.map((x) => ({
     id: x.id,
-    libelle: libelleEcheance(x, x.droitsEnTranches),
+    libelle: libelleCopie(x),
     type: x.type,
     mois: x.jourMois,
     montantDu: x.montantDu,
@@ -296,8 +306,8 @@ export function imputerJusquAuReste(
   return { lignes: r.lignes, impute, surplus: montant - impute };
 }
 
-function aPayer(echeances: readonly EcheanceCopie[]): (EcheanceAPayer & EcheanceDatee)[] {
-  return dater(echeances)
+function aPayer(echeances: readonly EcheanceCopie[], jour: Jour): (EcheanceAPayer & EcheanceDatee)[] {
+  return dater(echeances, jour)
     .map((e) => ({ ...e, reste: Math.max(0, e.montantDu - e.paye) }))
     .filter((e) => e.reste > 0);
 }
@@ -305,16 +315,20 @@ function aPayer(echeances: readonly EcheanceCopie[]): (EcheanceAPayer & Echeance
 /**
  * Copie vue par le poste une fois les paiements encore en file imputés, dans l'ordre de la file :
  * un 2e paiement hors ligne du même étudiant part des restes déjà diminués.
+ * Chaque paiement est réparti au jour de sa saisie, comme le serveur le fera à la synchronisation.
  */
 export function appliquerFile(
   copie: CopieGuichet,
-  enAttente: readonly Pick<ElementFile, "etudiantId" | "montant">[],
+  enAttente: readonly Pick<ElementFile, "etudiantId" | "montant" | "instantSaisie">[],
 ): CopieGuichet {
   const parId = new Map(copie.etudiants.map((e) => [e.id, e]));
   for (const p of enAttente) {
     const e = parId.get(p.etudiantId);
     if (!e || !Number.isInteger(p.montant) || p.montant <= 0) continue;
-    const { lignes } = imputerJusquAuReste(aPayer(e.echeances), p.montant);
+    // Heure illisible : jour de la copie, pour ne jamais laisser un paiement en file hors du reste affiché.
+    const saisie = new Date(p.instantSaisie);
+    const instant = Number.isNaN(saisie.getTime()) ? new Date(copie.genereeLeISO) : saisie;
+    const { lignes } = imputerJusquAuReste(aPayer(e.echeances, jourMadagascar(instant)), p.montant);
     const impute = new Map(lignes.map((l) => [l.echeanceId, l.montant]));
     parId.set(e.id, {
       ...e,
@@ -363,7 +377,7 @@ export function recuHorsLigne(
   s: SaisieHorsLigne,
 ): { ok: true; recu: DonneesRecu; resteDuAvant: number; lignes: LigneRepartie[] } | { ok: false; erreur: string } {
   const jour = jourMadagascar(s.instant);
-  const nonSoldees = aPayer(s.etudiant.echeances);
+  const nonSoldees = aPayer(s.etudiant.echeances, jour);
   const repartition = repartirPaiement(nonSoldees, s.montant);
   if (!repartition.ok) return { ok: false, erreur: repartition.erreur };
   const { resteApres, retardApres } = restesApres(nonSoldees, repartition.lignes, jour);
@@ -385,14 +399,15 @@ export function recuHorsLigne(
     lignes: payees.map(({ l, e }) => ({
       montant: l.montant,
       resteEcheanceApres: l.resteEcheance,
+      libelle: libelleCopie(e),
       echeance: {
+        id: e.id,
         type: e.type,
-        tranche: e.tranche,
         mois: e.mois,
-        ordre: e.ordre,
-        droitsEnTranches: e.droitsEnTranches,
         anneeDebut: e.anneeDebut,
         anneeLibelle: e.anneeLibelle,
+        rangFrais: e.rangFrais ?? null,
+        libelleFrais: e.type === "FRAIS" ? (e.libelle ?? null) : null,
       },
     })),
     montant: s.montant,

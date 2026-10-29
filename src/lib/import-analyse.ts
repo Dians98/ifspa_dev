@@ -1,31 +1,23 @@
 import { createHash } from "node:crypto";
 import type { StatutEtudiant } from "@/generated/prisma/enums";
-import { anneeCivile, dateDuJour, debutJourMadagascar, jourDeDate, type Jour } from "@/lib/dates";
-import {
-  controleTranches,
-  genererEcheances,
-  repartirPaiement,
-  resteDuTotal,
-  trierPourSolde,
-  type EcheancePayee,
-  type TarifEcheances,
-} from "@/lib/ecolage";
+import { dateDuJour, jourDeDate, type Jour } from "@/lib/dates";
+import { controleDroits, echeanceFrais, genererEcheances, type EcheanceGeneree, type TarifEcheances } from "@/lib/ecolage";
 import { estDoublon, LIBELLE_STATUT_ETUDIANT, normaliserRecherche } from "@/lib/etudiants";
-import { lireDate, normaliserRecuPapier, validerEtudiants, validerPaiements, type EtudiantImport, type PaiementImport } from "@/lib/import";
+import { lireDate, validerEtudiants, type EtudiantImport } from "@/lib/import";
 import { messageImport, type LieuMessage, type MessageImport, type RepriseLue } from "@/lib/import-lecture";
-import { COLONNES_ETUDIANTS, COLONNES_PAIEMENTS, FEUILLE_ETUDIANTS, FEUILLE_PAIEMENTS, type CleEtudiant, type ClePaiement } from "@/lib/import-modele";
-import { formaterNumeroRecu, SEQUENCE_RECU_MAX } from "@/lib/matricule";
-import { formaterAriary } from "@/lib/montant";
+import { COLONNES_ETUDIANTS, FEUILLE_ETUDIANTS, type CleEtudiant } from "@/lib/import-modele";
 import { libelleAnnee, libelleNiveau } from "@/lib/parametres";
 
-// Analyse de la reprise sans rien écrire : contrôles globaux, étudiants (nouveaux, déjà en base, refusés),
-// paiements simulés comme au guichet. Pur (ni base, ni horloge) ; node:crypto pour les clés : serveur seulement,
+// Analyse de la reprise sans rien écrire : contrôles globaux, étudiants (nouveaux, déjà en base, refusés).
+// Les paiements ne sont pas repris. Pur (ni base, ni horloge) ; node:crypto pour la signature : serveur seulement,
 // un composant client n'importe d'ici que des types.
 
 export type FiliereReprise = { id: string; code: string; nom: string; dureeAnnees: number; actif: boolean };
 export type AnneeReprise = { id: string; anneeDebut: number; libelle: string; cloturee: boolean };
-export type AnneeCouranteReprise = AnneeReprise & { moisDebutEcolage: number; dateDebut: Jour };
+export type AnneeCouranteReprise = AnneeReprise & { moisDebutEcolage: number };
 export type TarifReprise = TarifEcheances & { filiereId: string; niveau: number };
+/** Frais de l'année courante : copiés sur les étudiants créés par l'import dans ses classes. */
+export type FraisReprise = { id: string; montant: number; mois: Date; rang: number; classes: { filiereId: string; niveau: number }[] };
 
 /** Étudiant en base né un jour cité par le fichier : candidat au doublon (`estDoublon`). */
 export type EtudiantEnBase = {
@@ -40,11 +32,7 @@ export type EtudiantEnBase = {
   anneeEntree: number;
   statut: StatutEtudiant;
   /** Inscription sur l'année courante, null s'il n'en a pas. */
-  inscriptionCourante: { niveau: number; redoublement: boolean; droitsEnTranches: number } | null;
-  /** Toutes années, payé = lignes des paiements non annulés ; celles « non dues » après une sortie sont ignorées. */
-  echeances: EcheancePayee[];
-  /** Paiements non annulés saisis hors reprise (guichet) : le fichier ne doit pas les reprendre une seconde fois. */
-  paiementsHorsReprise: number;
+  inscriptionCourante: { niveau: number; redoublement: boolean } | null;
 };
 
 export type ContexteReprise = {
@@ -54,15 +42,12 @@ export type ContexteReprise = {
   annees: AnneeReprise[];
   /** Tarifs de l'année courante. */
   tarifs: TarifReprise[];
+  /** Frais de l'année courante, par ordre de création. */
+  frais: FraisReprise[];
   etudiantsEnBase: EtudiantEnBase[];
-  /** `Paiement.idClient` commençant par `PREFIXE_CLE_REPRISE` (paiements déjà importés, annulés compris). */
-  clesReprise: ReadonlySet<string>;
-  /** Valeur des compteurs `RECU:{année}` des années civiles des paiements du fichier : { 2026: 42 }. */
-  compteursRecu: Readonly<Record<number, number>>;
 };
 
 export type StatutEtudiantReprise = "nouveau" | "existant" | "refuse";
-export type StatutPaiementReprise = "a_importer" | "deja_importe" | "refuse";
 
 export type EtudiantPlan = {
   ligne: number;
@@ -74,31 +59,16 @@ export type EtudiantPlan = {
   filiereId: string | null;
   anneeEntreeId: string | null;
   tarif: TarifEcheances | null;
+  /** Nouveau : frais de l'année courante copiés sur ses échéances. */
+  fraisIds: string[];
   /** Nouveau : total des échéances de l'année courante. */
   duAnnee: number | null;
   /** Étudiant déjà en base (statut « existant », ou refusé pour une différence avec la base). */
   existant: { id: string; matricule: string } | null;
 };
 
-export type PaiementPlan = {
-  ligne: number;
-  numeroEtudiant: string | null;
-  /** Ligne de l'étudiant dans la feuille Étudiants, null si son N° est inconnu ou en double. */
-  ligneEtudiant: number | null;
-  statut: StatutPaiementReprise;
-  donnees: PaiementImport | null;
-  /** Futur `Paiement.idClient` : un second import du même paiement est reconnu. */
-  cle: string | null;
-  /** Reste dû simulé de l'étudiant (toutes années) juste avant / après ce paiement ; null s'il n'est pas importé. */
-  resteDuAvant: number | null;
-  resteDuApres: number | null;
-  /** Année du reçu `R-{année}` qui sera émis. */
-  anneeRecu: number | null;
-};
-
 export type TotauxReprise = {
   etudiants: { lus: number; nouveaux: number; existants: number; refuses: number };
-  paiements: { lus: number; aImporter: number; dejaImportes: number; refuses: number; montantAImporter: number };
   erreurs: number;
   avertissements: number;
 };
@@ -107,12 +77,10 @@ export type RapportReprise = {
   /** Une erreur au moins : rien ne peut être importé. */
   bloquant: boolean;
   annee: { id: string; libelle: string } | null;
-  /** Globaux d'abord, puis Étudiants et Paiements par ligne ; erreurs avant avertissements. */
+  /** Globaux d'abord, puis par ligne ; erreurs avant avertissements. */
   messages: MessageImport[];
   /** Ordre d'import : filière, année d'entrée, N° (c'est l'ordre des matricules) ; lignes illisibles à la fin. */
   etudiants: EtudiantPlan[];
-  /** Ordre d'import : date puis ligne (c'est l'ordre des reçus) ; lignes illisibles à la fin. */
-  paiements: PaiementPlan[];
   totaux: TotauxReprise;
   /** Tout ce qui sera écrit, une ligne JSON par élément ; sa signature lie la confirmation au plan affiché. */
   canonique: string;
@@ -134,53 +102,16 @@ export type EtudiantRapport = {
   duAnnee: number | null;
 };
 
-export type PaiementRefuseRapport = {
-  ligne: number;
-  numeroEtudiant: string | null;
-  jour: Jour | null;
-  montant: number | null;
-};
-
-/** Paiements du fichier pour un étudiant accepté. */
-export type RecapPaiementsEtudiant = {
-  ligneEtudiant: number;
-  numero: string;
-  aImporter: number;
-  montantAImporter: number;
-  dejaImportes: number;
-  refuses: number;
-  /** Reste dû toutes années après le dernier paiement importé ; null si aucun n'est importé. */
-  resteApres: number | null;
-};
-
-/** Ce que l'action renvoie à l'écran : pas les 10 000 lignes de paiements, seulement les refusées et un récapitulatif. */
+/** Ce que l'action renvoie à l'écran : sans les données internes du plan (ids, tarifs). */
 export type RapportRepriseAllege = {
   bloquant: boolean;
   annee: RapportReprise["annee"];
   messages: MessageImport[];
   etudiants: EtudiantRapport[];
-  paiementsRefuses: PaiementRefuseRapport[];
-  recapPaiements: RecapPaiementsEtudiant[];
   totaux: TotauxReprise;
 };
 
 export function allegerRapport(r: RapportReprise): RapportRepriseAllege {
-  const recaps = new Map<number, RecapPaiementsEtudiant>();
-  const ligneParNumero = new Map(r.etudiants.flatMap((e) => (e.statut !== "refuse" && e.numero ? [[e.numero, e.ligne] as const] : [])));
-  for (const p of r.paiements) {
-    const ligneEtudiant = p.numeroEtudiant ? ligneParNumero.get(p.numeroEtudiant) : undefined;
-    if (ligneEtudiant === undefined || !p.numeroEtudiant) continue;
-    const recap = recaps.get(ligneEtudiant) ?? {
-      ligneEtudiant, numero: p.numeroEtudiant, aImporter: 0, montantAImporter: 0, dejaImportes: 0, refuses: 0, resteApres: null,
-    };
-    if (p.statut === "a_importer") {
-      recap.aImporter++;
-      recap.montantAImporter += p.donnees?.montant ?? 0;
-      recap.resteApres = p.resteDuApres;
-    } else if (p.statut === "deja_importe") recap.dejaImportes++;
-    else recap.refuses++;
-    recaps.set(ligneEtudiant, recap);
-  }
   return {
     bloquant: r.bloquant,
     annee: r.annee,
@@ -196,57 +127,8 @@ export function allegerRapport(r: RapportReprise): RapportRepriseAllege {
       matricule: e.existant?.matricule ?? null,
       duAnnee: e.duAnnee,
     })),
-    paiementsRefuses: r.paiements
-      .filter((p) => p.statut === "refuse")
-      .map((p) => ({ ligne: p.ligne, numeroEtudiant: p.numeroEtudiant, jour: p.donnees?.jour ?? null, montant: p.donnees?.montant ?? null })),
-    recapPaiements: r.etudiants.flatMap((e) => (recaps.has(e.ligne) ? [recaps.get(e.ligne)!] : [])),
     totaux: r.totaux,
   };
-}
-
-export const PREFIXE_CLE_REPRISE = "reprise:";
-
-const HEURE_REPRISE_MS = 12 * 60 * 60 * 1000;
-
-/** Instant enregistré pour un paiement repris : le jour du fichier à 12:00, heure de Madagascar. */
-export function instantReprise(jour: Jour): Date {
-  return new Date(debutJourMadagascar(jour).getTime() + HEURE_REPRISE_MS);
-}
-
-/** `Paiement.observation` d'un paiement repris. */
-export function observationReprise(recuPapier: string | null): string {
-  return recuPapier ? `Reprise des données · reçu papier n° ${recuPapier}` : "Reprise des données";
-}
-
-export type ElementsClePaiement = {
-  nom: string;
-  prenoms: string;
-  dateNaissance: Jour;
-  jour: Jour;
-  montant: number;
-  mode: string;
-  operateur: string | null;
-  reference: string | null;
-  recuPapier: string | null;
-  /** 1 pour le premier de plusieurs paiements identiques du même étudiant, 2 pour le suivant… */
-  rang: number;
-};
-
-/** Clé déterministe d'un paiement repris : l'étudiant y figure par son identité, présente avant comme après sa création. */
-export function cleReprisePaiement(p: ElementsClePaiement): string {
-  const elements = [
-    normaliserRecherche(p.nom),
-    normaliserRecherche(p.prenoms),
-    p.dateNaissance,
-    p.jour,
-    p.montant,
-    p.mode,
-    p.operateur ?? "",
-    (p.reference ?? "").replace(/\s+/g, "").toUpperCase(),
-    p.recuPapier ? normaliserRecuPapier(p.recuPapier) : "",
-    p.rang,
-  ];
-  return PREFIXE_CLE_REPRISE + createHash("sha256").update(JSON.stringify(elements)).digest("hex").slice(0, 40);
 }
 
 /** Signature du plan, à renvoyer avec la confirmation : l'import refuse un plan qui a changé depuis le rapport. */
@@ -264,16 +146,6 @@ export function joursNaissanceCites(lu: RepriseLue): Jour[] {
   return [...jours].sort();
 }
 
-/** Années civiles des paiements du fichier : compteurs `RECU:{année}` à lire. */
-export function anneesPaiementsCitees(lu: RepriseLue): number[] {
-  const annees = new Set<number>();
-  for (const l of lu.paiements.lignes) {
-    const d = lireDate(l.cellules.date);
-    if (d.ok) annees.add(anneeCivile(d.valeur));
-  }
-  return [...annees].sort((a, b) => a - b);
-}
-
 const LIGNES_CITEES_MAX = 15;
 
 function lignesCitees(lignes: number[]): string {
@@ -284,7 +156,6 @@ function lignesCitees(lignes: number[]): string {
 }
 
 const colonneEtudiant = (cle: CleEtudiant) => COLONNES_ETUDIANTS.find((c) => c.cle === cle)!.entete;
-const colonnePaiement = (cle: ClePaiement) => COLONNES_PAIEMENTS.find((c) => c.cle === cle)!.entete;
 
 function comparerNumeros(a: string | null, b: string | null): number {
   return (a ?? "").localeCompare(b ?? "", "fr", { numeric: true });
@@ -294,19 +165,20 @@ function identite(e: { nom: string; prenoms: string; dateNaissance: Jour }): str
   return `${normaliserRecherche(e.nom)}|${normaliserRecherche(e.prenoms)}|${e.dateNaissance}`;
 }
 
-type EcheanceSimulee = { id: string; reste: number; anneeDebut: number };
-
-type Suivi = {
-  plan: EtudiantPlan;
-  donnees: EtudiantImport;
-  echeances: EcheanceSimulee[];
-  /** Existant : reste dû sur les années antérieures à l'année courante. */
-  impayesAnterieurs: number;
-  paiementsHorsReprise: number;
-};
+/** Échéances FRAIS d'une classe, telles que l'import les crée (même fonction pour l'analyse et l'écriture). */
+export function echeancesFraisReprise(
+  frais: readonly FraisReprise[],
+  filiereId: string,
+  niveau: number,
+): (EcheanceGeneree & { rangFrais: number })[] {
+  return [...frais]
+    .filter((f) => f.classes.some((c) => c.filiereId === filiereId && c.niveau === niveau))
+    .sort((a, b) => a.rang - b.rang)
+    .map((f) => ({ ...echeanceFrais(f), rangFrais: f.rang }));
+}
 
 const GRAVITE_ORDRE = { erreur: 0, avertissement: 1 } as const;
-const FEUILLE_ORDRE = (f: MessageImport["feuille"]) => (f === null ? 0 : f === FEUILLE_ETUDIANTS ? 1 : 2);
+const FEUILLE_ORDRE = (f: MessageImport["feuille"]) => (f === null ? 0 : 1);
 
 function trierMessages(messages: MessageImport[]): MessageImport[] {
   return messages
@@ -321,45 +193,28 @@ function trierMessages(messages: MessageImport[]): MessageImport[] {
     .map((x) => x.m);
 }
 
-function totaux(etudiants: EtudiantPlan[], paiements: PaiementPlan[], messages: MessageImport[]): TotauxReprise {
-  const compter = <T extends { statut: string }>(l: T[], s: T["statut"]) => l.filter((x) => x.statut === s).length;
+function totaux(etudiants: EtudiantPlan[], messages: MessageImport[]): TotauxReprise {
+  const compter = (s: StatutEtudiantReprise) => etudiants.filter((x) => x.statut === s).length;
   return {
-    etudiants: {
-      lus: etudiants.length,
-      nouveaux: compter(etudiants, "nouveau"),
-      existants: compter(etudiants, "existant"),
-      refuses: compter(etudiants, "refuse"),
-    },
-    paiements: {
-      lus: paiements.length,
-      aImporter: compter(paiements, "a_importer"),
-      dejaImportes: compter(paiements, "deja_importe"),
-      refuses: compter(paiements, "refuse"),
-      montantAImporter: paiements.filter((p) => p.statut === "a_importer").reduce((s, p) => s + (p.donnees?.montant ?? 0), 0),
-    },
+    etudiants: { lus: etudiants.length, nouveaux: compter("nouveau"), existants: compter("existant"), refuses: compter("refuse") },
     erreurs: messages.filter((m) => m.gravite === "erreur").length,
     avertissements: messages.filter((m) => m.gravite === "avertissement").length,
   };
 }
 
-function canonique(annee: { id: string; libelle: string }, etudiants: EtudiantPlan[], paiements: PaiementPlan[]): string {
+function canonique(annee: { id: string; libelle: string }, etudiants: EtudiantPlan[]): string {
   const lignes: unknown[][] = [["annee", annee.id, annee.libelle]];
   for (const e of etudiants) {
     const d = e.donnees;
     if (e.statut === "nouveau" && d && e.tarif) {
       lignes.push([
         "nouveau", e.ligne, e.numero, d.nom, d.prenoms, d.sexe, d.dateNaissance, d.lieuNaissance, d.cin, d.telephone, d.adresse,
-        d.tuteurNom, d.tuteurTelephone, d.tuteurProfession, e.filiereId, e.anneeEntreeId, d.anneeEntree, d.niveau, d.redoublant, d.droitsEnTranches,
-        e.tarif.droitsInscription, e.tarif.montantMensuel, e.tarif.nombreMois,
+        d.tuteurNom, d.tuteurTelephone, d.tuteurProfession, e.filiereId, e.anneeEntreeId, d.anneeEntree, d.niveau, d.redoublant,
+        e.tarif.droitsInscription, e.tarif.montantMensuel, e.tarif.nombreMois, e.fraisIds.join(","),
       ]);
     } else if (e.statut === "existant" && e.existant) {
       lignes.push(["existant", e.ligne, e.numero, e.existant.id]);
     }
-  }
-  for (const p of paiements) {
-    const d = p.donnees;
-    if (p.statut !== "a_importer" || !d) continue;
-    lignes.push(["paiement", p.ligne, p.cle, p.ligneEtudiant, d.jour, d.montant, d.mode, d.operateur, d.reference, d.recuPapier, p.resteDuAvant]);
   }
   return lignes.map((l) => JSON.stringify(l)).join("\n");
 }
@@ -371,12 +226,7 @@ function sansPlan(lu: RepriseLue, messages: MessageImport[], annee: RapportRepri
     annee,
     messages: tries,
     etudiants: [],
-    paiements: [],
-    totaux: {
-      ...totaux([], [], tries),
-      etudiants: { lus: lu.etudiants.lignes.length, nouveaux: 0, existants: 0, refuses: 0 },
-      paiements: { lus: lu.paiements.lignes.length, aImporter: 0, dejaImportes: 0, refuses: 0, montantAImporter: 0 },
-    },
+    totaux: { ...totaux([], tries), etudiants: { lus: lu.etudiants.lignes.length, nouveaux: 0, existants: 0, refuses: 0 } },
     canonique: "",
   };
 }
@@ -414,11 +264,8 @@ export function analyserReprise(lu: RepriseLue, ctx: ContexteReprise, jour: Jour
   }
   if (lu.etudiants.lignes.length === 0) ajouter("erreur", "la feuille ne contient aucun étudiant.", { feuille: FEUILLE_ETUDIANTS });
 
-  const cadre = { jour, dateDebutAnnee: annee.dateDebut };
-  const ve = validerEtudiants(lu.etudiants, cadre);
-  const numerosLus = new Set([...ve.valides.map((e) => e.numero), ...ve.refusees.flatMap((r) => (r.numero ? [r.numero] : []))]);
-  const vp = validerPaiements(lu.paiements, numerosLus, cadre);
-  messages.push(...ve.messages, ...vp.messages);
+  const ve = validerEtudiants(lu.etudiants, { jour });
+  messages.push(...ve.messages);
 
   const filiereParCode = new Map(ctx.filieres.map((f) => [f.code.toUpperCase(), f]));
   const filiereParId = new Map(ctx.filieres.map((f) => [f.id, f]));
@@ -433,14 +280,13 @@ export function analyserReprise(lu: RepriseLue, ctx: ContexteReprise, jour: Jour
   for (const e of ve.valides) parIdentite.set(identite(e), [...(parIdentite.get(identite(e)) ?? []), e.ligne]);
 
   const etudiants: EtudiantPlan[] = [];
-  const suivis = new Map<string, Suivi>();
   const anneesManquantes = new Map<number, number[]>();
   const tarifsManquants = new Map<string, { filiere: FiliereReprise; niveau: number; lignes: number[] }>();
 
   for (const e of ve.valides) {
     const plan: EtudiantPlan = {
       ligne: e.ligne, numero: e.numero, statut: "refuse", donnees: e,
-      filiereId: null, anneeEntreeId: null, tarif: null, duAnnee: null, existant: null,
+      filiereId: null, anneeEntreeId: null, tarif: null, fraisIds: [], duAnnee: null, existant: null,
     };
     etudiants.push(plan);
     let refuse = false;
@@ -479,31 +325,14 @@ export function analyserReprise(lu: RepriseLue, ctx: ContexteReprise, jour: Jour
       }
       if (refuse) continue;
       plan.statut = "existant";
-      ici("avertissement", "nom", `déjà en base sous le matricule ${c.matricule} : il n'est pas recréé, ses paiements sont rattachés à sa fiche.`, e.nom);
+      const sorti = c.statut !== "ACTIF" ? `, sorti (${LIBELLE_STATUT_ETUDIANT[c.statut]})` : "";
+      ici("avertissement", "nom", `déjà en base sous le matricule ${c.matricule}${sorti} : il n'est pas recréé.`, e.nom);
       if (insc && insc.redoublement !== e.redoublant) {
         ici("avertissement", "redoublant", `la base l'indique ${insc.redoublement ? "redoublant" : "non redoublant"} : la base fait foi.`, e.redoublant ? "oui" : "non");
-      }
-      if (insc && insc.droitsEnTranches !== e.droitsEnTranches) {
-        ici("avertissement", "droitsEnTranches", `droits en ${insc.droitsEnTranches} fois dans la base : la base fait foi.`, String(e.droitsEnTranches));
       }
       if (c.anneeEntree !== e.anneeEntree) {
         ici("avertissement", "anneeEntree", `année d'entrée ${c.anneeEntree} dans la base : le matricule ${c.matricule} est conservé.`, String(e.anneeEntree));
       }
-      if (c.statut !== "ACTIF") {
-        ici("avertissement", "nom", `étudiant sorti (${LIBELLE_STATUT_ETUDIANT[c.statut]}) : ses paiements sont imputés quand même.`, e.nom);
-      }
-      const echeances = trierPourSolde(c.echeances.filter((x) => !x.nonDueSortie)).map((x) => ({
-        id: x.id,
-        reste: Math.max(0, x.montantDu - x.paye),
-        anneeDebut: x.anneeDebut,
-      }));
-      suivis.set(e.numero, {
-        plan,
-        donnees: e,
-        echeances,
-        impayesAnterieurs: echeances.filter((x) => x.anneeDebut < annee.anneeDebut).reduce((s, x) => s + x.reste, 0),
-        paiementsHorsReprise: c.paiementsHorsReprise,
-      });
       continue;
     }
 
@@ -543,24 +372,19 @@ export function analyserReprise(lu: RepriseLue, ctx: ContexteReprise, jour: Jour
         groupe.lignes.push(e.ligne);
         tarifsManquants.set(cle, groupe);
       } else {
-        const refusTranches = controleTranches(tarif.droitsInscription, e.droitsEnTranches);
-        if (refusTranches) ici("erreur", "droitsEnTranches", refusTranches, String(e.droitsEnTranches));
+        const refusDroits = controleDroits(tarif.droitsInscription);
+        if (refusDroits) ici("erreur", "niveau", refusDroits, String(e.niveau));
         else if (!refuse && anneeEntree) {
           const montants = { droitsInscription: tarif.droitsInscription, montantMensuel: tarif.montantMensuel, nombreMois: tarif.nombreMois };
           try {
-            const generees = genererEcheances(montants, annee, e.droitsEnTranches);
+            const frais = echeancesFraisReprise(ctx.frais, filiere.id, e.niveau);
+            const generees = [...genererEcheances(montants, annee), ...frais];
             plan.statut = "nouveau";
             plan.filiereId = filiere.id;
             plan.anneeEntreeId = anneeEntree.id;
             plan.tarif = montants;
+            plan.fraisIds = frais.flatMap((f) => (f.fraisId ? [f.fraisId] : []));
             plan.duAnnee = generees.reduce((s, g) => s + g.montantDu, 0);
-            suivis.set(e.numero, {
-              plan,
-              donnees: e,
-              echeances: generees.map((g) => ({ id: `ligne${e.ligne}:${g.ordre}`, reste: g.montantDu, anneeDebut: annee.anneeDebut })),
-              impayesAnterieurs: 0,
-              paiementsHorsReprise: 0,
-            });
           } catch (err) {
             if (!(err instanceof RangeError)) throw err;
             ici("erreur", "niveau", err.message, String(e.niveau));
@@ -587,116 +411,8 @@ export function analyserReprise(lu: RepriseLue, ctx: ContexteReprise, jour: Jour
   for (const r of ve.refusees) {
     etudiants.push({
       ligne: r.ligne, numero: r.numero, statut: "refuse", donnees: null,
-      filiereId: null, anneeEntreeId: null, tarif: null, duAnnee: null, existant: null,
+      filiereId: null, anneeEntreeId: null, tarif: null, fraisIds: [], duAnnee: null, existant: null,
     });
-  }
-
-  const lignesRefuseesParNumero = new Map<string, number[]>();
-  for (const r of ve.refusees) if (r.numero) lignesRefuseesParNumero.set(r.numero, [...(lignesRefuseesParNumero.get(r.numero) ?? []), r.ligne]);
-  for (const e of etudiants) {
-    if (e.statut === "refuse" && e.donnees) lignesRefuseesParNumero.set(e.donnees.numero, [e.ligne]);
-  }
-
-  const paiements: PaiementPlan[] = [];
-  const parEtudiant = new Map<string, PaiementImport[]>();
-  for (const p of vp.valides) {
-    const suivi = suivis.get(p.numeroEtudiant);
-    if (!suivi) {
-      const lignes = lignesRefuseesParNumero.get(p.numeroEtudiant) ?? [];
-      paiements.push({
-        ligne: p.ligne, numeroEtudiant: p.numeroEtudiant, ligneEtudiant: lignes.length === 1 ? lignes[0] : null, statut: "refuse",
-        donnees: p, cle: null, resteDuAvant: null, resteDuApres: null, anneeRecu: null,
-      });
-      ajouter("erreur", `refusé car l'étudiant de ce N° est refusé (Étudiants, ${lignesCitees(lignes)}) : corrigez d'abord cet étudiant.`, {
-        feuille: FEUILLE_PAIEMENTS,
-        ligne: p.ligne,
-        colonne: colonnePaiement("numeroEtudiant"),
-        valeur: p.numeroEtudiant,
-      });
-      continue;
-    }
-    parEtudiant.set(p.numeroEtudiant, [...(parEtudiant.get(p.numeroEtudiant) ?? []), p]);
-  }
-
-  for (const [numero, liste] of parEtudiant) {
-    const suivi = suivis.get(numero)!;
-    const ordonnes = [...liste].sort((a, b) => a.jour.localeCompare(b.jour) || a.ligne - b.ligne);
-    const rangs = new Map<string, number>();
-    let importes = 0;
-    for (const p of ordonnes) {
-      const elements = {
-        nom: suivi.donnees.nom, prenoms: suivi.donnees.prenoms, dateNaissance: suivi.donnees.dateNaissance,
-        jour: p.jour, montant: p.montant, mode: p.mode, operateur: p.operateur, reference: p.reference, recuPapier: p.recuPapier,
-      };
-      const signature = JSON.stringify(elements);
-      const rang = (rangs.get(signature) ?? 0) + 1;
-      rangs.set(signature, rang);
-      const cle = cleReprisePaiement({ ...elements, rang });
-      const plan: PaiementPlan = {
-        ligne: p.ligne, numeroEtudiant: numero, ligneEtudiant: suivi.plan.ligne, statut: "refuse",
-        donnees: p, cle, resteDuAvant: null, resteDuApres: null, anneeRecu: null,
-      };
-      paiements.push(plan);
-      if (ctx.clesReprise.has(cle)) {
-        plan.statut = "deja_importe";
-        continue;
-      }
-      const nonSoldees = suivi.echeances.filter((x) => x.reste > 0);
-      const avant = resteDuTotal(nonSoldees);
-      const repartition = repartirPaiement(nonSoldees, p.montant);
-      if (!repartition.ok) {
-        ajouter(
-          "erreur",
-          avant === 0
-            ? `l'étudiant n° ${numero} n'a plus rien à payer après les paiements précédents : trop-perçu refusé.`
-            : `${formaterAriary(p.montant)} dépasse le reste dû de l'étudiant n° ${numero} (${formaterAriary(avant)} après les paiements précédents) : trop-perçu refusé.`,
-          { feuille: FEUILLE_PAIEMENTS, ligne: p.ligne, colonne: colonnePaiement("montant"), valeur: String(p.montant) },
-        );
-        continue;
-      }
-      const restes = new Map(repartition.lignes.map((l) => [l.echeanceId, l.resteEcheance]));
-      for (const x of suivi.echeances) if (restes.has(x.id)) x.reste = restes.get(x.id)!;
-      plan.statut = "a_importer";
-      plan.resteDuAvant = avant;
-      plan.resteDuApres = repartition.resteDuApres;
-      plan.anneeRecu = anneeCivile(p.jour);
-      importes++;
-    }
-    if (importes > 0 && suivi.plan.statut === "existant") {
-      const lieu = { feuille: FEUILLE_ETUDIANTS, ligne: suivi.plan.ligne, colonne: colonneEtudiant("nom"), valeur: suivi.donnees.nom } as const;
-      if (suivi.impayesAnterieurs > 0) {
-        ajouter("avertissement", `ses impayés des années précédentes (${formaterAriary(suivi.impayesAnterieurs)}) seront soldés en premier par les paiements repris, comme au guichet.`, lieu);
-      }
-      const n = suivi.paiementsHorsReprise;
-      if (n > 0) {
-        ajouter(
-          "avertissement",
-          n === 1
-            ? "1 paiement déjà saisi au guichet : vérifiez que le fichier ne le reprend pas une seconde fois."
-            : `${n} paiements déjà saisis au guichet : vérifiez que le fichier ne les reprend pas une seconde fois.`,
-          lieu,
-        );
-      }
-    }
-  }
-
-  for (const r of vp.refusees) {
-    paiements.push({
-      ligne: r.ligne, numeroEtudiant: r.numero, ligneEtudiant: null, statut: "refuse",
-      donnees: null, cle: null, resteDuAvant: null, resteDuApres: null, anneeRecu: null,
-    });
-  }
-
-  const anneesRecus = [...new Set(paiements.flatMap((p) => (p.anneeRecu !== null ? [p.anneeRecu] : [])))].sort();
-  for (const a of anneesRecus) {
-    const valeur = ctx.compteursRecu[a] ?? 0;
-    if (valeur > 0) {
-      ajouter(
-        "avertissement",
-        `des reçus ${a} existent déjà (jusqu'à ${formaterNumeroRecu(a, Math.min(valeur, SEQUENCE_RECU_MAX))}) : les reçus de reprise prendront les numéros suivants et ne suivront plus l'ordre des dates.`,
-        { feuille: FEUILLE_PAIEMENTS },
-      );
-    }
   }
 
   etudiants.sort((a, b) => {
@@ -708,14 +424,9 @@ export function analyserReprise(lu: RepriseLue, ctx: ContexteReprise, jour: Jour
       a.ligne - b.ligne
     );
   });
-  paiements.sort((a, b) => {
-    if (!a.donnees || !b.donnees) return a.donnees ? -1 : b.donnees ? 1 : a.ligne - b.ligne;
-    return a.donnees.jour.localeCompare(b.donnees.jour) || a.ligne - b.ligne;
-  });
 
-  const aEcrire = etudiants.some((e) => e.statut === "nouveau") || paiements.some((p) => p.statut === "a_importer");
-  if (!aEcrire && !messages.some((m) => m.gravite === "erreur")) {
-    ajouter("avertissement", "Rien à importer : les étudiants et les paiements du fichier sont déjà en base.");
+  if (!etudiants.some((e) => e.statut === "nouveau") && !messages.some((m) => m.gravite === "erreur")) {
+    ajouter("avertissement", "Rien à importer : les étudiants du fichier sont déjà en base.");
   }
 
   const tries = trierMessages(messages);
@@ -724,8 +435,7 @@ export function analyserReprise(lu: RepriseLue, ctx: ContexteReprise, jour: Jour
     annee: anneeRapport,
     messages: tries,
     etudiants,
-    paiements,
-    totaux: totaux(etudiants, paiements, tries),
-    canonique: canonique(anneeRapport, etudiants, paiements),
+    totaux: totaux(etudiants, tries),
+    canonique: canonique(anneeRapport, etudiants),
   };
 }

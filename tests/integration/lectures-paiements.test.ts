@@ -223,7 +223,7 @@ describe("lireImpayes", () => {
     expect(l.lignes[0]).toMatchObject({
       nom: "AAA",
       moisEnRetard: 2,
-      resteEnRetard: 260_000,
+      resteEnRetard: 100_000 + 160_000,
       resteDu: 900_000,
       anneesEnRetard: ["2026-2027"],
       niveau: 1,
@@ -248,7 +248,7 @@ describe("lireImpayes", () => {
     await scene();
     expect((await lireImpayes({}, "2026-10-31")).lignes).toEqual([]);
     const l = await lireImpayes({}, "2026-11-01");
-    expect(l.lignes.map((x) => [x.nom, x.moisEnRetard, x.resteEnRetard])).toEqual([["AAA", 1, 180_000]]);
+    expect(l.lignes.map((x) => [x.nom, x.moisEnRetard, x.resteEnRetard])).toEqual([["AAA", 1, 100_000 + 80_000]]);
   });
 
   it("filtres : filière, niveau, mois en retard minimum, recherche", async () => {
@@ -279,7 +279,7 @@ describe("lireImpayes", () => {
 });
 
 describe("situationGuichet à une date injectée", () => {
-  it("octobre pas encore échu le 31/10 ; échu et en retard le 1er novembre", async () => {
+  it("droits et octobre pas encore échus le 31/10 ; échus et en retard le 1er novembre", async () => {
     const e = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, TARIF);
 
     const veille = (await situationGuichet(e.etudiant.id, "2026-10-31"))!;
@@ -287,8 +287,10 @@ describe("situationGuichet à une date injectée", () => {
 
     expect(veille).toMatchObject({ resteEnRetard: 0, etudiant: { resteEnRetard: 0, resteDu: 900_000 } });
     expect(veille.echeances.slice(0, 2).map((x) => x.statut)).toEqual(["a_venir", "a_venir"]);
-    expect(lendemain.resteEnRetard).toBe(180_000);
-    expect(lendemain.echeances.slice(0, 2).map((x) => x.statut)).toEqual(["retard", "retard"]);
+    expect(lendemain.resteEnRetard).toBe(100_000 + 80_000);
+    expect(lendemain.echeances.slice(0, 2).map((x) => [x.libelle, x.statut])).toEqual([["Droits d'inscription", "retard"], ["Octobre 2026", "retard"]]);
+    expect(veille.echeances[0]).toMatchObject({ libelle: "Droits d'inscription", statut: "a_venir", echue: false });
+    expect(lendemain.echeances[0]).toMatchObject({ libelle: "Droits d'inscription", statut: "retard", echue: true });
   });
 
   it("inconnu : null", async () => {

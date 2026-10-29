@@ -53,7 +53,7 @@ export default async function PageFicheEtudiant({
           <AlertTitle className="font-semibold">Étudiant inscrit sous le matricule {e.matricule}</AlertTitle>
           <AlertDescription className="text-foreground">
             Prochaine étape : encaisser les droits d&apos;inscription
-            {premiersDroits ? ` (${formaterAriary(premiersDroits.montantDu)}${premiersDroits.tranche ? `, tranche ${premiersDroits.tranche}` : ""})` : ""}
+            {premiersDroits ? ` (${formaterAriary(premiersDroits.montantDu)})` : ""}
             , avec le bouton « Encaisser ».
           </AlertDescription>
         </Alert>

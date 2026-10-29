@@ -6,6 +6,7 @@ import {
   fabriquerInscription,
   fabriquerTarif,
 } from "../factories";
+import { MOIS_DEBUT_POSSIBLES } from "@/lib/parametres";
 
 const { revalidatePath } = vi.hoisted(() => ({ revalidatePath: vi.fn() }));
 
@@ -154,7 +155,7 @@ describe("enregistrement des tarifs", () => {
     const tarif = await fabriquerTarif(f.id, a.id, { niveau: 1, montantMensuel: 80_000, droitsInscription: 100_000 });
     const e = await fabriquerEtudiant(f.id, a.id);
     await fabriquerInscription(e.id, a.id, tarif, a.dateDebut);
-    const avant = await db.echeance.findMany({ orderBy: { ordre: "asc" } });
+    const avant = await db.echeance.findMany({ orderBy: [{ mois: "asc" }, { type: "asc" }] });
 
     const r = await actions.enregistrerTarifs({
       anneeId: a.id,
@@ -163,8 +164,9 @@ describe("enregistrement des tarifs", () => {
 
     expect(r.statut).toBe("succes");
     expect((await db.tarif.findUniqueOrThrow({ where: { id: tarif.id } })).montantMensuel).toBe(95_000);
-    expect(await db.echeance.findMany({ orderBy: { ordre: "asc" } })).toEqual(avant);
+    expect(await db.echeance.findMany({ orderBy: [{ mois: "asc" }, { type: "asc" }] })).toEqual(avant);
     expect(avant.filter((x) => x.type === "MENSUALITE").every((x) => x.montantDu === 80_000)).toBe(true);
+    expect(avant.filter((x) => x.type === "DROITS").map((x) => x.montantDu)).toEqual([100_000]);
   });
 });
 
@@ -238,6 +240,57 @@ describe("années : création et suppression", () => {
 
     const doublon = await actions.creerAnnee({ anneeDebut: 2030 });
     expect(doublon).toMatchObject({ statut: "erreur", erreurs: { anneeDebut: "L'année 2030-2031 existe déjà." } });
+  });
+
+  it("accepte les 12 premiers mois ; une année commençant en janvier va de janvier à octobre de l'année de début", async () => {
+    expect((await actions.creerAnnee({ anneeDebut: 2041, moisDebutEcolage: 1 })).statut).toBe("succes");
+    const a = await db.anneeScolaire.findUniqueOrThrow({ where: { anneeDebut: 2041 } });
+    expect(a).toMatchObject({ libelle: "2041-2042", moisDebutEcolage: 1 });
+    expect([a.dateDebut, a.dateFin].map((d) => d.toISOString().slice(0, 10))).toEqual(["2041-01-01", "2041-10-31"]);
+
+    expect(MOIS_DEBUT_POSSIBLES).toHaveLength(12);
+    // Années espacées de 2 ans : aucune ne peut chevaucher sa voisine.
+    for (const m of MOIS_DEBUT_POSSIBLES) {
+      const r = await actions.creerAnnee({ anneeDebut: 2050 + 2 * m, moisDebutEcolage: m });
+      expect(r.statut, String(m)).toBe("succes");
+    }
+  });
+
+  it("refuse une année qui chevauche la précédente ou la suivante, accepte celle qui la suit sans chevauchement", async () => {
+    expect((await actions.creerAnnee({ anneeDebut: 2027, moisDebutEcolage: 8 })).statut).toBe("succes");
+
+    const avant = await actions.creerAnnee({ anneeDebut: 2028, moisDebutEcolage: 3 });
+    expect(avant).toMatchObject({
+      statut: "erreur",
+      erreurs: { moisDebutEcolage: "2028-2029 ne peut pas commencer avant juin 2028 : 2027-2028 se termine en mai 2028." },
+    });
+
+    const apres = await actions.creerAnnee({ anneeDebut: 2026, moisDebutEcolage: 11 });
+    expect(apres).toMatchObject({ statut: "erreur", message: "2026-2027 ne peut pas se terminer après juillet 2027 : 2027-2028 commence en août 2027." });
+    expect(await db.anneeScolaire.count()).toBe(1);
+
+    expect((await actions.creerAnnee({ anneeDebut: 2028, moisDebutEcolage: 6 })).statut).toBe("succes");
+    expect((await actions.creerAnnee({ anneeDebut: 2026, moisDebutEcolage: 10 })).statut).toBe("succes");
+  });
+
+  it("deux créations simultanées qui se chevauchent : une seule passe", async () => {
+    const resultats = await Promise.all([
+      actions.creerAnnee({ anneeDebut: 2026, moisDebutEcolage: 10 }),
+      actions.creerAnnee({ anneeDebut: 2027, moisDebutEcolage: 1 }),
+    ]);
+
+    expect(resultats.map((r) => r.statut).sort()).toEqual(["erreur", "succes"]);
+    expect(await db.anneeScolaire.count()).toBe(1);
+  });
+
+  it("deux créations simultanées de la même année : une seule passe", async () => {
+    const resultats = await Promise.all([
+      actions.creerAnnee({ anneeDebut: 2026, moisDebutEcolage: 10 }),
+      actions.creerAnnee({ anneeDebut: 2026, moisDebutEcolage: 11 }),
+    ]);
+
+    expect(resultats.map((r) => r.statut).sort()).toEqual(["erreur", "succes"]);
+    expect(await db.anneeScolaire.count({ where: { anneeDebut: 2026 } })).toBe(1);
   });
 
   it("supprime une année inutilisée avec ses tarifs, jamais l'année courante", async () => {

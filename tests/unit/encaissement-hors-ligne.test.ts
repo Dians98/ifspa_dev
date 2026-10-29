@@ -28,20 +28,34 @@ const ID_CLIENT = "7a1d2c3e-9b8f-4e6a-a5d4-1f0e2b3c4d5e";
 
 const TARIF = { droitsInscription: 100_000, montantMensuel: 80_000, nombreMois: 10 };
 
-/** Échéancier généré comme en production, ids lisibles `{annee}-{ordre}`. */
-function echeancesAnnee(anneeDebut: number, payeParOrdre: Record<number, number> = {}, droitsEnTranches = 1): EcheanceCopie[] {
-  return genererEcheances(TARIF, { anneeDebut, moisDebutEcolage: 10 }, droitsEnTranches).map((e) => ({
-    id: `${anneeDebut}-${e.ordre}`,
+type FraisCopie = { rang: number; libelle?: string; montant: number; mois: string; paye?: number };
+
+/**
+ * Échéancier généré comme en production, ids lisibles `{annee}-{rang}` (1 droits, 2 octobre, 3 novembre…).
+ * Les frais, `{annee}-f{rang}`, portent leur libellé et leur ordre de création comme la copie du serveur.
+ */
+function echeancesAnnee(anneeDebut: number, payeParRang: Record<number, number> = {}, frais: FraisCopie[] = []): EcheanceCopie[] {
+  const generees = genererEcheances(TARIF, { anneeDebut, moisDebutEcolage: 10 }).map((e, i) => ({
+    id: `${anneeDebut}-${i + 1}`,
     anneeDebut,
     anneeLibelle: `${anneeDebut}-${anneeDebut + 1}`,
     type: e.type,
-    tranche: e.tranche,
-    droitsEnTranches,
     mois: jourDeDate(e.mois),
-    ordre: e.ordre,
     montantDu: e.montantDu,
-    paye: payeParOrdre[e.ordre] ?? 0,
+    paye: payeParRang[i + 1] ?? 0,
   }));
+  const fraisCopies = frais.map((f) => ({
+    id: `${anneeDebut}-f${f.rang}`,
+    anneeDebut,
+    anneeLibelle: `${anneeDebut}-${anneeDebut + 1}`,
+    type: "FRAIS" as const,
+    mois: f.mois,
+    libelle: f.libelle ?? "Frais",
+    rangFrais: f.rang,
+    montantDu: f.montant,
+    paye: f.paye ?? 0,
+  }));
+  return [...generees, ...fraisCopies];
 }
 
 let compteur = 0;
@@ -64,6 +78,10 @@ function etudiant(surcharge: Partial<EtudiantCopie> = {}): EtudiantCopie {
 
 const copie = (...etudiants: EtudiantCopie[]): CopieGuichet => ({ genereeLeISO: "2026-11-15T09:00:00.000Z", etudiants });
 
+/** Heure de saisie à midi à Madagascar (09:00 UTC) du jour donné. */
+const saisiLe = (jour: string) => `${jour}T09:00:00.000Z`;
+const JOUR_FILE = saisiLe("2026-11-15");
+
 const payeParId = (e: EtudiantCopie) => Object.fromEntries(e.echeances.map((x) => [x.id, x.paye]));
 
 describe("appliquerFile", () => {
@@ -71,8 +89,8 @@ describe("appliquerFile", () => {
     const e = etudiant();
 
     const vue = appliquerFile(copie(e), [
-      { etudiantId: e.id, montant: 100_000 },
-      { etudiantId: e.id, montant: 100_000 },
+      { etudiantId: e.id, montant: 100_000, instantSaisie: JOUR_FILE },
+      { etudiantId: e.id, montant: 100_000, instantSaisie: JOUR_FILE },
     ]);
 
     expect(payeParId(vue.etudiants[0])).toMatchObject({ "2026-1": 100_000, "2026-2": 80_000, "2026-3": 20_000, "2026-4": 0 });
@@ -81,7 +99,7 @@ describe("appliquerFile", () => {
   it("un montant inférieur à une échéance reste en acompte sur elle", () => {
     const e = etudiant({ echeances: echeancesAnnee(2026, { 1: 100_000 }) });
 
-    const vue = appliquerFile(copie(e), [{ etudiantId: e.id, montant: 30_000 }]);
+    const vue = appliquerFile(copie(e), [{ etudiantId: e.id, montant: 30_000, instantSaisie: JOUR_FILE }]);
 
     expect(vue.etudiants[0].echeances.find((x) => x.id === "2026-2")?.paye).toBe(30_000);
   });
@@ -89,7 +107,7 @@ describe("appliquerFile", () => {
   it("n'impute jamais au-delà du reste dû, même pour un montant plus grand", () => {
     const e = etudiant();
 
-    const vue = appliquerFile(copie(e), [{ etudiantId: e.id, montant: 5_000_000 }]);
+    const vue = appliquerFile(copie(e), [{ etudiantId: e.id, montant: 5_000_000, instantSaisie: JOUR_FILE }]);
 
     expect(vue.etudiants[0].echeances.every((x) => x.paye === x.montantDu)).toBe(true);
   });
@@ -99,10 +117,10 @@ describe("appliquerFile", () => {
     const b = etudiant();
 
     const vue = appliquerFile(copie(a, b), [
-      { etudiantId: "inconnu", montant: 50_000 },
-      { etudiantId: a.id, montant: 0 },
-      { etudiantId: a.id, montant: 1_000.5 },
-      { etudiantId: b.id, montant: 80_000 },
+      { etudiantId: "inconnu", montant: 50_000, instantSaisie: JOUR_FILE },
+      { etudiantId: a.id, montant: 0, instantSaisie: JOUR_FILE },
+      { etudiantId: a.id, montant: 1_000.5, instantSaisie: JOUR_FILE },
+      { etudiantId: b.id, montant: 80_000, instantSaisie: JOUR_FILE },
     ]);
 
     expect(payeParId(vue.etudiants[0])).toEqual(payeParId(a));
@@ -113,7 +131,7 @@ describe("appliquerFile", () => {
     const e = etudiant();
     const origine = copie(e);
 
-    appliquerFile(origine, [{ etudiantId: e.id, montant: 100_000 }]);
+    appliquerFile(origine, [{ etudiantId: e.id, montant: 100_000, instantSaisie: JOUR_FILE }]);
 
     expect(origine.etudiants[0].echeances.every((x) => x.paye === 0)).toBe(true);
   });
@@ -127,13 +145,48 @@ describe("appliquerFile", () => {
       echeances: [...echeancesAnnee(2026), ...echeancesAnnee(2025)],
     });
 
-    const vue = appliquerFile(copie(e), [{ etudiantId: e.id, montant: 950_000 }]);
+    const vue = appliquerFile(copie(e), [{ etudiantId: e.id, montant: 950_000, instantSaisie: JOUR_FILE }]);
 
     const paye = payeParId(vue.etudiants[0]);
     expect(paye["2025-1"]).toBe(100_000);
     expect(paye["2025-11"]).toBe(80_000);
     expect(paye["2026-1"]).toBe(50_000);
     expect(paye["2026-2"]).toBe(0);
+  });
+
+  it("répartit chaque paiement au jour de sa saisie : le frais de mars passe devant avril jusqu'au 31 mars seulement", () => {
+    const e = etudiant({
+      echeances: echeancesAnnee(2026, { 1: 100_000, 2: 80_000, 3: 80_000, 4: 80_000, 5: 80_000, 6: 80_000, 7: 80_000 }, [
+        { rang: 1, libelle: "Frais d'examen", montant: 15_000, mois: "2027-03-01" },
+      ]),
+    });
+
+    const veille = appliquerFile(copie(e), [{ etudiantId: e.id, montant: 15_000, instantSaisie: saisiLe("2027-03-31") }]);
+    const lendemain = appliquerFile(copie(e), [{ etudiantId: e.id, montant: 15_000, instantSaisie: saisiLe("2027-04-01") }]);
+
+    expect(payeParId(veille.etudiants[0])).toMatchObject({ "2026-f1": 15_000, "2026-8": 0 });
+    expect(payeParId(lendemain.etudiants[0])).toMatchObject({ "2026-f1": 0, "2026-8": 15_000 });
+  });
+
+  it("deux paiements en file à des jours différents suivent chacun l'ordre de leur jour", () => {
+    const e = etudiant({
+      echeances: echeancesAnnee(2026, { 1: 100_000, 2: 80_000, 3: 80_000, 4: 80_000, 5: 80_000, 6: 80_000, 7: 80_000 }, [
+        { rang: 1, montant: 15_000, mois: "2027-03-01" },
+      ]),
+    });
+
+    const vue = appliquerFile(copie(e), [
+      { etudiantId: e.id, montant: 15_000, instantSaisie: saisiLe("2027-03-31") },
+      { etudiantId: e.id, montant: 15_000, instantSaisie: saisiLe("2027-04-01") },
+    ]);
+
+    expect(payeParId(vue.etudiants[0])).toMatchObject({ "2026-f1": 15_000, "2026-8": 15_000 });
+  });
+
+  it("heure de saisie illisible : le paiement est réparti au jour de la copie, jamais perdu", () => {
+    const e = etudiant();
+    const vue = appliquerFile(copie(e), [{ etudiantId: e.id, montant: 100_000, instantSaisie: "pas une date" }]);
+    expect(payeParId(vue.etudiants[0])["2026-1"]).toBe(100_000);
   });
 });
 
@@ -217,7 +270,16 @@ describe("rechercheLocale", () => {
     const lendemain = rechercheLocale(copie(e), e.matricule, "2026-11-01")[0];
 
     expect(veille).toMatchObject({ resteDu: 900_000, resteEnRetard: 0 });
-    expect(lendemain).toMatchObject({ resteDu: 900_000, resteEnRetard: 180_000 });
+    expect(lendemain).toMatchObject({ resteDu: 900_000, resteEnRetard: 100_000 + 80_000 });
+  });
+
+  it("les droits (1er mois) ne sont en retard qu'à partir du 1er du 2e mois, un frais qu'à partir du mois suivant", () => {
+    const e = etudiant({
+      echeances: echeancesAnnee(2026, { 2: 80_000, 3: 80_000, 4: 80_000 }, [{ rang: 1, montant: 15_000, mois: "2027-02-01" }]),
+    });
+    expect(rechercheLocale(copie(e), e.matricule, "2026-10-31")[0]).toMatchObject({ resteEnRetard: 0 });
+    expect(rechercheLocale(copie(e), e.matricule, "2026-11-01")[0]).toMatchObject({ resteEnRetard: 100_000 });
+    expect(rechercheLocale(copie(e), e.matricule, "2027-03-01")[0]).toMatchObject({ resteEnRetard: 100_000 + 80_000 + 80_000 + 15_000 });
   });
 });
 
@@ -251,7 +313,7 @@ describe("construireSituationGuichet", () => {
 
     expect(s.etudiant).toMatchObject({ sorti: true, libelleStatut: expect.any(String) });
     expect(s.echeances.filter((x) => x.statut === "retard").map((x) => x.id)).toEqual(["2026-1", "2026-2"]);
-    expect(s).toMatchObject({ resteDuTotal: 900_000, resteEnRetard: 180_000 });
+    expect(s).toMatchObject({ resteDuTotal: 900_000, resteEnRetard: 100_000 + 80_000 });
   });
 
   it("plusieurs années : seulement les échéances non soldées, par année, la plus ancienne d'abord", () => {
@@ -269,6 +331,77 @@ describe("construireSituationGuichet", () => {
     expect(s.echeances[0]).toMatchObject({ id: "2025-3", paye: 30_000, reste: 50_000, statut: "retard" });
     expect(s.echeances.every((x) => x.reste > 0)).toBe(true);
     expect(s.resteDuTotal).toBe(900_000 - 210_000 + 900_000 - 100_000);
+  });
+});
+
+describe("frais dans la situation du guichet", () => {
+  const PAYE_JUSQUEN_MARS = { 1: 100_000, 2: 80_000, 3: 80_000, 4: 80_000, 5: 80_000, 6: 80_000, 7: 80_000 };
+  const aJourEnMars = () =>
+    etudiant({
+      echeances: echeancesAnnee(2026, PAYE_JUSQUEN_MARS, [{ rang: 1, libelle: "Frais d'examen", montant: 15_000, mois: "2027-03-01" }]),
+    });
+
+  it("étudiant à jour en mars : le frais exigible en mars est proposé avant la mensualité d'avril", () => {
+    const e = aJourEnMars();
+
+    const s = construireSituationGuichet(e, e.echeances, "2027-03-10");
+
+    expect(s.echeances.slice(0, 2).map((x) => [x.id, x.libelle, x.type])).toEqual([
+      ["2026-f1", "Frais d'examen", "FRAIS"],
+      ["2026-8", "Avril 2027", "MENSUALITE"],
+    ]);
+    expect(s.echeances[0]).toMatchObject({ montantDu: 15_000, reste: 15_000, statut: "a_venir" });
+  });
+
+  it("le même étudiant en avril : la mensualité d'avril devient exigible et passe avant le frais de mars, en retard", () => {
+    const e = aJourEnMars();
+
+    const s = construireSituationGuichet(e, e.echeances, "2027-04-01");
+
+    expect(s.echeances.slice(0, 2).map((x) => x.id)).toEqual(["2026-8", "2026-f1"]);
+    expect(s.echeances.find((x) => x.id === "2026-f1")).toMatchObject({ statut: "retard", echue: true });
+  });
+
+  it("étudiant en retard : ses mensualités dues passent avant le frais exigible", () => {
+    const e = etudiant({
+      echeances: echeancesAnnee(2026, { 1: 100_000, 2: 80_000 }, [{ rang: 1, montant: 15_000, mois: "2026-11-01" }]),
+    });
+
+    const s = construireSituationGuichet(e, e.echeances, "2026-11-15");
+
+    expect(s.echeances.slice(0, 3).map((x) => x.id)).toEqual(["2026-3", "2026-f1", "2026-4"]);
+  });
+
+  it("deux frais du même mois : dans l'ordre de création, quel que soit l'ordre dans la copie", () => {
+    const frais = [
+      { rang: 7, libelle: "Second", montant: 5_000, mois: "2027-03-01" },
+      { rang: 3, libelle: "Premier", montant: 5_000, mois: "2027-03-01" },
+    ];
+    const e = etudiant({ echeances: echeancesAnnee(2026, PAYE_JUSQUEN_MARS, frais) });
+
+    const s = construireSituationGuichet(e, e.echeances, "2027-03-10");
+
+    expect(s.echeances.slice(0, 2).map((x) => x.libelle)).toEqual(["Premier", "Second"]);
+  });
+
+  it("copie faite avant les frais (sans libellé ni rang) : libellés recalculés, droits sans mention de tranche", () => {
+    const ancienne = echeancesAnnee(2026).map((x) => ({ ...x }));
+    const e = etudiant({ echeances: ancienne });
+
+    const s = construireSituationGuichet(e, e.echeances, "2026-11-15");
+
+    expect(s.echeances.slice(0, 3).map((x) => x.libelle)).toEqual(["Droits d'inscription", "Octobre 2026", "Novembre 2026"]);
+  });
+
+  it("le frais payé en partie reste proposé avec son reste, et compte dans le reste dû total", () => {
+    const e = etudiant({
+      echeances: echeancesAnnee(2026, PAYE_JUSQUEN_MARS, [{ rang: 1, montant: 15_000, mois: "2027-03-01", paye: 6_000 }]),
+    });
+
+    const s = construireSituationGuichet(e, e.echeances, "2027-03-10");
+
+    expect(s.echeances[0]).toMatchObject({ id: "2026-f1", paye: 6_000, reste: 9_000, statut: "partiel" });
+    expect(s.resteDuTotal).toBe(9_000 + 4 * 80_000);
   });
 });
 
@@ -350,6 +483,52 @@ describe("recuHorsLigne", () => {
       heure: "10:24",
     });
     expect(r.recu.lignes).toEqual([{ libelle: "Droits d'inscription", montant: 100_000, acompte: false, resteEcheance: 0 }]);
+  });
+
+  it("un frais soldé avant la mensualité suivante : ligne au libellé de la copie, sans acompte", () => {
+    const e = etudiant({
+      echeances: echeancesAnnee(2026, { 1: 100_000, 2: 80_000, 3: 80_000, 4: 80_000, 5: 80_000, 6: 80_000, 7: 80_000 }, [
+        { rang: 1, libelle: "Frais d'examen", montant: 15_000, mois: "2027-03-01" },
+      ]),
+    });
+    const mars = new Date("2027-03-10T07:00:00Z");
+
+    const r = recuHorsLigne({ ...saisie(e, 15_000), instant: mars });
+
+    expect(r.ok && r.recu.lignes).toEqual([{ libelle: "Frais d'examen", montant: 15_000, acompte: false, resteEcheance: 0 }]);
+    expect(r.ok && r.recu).toMatchObject({ resteApres: 4 * 80_000, retardApres: 0 });
+  });
+
+  it("un frais payé en partie : acompte avec le reste du frais", () => {
+    const e = etudiant({
+      echeances: echeancesAnnee(2026, { 1: 100_000, 2: 80_000, 3: 80_000, 4: 80_000, 5: 80_000, 6: 80_000, 7: 80_000 }, [
+        { rang: 1, libelle: "Frais d'examen", montant: 15_000, mois: "2027-03-01" },
+      ]),
+    });
+
+    const r = recuHorsLigne({ ...saisie(e, 5_000), instant: new Date("2027-03-10T07:00:00Z") });
+
+    expect(r.ok && r.recu.lignes).toEqual([{ libelle: "Frais d'examen", montant: 5_000, acompte: true, resteEcheance: 10_000 }]);
+  });
+
+  it("le même montant au 1er avril va d'abord à la mensualité d'avril : ordre de solde du jour du paiement", () => {
+    const e = etudiant({
+      echeances: echeancesAnnee(2026, { 1: 100_000, 2: 80_000, 3: 80_000, 4: 80_000, 5: 80_000, 6: 80_000, 7: 80_000 }, [
+        { rang: 1, libelle: "Frais d'examen", montant: 15_000, mois: "2027-03-01" },
+      ]),
+    });
+
+    const r = recuHorsLigne({ ...saisie(e, 15_000), instant: new Date("2027-04-01T07:00:00Z") });
+
+    expect(r.ok && r.recu.lignes.map((l) => l.libelle)).toEqual(["Avril 2027"]);
+  });
+
+  it("les droits payés en plusieurs fois : chaque ticket garde le libellé « Droits d'inscription »", () => {
+    const e = etudiant({ echeances: echeancesAnnee(2026, { 1: 40_000 }) });
+
+    const r = recuHorsLigne(saisie(e, 30_000));
+
+    expect(r.ok && r.recu.lignes).toEqual([{ libelle: "Droits d'inscription", montant: 30_000, acompte: true, resteEcheance: 30_000 }]);
   });
 
   it("le surplus sur l'échéance suivante est un acompte", () => {

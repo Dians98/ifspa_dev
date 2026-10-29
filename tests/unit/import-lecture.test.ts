@@ -12,13 +12,13 @@ import {
   messageImport,
   natureTableau,
   normaliserEntete,
-  PAIEMENTS_MAX,
+  PAIEMENTS_IGNORES,
   texteCellule,
 } from "@/lib/import-lecture";
-import { COLONNES_ETUDIANTS, COLONNES_PAIEMENTS, PARAMETRES_MODELE_EXEMPLE } from "@/lib/import-modele";
-import { csvEtudiants, csvPaiements, feuillesModele } from "@/lib/import-modele-fichiers";
+import { COLONNES_ETUDIANTS, PARAMETRES_MODELE_EXEMPLE } from "@/lib/import-modele";
+import { csvEtudiants, feuillesModele } from "@/lib/import-modele-fichiers";
 import { fichiersDepuisFormData, lireFichiersReprise, TAILLE_MAX_OCTETS, type FichierRecu } from "@/server/import/lire-fichiers";
-import { reprise, tableauEtudiants, tableauPaiements } from "../factories/reprise";
+import { reprise, tableauAnciensPaiements, tableauEtudiants, versCsv } from "../factories/reprise";
 
 const octets = (t: string) => new TextEncoder().encode(t);
 const fichier = (nom: string, contenu: Uint8Array | string): FichierRecu => ({ nom, octets: typeof contenu === "string" ? octets(contenu) : contenu });
@@ -128,8 +128,8 @@ describe("messages", () => {
 
   it("sans lieu, le texte est la raison seule ; une valeur vide n'est pas citée", () => {
     expect(messageImport("avertissement", "Rien à signaler.").texte).toBe("Rien à signaler.");
-    expect(messageImport("erreur", "vide.", { feuille: "Paiements", ligne: 3, colonne: "Date", valeur: "" }).texte).toBe(
-      "Paiements, ligne 3, colonne « Date » : vide.",
+    expect(messageImport("erreur", "vide.", { feuille: "Étudiants", ligne: 3, colonne: "Adresse", valeur: "" }).texte).toBe(
+      "Étudiants, ligne 3, colonne « Adresse » : vide.",
     );
   });
 
@@ -156,21 +156,15 @@ describe("en-têtes", () => {
         expect(colonneDeEntete(COLONNES_ETUDIANTS, entete)?.cle, entete).toBe(c.cle);
       }
     }
-    for (const c of COLONNES_PAIEMENTS) {
-      for (const entete of [c.entete, `${c.entete} *`, c.entete.toUpperCase()]) {
-        expect(colonneDeEntete(COLONNES_PAIEMENTS, entete)?.cle, entete).toBe(c.cle);
-      }
-    }
   });
 
   it("reconnaît les autres écritures d'un en-tête (alias)", () => {
     const cle = (e: string) => colonneDeEntete(COLONNES_ETUDIANTS, e)?.cle;
 
-    expect([cle("Prenom"), cle("Né le"), cle("N° CIN"), cle("Tel"), cle("Code filière"), cle("Annee entree"), cle("Droits")]).toEqual([
-      "prenoms", "dateNaissance", "cin", "telephone", "filiere", "anneeEntree", "droitsEnTranches",
+    expect([cle("Prenom"), cle("Né le"), cle("N° CIN"), cle("Tel"), cle("Code filière"), cle("Annee entree")]).toEqual([
+      "prenoms", "dateNaissance", "cin", "telephone", "filiere", "anneeEntree",
     ]);
-    expect(colonneDeEntete(COLONNES_PAIEMENTS, "Montant")?.cle).toBe("montant");
-    expect(colonneDeEntete(COLONNES_PAIEMENTS, "N° reçu papier")?.cle).toBe("recuPapier");
+    for (const retiree of ["Droits en", "Droits", "Tranches"]) expect(cle(retiree), retiree).toBeUndefined();
   });
 
   it("« Niveau » est reconnu avec ou sans année, mais pas « Niveaux »", () => {
@@ -189,9 +183,9 @@ describe("en-têtes", () => {
     expect(anneeDeEnteteNiveau(undefined)).toBeNull();
   });
 
-  it("reconnaît la nature d'un tableau d'après ses en-têtes, quel que soit le nom du fichier", () => {
-    expect(natureTableau(tableauEtudiants([{}]))).toBe("Étudiants");
-    expect(natureTableau(tableauPaiements([{}]))).toBe("Paiements");
+  it("reconnaît la nature d'un tableau d'après ses en-têtes, quel que soit le nom du fichier, ancien CSV Paiements compris", () => {
+    expect(natureTableau(tableauEtudiants([{}]))).toBe("etudiants");
+    expect(natureTableau(tableauAnciensPaiements())).toBe("paiements");
     expect(natureTableau([["Foo", "Bar"], ["1", "2"]])).toBeNull();
     expect(natureTableau([["Nom", "Date"]])).toBeNull();
   });
@@ -210,14 +204,14 @@ describe("lecture de la feuille Étudiants", () => {
 
   it("garde le n° de ligne Excel malgré les lignes vides et saute la ligne d'aide du modèle", () => {
     const csv = [
-      "N° *;Nom *;Prénoms *;Sexe *;Date de naissance *;Lieu de naissance *;CIN;Téléphone;Adresse;Filière *;Année d'entrée *;Niveau 2026-2027 *;Redoublant;Droits en",
-      "Numéro de ligne, unique.;En majuscules ou non.;;F ou M.;JJ/MM/AAAA.;;12 chiffres, en texte.;;;Code de la filière : IF ou SF.;;1, 2 ou 3.;;",
-      "1;RAKOTO;Jean;M;10/05/2004;Toamasina;;;;IF;2026;1;;",
-      ";;;;;;;;;;;;;",
+      "N° *;Nom *;Prénoms *;Sexe *;Date de naissance *;Lieu de naissance *;CIN;Téléphone;Adresse;Filière *;Année d'entrée *;Niveau 2026-2027 *;Redoublant",
+      "Numéro de ligne, unique.;En majuscules ou non.;;F ou M.;JJ/MM/AAAA.;;12 chiffres, en texte.;;;Code de la filière : IF ou SF.;;1, 2 ou 3.;",
+      "1;RAKOTO;Jean;M;10/05/2004;Toamasina;;;;IF;2026;1;",
+      ";;;;;;;;;;;;",
       "",
-      "2;RASOA;Fanja;F;02/11/2005;Toamasina;;;;SF;2026;1;;",
+      "2;RASOA;Fanja;F;02/11/2005;Toamasina;;;;SF;2026;1;",
     ].join("\r\n");
-    const lu = lireReprise({ etudiants: decouperCsvLignes(csv), paiements: null });
+    const lu = lireReprise(decouperCsvLignes(csv));
 
     expect(lu.etudiants.lignes.map((l) => [l.ligne, l.cellules.numero])).toEqual([
       [3, { type: "texte", texte: "1" }],
@@ -228,7 +222,7 @@ describe("lecture de la feuille Étudiants", () => {
   it("saute la ligne d'aide du modèle téléchargé (CSV), les exemples commencent en ligne 3", () => {
     const lignes = decouperCsvLignes(csvEtudiants(PARAMETRES_MODELE_EXEMPLE));
 
-    const lu = lireReprise({ etudiants: lignes, paiements: null });
+    const lu = lireReprise(lignes);
 
     expect(lu.etudiants.lignes.map((l) => l.ligne)).toEqual([3, 4, 5]);
     expect(lu.etudiants.lignes[0].cellules.nom).toEqual({ type: "texte", texte: "RAKOTOMALALA" });
@@ -244,7 +238,7 @@ describe("lecture de la feuille Étudiants", () => {
   it("cherche les en-têtes dans les premières lignes : un titre au-dessus ne gêne pas", () => {
     const tableau = [["Reprise IFSPA 2026"], [], ...tableauEtudiants([{ numero: "1" }])];
 
-    const lu = lireReprise({ etudiants: tableau, paiements: null });
+    const lu = lireReprise(tableau);
 
     expect(lu.etudiants.ligneEntetes).toBe(3);
     expect(lu.etudiants.lignes.map((l) => l.ligne)).toEqual([4]);
@@ -252,7 +246,7 @@ describe("lecture de la feuille Étudiants", () => {
   });
 
   it("en-têtes introuvables : une erreur qui renvoie au modèle, sans ligne lue", () => {
-    const lu = lireReprise({ etudiants: [["a", "b"], ["1", "2"]], paiements: null });
+    const lu = lireReprise([["a", "b"], ["1", "2"]]);
 
     expect(lu.etudiants.ligneEntetes).toBeNull();
     expect(lu.etudiants.lignes).toEqual([]);
@@ -261,7 +255,7 @@ describe("lecture de la feuille Étudiants", () => {
   });
 
   it("une colonne obligatoire absente est une erreur qui la nomme, une colonne facultative absente non", () => {
-    const sans = reprise([{ numero: "1" }], [], { sans: ["nom", "redoublant", "cin"] });
+    const sans = reprise([{ numero: "1" }], { sans: ["nom", "redoublant", "cin"] });
 
     const bloquantes = erreurs(sans.messages);
     expect(bloquantes).toHaveLength(1);
@@ -276,7 +270,7 @@ describe("lecture de la feuille Étudiants", () => {
     const tableau = [[...base[0], "Commentaire"], [...base[1], "à voir"]];
 
     const lu = reprise([]);
-    const avecInconnue = lireReprise({ etudiants: tableau, paiements: null });
+    const avecInconnue = lireReprise(tableau);
 
     expect(lu.messages).toEqual([]);
     expect(erreurs(avecInconnue.messages)).toEqual([]);
@@ -290,29 +284,56 @@ describe("lecture de la feuille Étudiants", () => {
     const base = tableauEtudiants([{ numero: "1" }]);
     const tableau = [[...base[0], ""], [...base[1], "oubli"]];
 
-    const lu = lireReprise({ etudiants: tableau, paiements: null });
+    const lu = lireReprise(tableau);
 
     expect(lu.messages).toHaveLength(1);
-    expect(lu.messages[0]).toMatchObject({ gravite: "avertissement", colonne: "R" });
+    expect(lu.messages[0]).toMatchObject({ gravite: "avertissement", colonne: "Q" });
     expect(lu.messages[0].texte).toMatch(/colonne sans en-tête, ignorée/);
+  });
+
+  it("la colonne « Droits en » d'un ancien fichier est ignorée sans erreur ni avertissement", () => {
+    for (const entete of ["Droits en", "Droits", "Tranches"]) {
+      const base = tableauEtudiants([{ numero: "1" }, { numero: "2", nom: "RASOA" }]);
+      const tableau = [[...base[0], entete], [...base[1], "3"], [...base[2], "2"]];
+
+      const lu = lireReprise(tableau);
+
+      expect(lu.messages, entete).toEqual([]);
+      expect(lu.etudiants.lignes.map((l) => l.ligne)).toEqual([2, 3]);
+      expect(lu.etudiants.colonnes, entete).not.toContain("droitsEnTranches");
+      expect(lu.etudiants.lignes[1].cellules.nom).toEqual({ type: "texte", texte: "RASOA" });
+    }
+  });
+
+  it("un ancien fichier CSV avec la colonne « Droits en » au milieu : les autres colonnes restent lues", () => {
+    const csv = [
+      "N° *;Nom *;Prénoms *;Sexe *;Date de naissance *;Lieu de naissance *;Droits en;Filière *;Année d'entrée *;Niveau 2026-2027 *",
+      "1;RAKOTO;Jean;M;10/05/2004;Toamasina;3;IF;2026;1",
+    ].join("\r\n");
+
+    const lu = lireReprise(decouperCsvLignes(csv));
+
+    expect(lu.messages).toEqual([]);
+    expect(lu.etudiants.lignes[0].cellules.filiere).toEqual({ type: "texte", texte: "IF" });
+    expect(lu.etudiants.lignes[0].cellules.niveau).toEqual({ type: "texte", texte: "1" });
   });
 
   it("une colonne en double est une erreur qui cite les deux colonnes", () => {
     const base = tableauEtudiants([{ numero: "1" }]);
     const tableau = [[...base[0], "Nom"], [...base[1], "AUTRE"]];
 
-    const lu = lireReprise({ etudiants: tableau, paiements: null });
+    const lu = lireReprise(tableau);
 
     const bloquantes = erreurs(lu.messages);
     expect(bloquantes).toHaveLength(1);
-    expect(bloquantes[0].texte).toMatch(/la colonne « Nom » apparaît deux fois \(colonnes B et R\)/);
+    expect(bloquantes[0].texte).toMatch(/la colonne « Nom » apparaît deux fois \(colonnes B et Q\)/);
     expect(lu.etudiants.lignes[0].cellules.nom).toEqual({ type: "texte", texte: "RAKOTO" });
   });
 
   it("l'année de « Niveau 2026-2027 » est rendue, null quand l'en-tête n'en porte pas", () => {
     expect(reprise([{}]).anneeNiveau).toBe("2026-2027");
-    expect(reprise([{}], [], { enteteNiveau: "Niveau 2025-2026 *" }).anneeNiveau).toBe("2025-2026");
-    expect(reprise([{}], [], { enteteNiveau: "Niveau *" }).anneeNiveau).toBeNull();
+    expect(reprise([{}], { enteteNiveau: "Niveau 2025-2026 *" }).anneeNiveau).toBe("2025-2026");
+    expect(reprise([{}], { enteteNiveau: "Niveau *" }).anneeNiveau).toBeNull();
   });
 });
 
@@ -331,79 +352,45 @@ describe("limites de lignes", () => {
     expect(erreurs(lu.messages).map((m) => m.texte)).toEqual([expect.stringMatching(/^Étudiants : plus de 2000 lignes/)]);
   });
 
-  it("accepte 10 000 paiements et refuse 10 001", () => {
-    const paiements = (n: number) => Array.from({ length: n }, () => ({}));
-
-    const limite = reprise([{}], paiements(PAIEMENTS_MAX));
-    const trop = reprise([{}], paiements(PAIEMENTS_MAX + 1));
-
-    expect(limite.paiements.lignes).toHaveLength(PAIEMENTS_MAX);
-    expect(erreurs(limite.messages)).toEqual([]);
-    expect(trop.paiements.lignes).toHaveLength(PAIEMENTS_MAX);
-    expect(erreurs(trop.messages).map((m) => m.texte)).toEqual([expect.stringMatching(/^Paiements : plus de 10000 lignes/)]);
-  });
 });
 
-describe("lecture de la feuille Paiements", () => {
-  it("sans fichier de paiements (un seul CSV) : feuille vide, aucun message", () => {
-    const lu = reprise([{ numero: "1" }], null);
-
-    expect(lu.paiements.lignes).toEqual([]);
-    expect(lu.messages).toEqual([]);
-  });
-
-  it("garde le n° de ligne Excel et ignore une ligne entièrement vide", () => {
-    const tableau = [...tableauPaiements([{ montant: "34000" }]), ["", "", "", "", "", "", ""], ...tableauPaiements([{ montant: "80000" }]).slice(1)];
-
-    const lu = lireReprise({ etudiants: tableauEtudiants([{}]), paiements: tableau });
-
-    expect(lu.paiements.lignes.map((l) => [l.ligne, l.cellules.montant])).toEqual([
-      [2, { type: "texte", texte: "34000" }],
-      [4, { type: "texte", texte: "80000" }],
-    ]);
-  });
-
-  it("colonne obligatoire absente : erreur sur la feuille Paiements", () => {
-    const tableau = tableauPaiements([{}]).map((r) => r.filter((_, i) => i !== 2));
-
-    const lu = lireReprise({ etudiants: tableauEtudiants([{}]), paiements: tableau });
-
-    expect(erreurs(lu.messages).map((m) => m.texte)).toEqual([expect.stringMatching(/^Paiements, ligne 1 : colonne obligatoire « Montant \(Ar\) » absente/)]);
-  });
-
+describe("messages de lecture du dépôt", () => {
   it("les messages de lecture du dépôt (encodage) passent en tête des messages", () => {
     const m = messageImport("avertissement", "lu en ANSI.");
 
-    const lu = lireReprise({ etudiants: tableauEtudiants([{}]), paiements: null }, [m]);
+    const lu = lireReprise(tableauEtudiants([{}]), [m]);
 
     expect(lu.messages[0]).toBe(m);
   });
 });
 
 describe("lireFichiersReprise : CSV", () => {
-  it("lit le modèle CSV téléchargé (étudiants + paiements), reconnus par leurs en-têtes et non par leur nom", async () => {
+  it("lit le CSV Étudiants du modèle, reconnu par ses en-têtes et non par son nom", async () => {
+    const lu = await lireFichiersReprise([fichier("liste.csv", csvEtudiants(PARAMETRES_MODELE_EXEMPLE))]);
+
+    expect(lu.ok).toBe(true);
+    if (!lu.ok) return;
+    expect(lu.lu.etudiants.lignes).toHaveLength(3);
+    expect(lu.lu.anneeNiveau).toBe("2026-2027");
+    expect(lu.lu.messages).toEqual([]);
+  });
+
+  it("un ancien CSV Paiements déposé avec les étudiants est ignoré, avec un avertissement neutre", async () => {
     const lu = await lireFichiersReprise([
-      fichier("export-final.csv", csvPaiements(PARAMETRES_MODELE_EXEMPLE)),
+      fichier("export-final.csv", versCsv(tableauAnciensPaiements(3))),
       fichier("liste.csv", csvEtudiants(PARAMETRES_MODELE_EXEMPLE)),
     ]);
 
     expect(lu.ok).toBe(true);
     if (!lu.ok) return;
     expect(lu.lu.etudiants.lignes).toHaveLength(3);
-    expect(lu.lu.paiements.lignes).toHaveLength(3);
-    expect(lu.lu.anneeNiveau).toBe("2026-2027");
-    expect(lu.lu.messages).toEqual([]);
+    expect(lu.lu).not.toHaveProperty("paiements");
+    expect(lu.lu.messages).toEqual([expect.objectContaining({ gravite: "avertissement", feuille: null, texte: PAIEMENTS_IGNORES })]);
+    expect(PAIEMENTS_IGNORES).toMatch(/n'est plus importée.*encaissez les paiements au guichet/);
   });
 
-  it("accepte le CSV des étudiants seul : aucun paiement (décision 57)", async () => {
-    const lu = await lireFichiersReprise([fichier("etudiants.csv", csvEtudiants(PARAMETRES_MODELE_EXEMPLE))]);
-
-    expect(lu).toMatchObject({ ok: true });
-    expect(lu.ok && lu.lu.paiements.lignes).toEqual([]);
-  });
-
-  it("refuse le CSV des paiements seul : les paiements se rattachent aux étudiants par leur N°", async () => {
-    const lu = await lireFichiersReprise([fichier("paiements.csv", csvPaiements(PARAMETRES_MODELE_EXEMPLE))]);
+  it("refuse l'ancien CSV des paiements seul : il faut le CSV des étudiants", async () => {
+    const lu = await lireFichiersReprise([fichier("paiements.csv", versCsv(tableauAnciensPaiements()))]);
 
     expect(lu).toEqual({ ok: false, erreur: expect.stringMatching(/Ajoutez le CSV des étudiants/) });
   });
@@ -419,7 +406,7 @@ describe("lireFichiersReprise : CSV", () => {
   it("refuse un CSV qui n'a les en-têtes d'aucune feuille", async () => {
     const lu = await lireFichiersReprise([fichier("autre.csv", "Foo;Bar\n1;2\n")]);
 
-    expect(lu).toEqual({ ok: false, erreur: expect.stringMatching(/« autre\.csv » n'a ni les en-têtes de la feuille Étudiants ni ceux de la feuille Paiements/) });
+    expect(lu).toEqual({ ok: false, erreur: expect.stringMatching(/« autre\.csv » n'a pas les en-têtes de la feuille Étudiants/) });
   });
 
   it("propage l'avertissement ANSI dans les messages de lecture", async () => {
@@ -440,7 +427,7 @@ describe("lireFichiersReprise : CSV", () => {
 
   it("refuse un dépôt vide, un fichier vide, trois fichiers et un fichier trop gros", async () => {
     const e = csvEtudiants(PARAMETRES_MODELE_EXEMPLE);
-    const p = csvPaiements(PARAMETRES_MODELE_EXEMPLE);
+    const p = versCsv(tableauAnciensPaiements());
 
     expect(await lireFichiersReprise([])).toEqual({ ok: false, erreur: expect.stringMatching(/Déposez le fichier \.xlsx/) });
     expect(await lireFichiersReprise([fichier("vide.csv", "")])).toEqual({ ok: false, erreur: "« vide.csv » est vide." });
@@ -458,54 +445,66 @@ describe("lireFichiersReprise : CSV", () => {
 describe("lireFichiersReprise : xlsx", () => {
   const xlsx = async (feuilles: Parameters<typeof writeXlsxFile>[0]) => new Uint8Array(await writeXlsxFile(feuilles).toBuffer());
 
-  it("lit le classeur généré par feuillesModele avec les mêmes lignes que les CSV du modèle", async () => {
+  it("lit le classeur généré par feuillesModele avec les mêmes lignes que le CSV du modèle", async () => {
     const classeur = await xlsx(feuillesModele(PARAMETRES_MODELE_EXEMPLE));
 
     const depuisXlsx = await lireFichiersReprise([fichier("modele.xlsx", classeur)]);
-    const depuisCsv = await lireFichiersReprise([
-      fichier("etudiants.csv", csvEtudiants(PARAMETRES_MODELE_EXEMPLE)),
-      fichier("paiements.csv", csvPaiements(PARAMETRES_MODELE_EXEMPLE)),
-    ]);
+    const depuisCsv = await lireFichiersReprise([fichier("etudiants.csv", csvEtudiants(PARAMETRES_MODELE_EXEMPLE))]);
 
     expect(depuisXlsx.ok && depuisCsv.ok).toBe(true);
     if (!depuisXlsx.ok || !depuisCsv.ok) return;
     expect(depuisXlsx.lu.etudiants.lignes.map((l) => l.ligne)).toEqual([3, 4, 5]);
     expect(depuisXlsx.lu.etudiants.lignes).toEqual(depuisCsv.lu.etudiants.lignes);
-    expect(depuisXlsx.lu.paiements.lignes).toEqual(depuisCsv.lu.paiements.lignes);
     expect(depuisXlsx.lu.anneeNiveau).toBe(depuisCsv.lu.anneeNiveau);
     expect(depuisXlsx.lu.messages).toEqual([]);
+  });
+
+  it("un ancien classeur avec sa feuille Paiements remplie reste lisible : la feuille est ignorée, avec un avertissement", async () => {
+    const classeur = await xlsx([
+      ...feuillesModele(PARAMETRES_MODELE_EXEMPLE),
+      { sheet: "Paiements", data: tableauAnciensPaiements(3).map((r) => r.map((v) => (v === null ? null : { value: String(v) }))) },
+    ]);
+
+    const lu = await lireFichiersReprise([fichier("ancien-modele.xlsx", classeur)]);
+
+    expect(lu.ok).toBe(true);
+    if (!lu.ok) return;
+    expect(lu.lu.etudiants.lignes).toHaveLength(3);
+    expect(lu.lu.messages).toEqual([expect.objectContaining({ gravite: "avertissement", texte: PAIEMENTS_IGNORES })]);
   });
 
   it("une cellule date d'Excel donne le bon jour, quel que soit le fuseau du serveur", async () => {
     const classeur = await xlsx([
       { sheet: "Étudiants", data: [["N° *", "Nom *", "Date de naissance *"], [{ value: "1" }, { value: "RAKOTO" }, { value: new Date(Date.UTC(2007, 2, 14)), type: Date, format: "dd/mm/yyyy" }]] },
-      { sheet: "Paiements", data: [["N° étudiant *", "Date *"], [{ value: "1" }, { value: new Date(Date.UTC(2026, 9, 5)), type: Date, format: "dd/mm/yyyy" }]] },
     ]);
 
     const lu = await lireFichiersReprise([fichier("modele.xlsx", classeur)]);
 
     expect(lu.ok && lu.lu.etudiants.lignes[0].cellules.dateNaissance).toEqual({ type: "date", jour: "2007-03-14" });
-    expect(lu.ok && lu.lu.paiements.lignes[0].cellules.date).toEqual({ type: "date", jour: "2026-10-05" });
   });
 
-  it("un nombre saisi dans Excel reste un nombre (montant, numéro de série)", async () => {
-    const classeur = await xlsx([
-      { sheet: "Étudiants", data: [["N° *", "Nom *"], [{ value: 1, type: Number }, { value: "RAKOTO" }]] },
-      { sheet: "Paiements", data: [["N° étudiant *", "Montant (Ar) *"], [{ value: 1, type: Number }, { value: 80000, type: Number }]] },
-    ]);
+  it("un nombre saisi dans Excel reste un nombre (N°, numéro de série)", async () => {
+    const classeur = await xlsx([{ sheet: "Étudiants", data: [["N° *", "Nom *"], [{ value: 1, type: Number }, { value: "RAKOTO" }]] }]);
 
     const lu = await lireFichiersReprise([fichier("modele.xlsx", classeur)]);
 
-    expect(lu.ok && lu.lu.paiements.lignes[0].cellules.montant).toEqual({ type: "nombre", nombre: 80000 });
     expect(lu.ok && lu.lu.etudiants.lignes[0].cellules.numero).toEqual({ type: "nombre", nombre: 1 });
   });
 
-  it("nomme les feuilles manquantes et celles du classeur", async () => {
-    const classeur = await xlsx([{ sheet: "Étudiants", data: [["N° *", "Nom *"], [{ value: "1" }, { value: "X" }]] }]);
+  it("le classeur sans feuille Paiements est le modèle actuel : lu sans message", async () => {
+    const classeur = await xlsx([{ sheet: "Étudiants", data: tableauEtudiants([{}]).map((r) => r.map((v) => (v === null ? null : { value: String(v) }))) }]);
 
     const lu = await lireFichiersReprise([fichier("modele.xlsx", classeur)]);
 
-    expect(lu).toEqual({ ok: false, erreur: expect.stringMatching(/Feuille « Paiements » introuvable dans « modele\.xlsx » \(feuilles du classeur : Étudiants\)/) });
+    expect(lu.ok && lu.lu.messages).toEqual([]);
+  });
+
+  it("nomme la feuille Étudiants manquante et celles du classeur", async () => {
+    const classeur = await xlsx([{ sheet: "Paiements", data: tableauAnciensPaiements().map((r) => r.map((v) => (v === null ? null : { value: String(v) }))) }]);
+
+    const lu = await lireFichiersReprise([fichier("modele.xlsx", classeur)]);
+
+    expect(lu).toEqual({ ok: false, erreur: expect.stringMatching(/Feuille « Étudiants » introuvable dans « modele\.xlsx » \(feuilles du classeur : Paiements\)/) });
   });
 
   it("refuse un classeur Excel ancien format (.xls) par sa signature, quel que soit le nom", async () => {
@@ -529,7 +528,7 @@ describe("lireFichiersReprise : xlsx", () => {
 
     const lu = await lireFichiersReprise([fichier("modele.xlsx", classeur), fichier("etudiants.csv", csvEtudiants(PARAMETRES_MODELE_EXEMPLE))]);
 
-    expect(lu).toEqual({ ok: false, erreur: expect.stringMatching(/soit le classeur \.xlsx seul, soit les CSV/) });
+    expect(lu).toEqual({ ok: false, erreur: expect.stringMatching(/soit le classeur \.xlsx seul, soit le CSV Étudiants/) });
   });
 });
 

@@ -62,13 +62,14 @@ export async function enregistrerSortie(entree: EntreeSortie): Promise<EtatActio
       where: { inscription: { etudiantId } },
       select: {
         id: true,
+        type: true,
         mois: true,
         nonDueSortie: true,
         _count: { select: { lignesPaiement: { where: { paiement: { annule: false } } } } },
       },
     });
     const nonDues = echeancesNonDuesApresSortie(
-      echeances.map((e) => ({ id: e.id, mois: e.mois, nonDueSortie: e.nonDueSortie, lignesNonAnnulees: e._count.lignesPaiement })),
+      echeances.map((e) => ({ id: e.id, type: e.type, mois: e.mois, nonDueSortie: e.nonDueSortie, lignesNonAnnulees: e._count.lignesPaiement })),
       date,
     );
 

@@ -2,7 +2,7 @@ import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import type { StatutEtudiant, TypeEcheance } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
-import { jourDeDate } from "@/lib/dates";
+import { jourDeDate, type Jour } from "@/lib/dates";
 import { libelleEcheance, trierPourSolde, type EcheancePayee } from "@/lib/ecolage";
 import type { EcheanceCopie } from "@/lib/encaissement-hors-ligne";
 
@@ -11,12 +11,12 @@ type Tx = Prisma.TransactionClient;
 /** Base cPanel parfois lente : on laisse du temps aux transactions interactives. */
 export const OPTIONS_TRANSACTION = { timeout: 15_000, maxWait: 10_000 } as const;
 
-/** Reprise des données : jusqu'à 2 000 étudiants et 10 000 paiements dans une seule transaction. */
+/** Reprise des données : jusqu'à 2 000 étudiants créés dans une seule transaction. */
 export const OPTIONS_TRANSACTION_REPRISE = { timeout: 120_000, maxWait: 10_000 } as const;
 
 /**
  * Verrou de l'étudiant puis de toutes ses échéances (toutes années), toujours dans cet ordre :
- * encaisser, annuler un paiement et redécouper les droits ne peuvent ni se croiser ni s'interbloquer.
+ * encaisser, annuler un paiement et modifier un frais ne peuvent ni se croiser ni s'interbloquer.
  */
 export async function verrouillerEtudiant(
   tx: Tx,
@@ -34,10 +34,11 @@ export async function verrouillerEtudiant(
 export type EcheanceDossier = EcheancePayee & {
   inscriptionId: string;
   type: TypeEcheance;
-  tranche: number | null;
-  droitsEnTranches: number;
+  fraisId: string | null;
+  rangFrais: number | null;
   /** « 2026-2027 » */
   anneeLibelle: string;
+  /** « Droits d'inscription », « Octobre 2026 », ou le libellé courant du frais. */
   libelle: string;
   nonDueSortie: boolean;
   /** Lignes de paiements non annulés : une seule suffit à garder l'échéance due après une sortie. */
@@ -48,13 +49,13 @@ const SELECT_ECHEANCE_DOSSIER = {
   id: true,
   inscriptionId: true,
   type: true,
-  tranche: true,
   mois: true,
-  ordre: true,
   montantDu: true,
   nonDueSortie: true,
+  fraisId: true,
+  frais: { select: { rang: true, libelle: true } },
   inscription: {
-    select: { etudiantId: true, droitsEnTranches: true, anneeScolaire: { select: { anneeDebut: true, libelle: true } } },
+    select: { etudiantId: true, anneeScolaire: { select: { anneeDebut: true, libelle: true } } },
   },
   lignesPaiement: { where: { paiement: { annule: false } }, select: { montant: true } },
 } as const satisfies Prisma.EcheanceSelect;
@@ -64,40 +65,41 @@ function echeanceDossier(e: Prisma.EcheanceGetPayload<{ select: typeof SELECT_EC
     id: e.id,
     inscriptionId: e.inscriptionId,
     type: e.type,
-    tranche: e.tranche,
     mois: e.mois,
-    ordre: e.ordre,
     montantDu: e.montantDu,
     nonDueSortie: e.nonDueSortie,
+    fraisId: e.fraisId,
+    rangFrais: e.frais?.rang ?? null,
     paye: e.lignesPaiement.reduce((s, l) => s + l.montant, 0),
     lignesNonAnnulees: e.lignesPaiement.length,
     anneeDebut: e.inscription.anneeScolaire.anneeDebut,
     anneeLibelle: e.inscription.anneeScolaire.libelle,
-    droitsEnTranches: e.inscription.droitsEnTranches,
-    libelle: libelleEcheance(e, e.inscription.droitsEnTranches),
+    libelle: libelleEcheance({ type: e.type, mois: e.mois, libelleFrais: e.frais?.libelle }),
   };
 }
 
 /**
- * Échéances de l'étudiant, payé = lignes des paiements non annulés, dans l'ordre de solde.
+ * Échéances de l'étudiant, payé = lignes des paiements non annulés, dans l'ordre de solde du `jour`.
  * Sans `avecNonDues`, les échéances « non dues » après une sortie sont exclues (reste dû, répartition, guichet).
  */
 export async function echeancesEtudiant(
   client: Tx,
   etudiantId: string,
+  jour: Jour,
   options: { avecNonDues?: boolean } = {},
 ): Promise<EcheanceDossier[]> {
   const lignes = await client.echeance.findMany({
     where: { inscription: { etudiantId }, ...(options.avecNonDues ? {} : { nonDueSortie: false }) },
     select: SELECT_ECHEANCE_DOSSIER,
   });
-  return trierPourSolde(lignes.map(echeanceDossier));
+  return trierPourSolde(lignes.map(echeanceDossier), jour);
 }
 
-/** Échéances dues (hors « non dues » après sortie) de plusieurs étudiants en une requête, par étudiant, dans l'ordre de solde. */
+/** Échéances dues (hors « non dues » après sortie) de plusieurs étudiants en une requête, par étudiant, dans l'ordre de solde du `jour`. */
 export async function echeancesDesEtudiants(
   client: Tx,
   etudiants: Prisma.EtudiantWhereInput,
+  jour: Jour,
 ): Promise<Map<string, EcheanceDossier[]>> {
   const lignes = await client.echeance.findMany({
     where: { nonDueSortie: false, inscription: { etudiant: etudiants } },
@@ -109,7 +111,7 @@ export async function echeancesDesEtudiants(
     liste.push(echeanceDossier(l));
     parEtudiant.set(l.inscription.etudiantId, liste);
   }
-  for (const [id, liste] of parEtudiant) parEtudiant.set(id, trierPourSolde(liste));
+  for (const [id, liste] of parEtudiant) parEtudiant.set(id, trierPourSolde(liste, jour));
   return parEtudiant;
 }
 
@@ -120,10 +122,9 @@ export function echeanceCopie(e: EcheanceDossier): EcheanceCopie {
     anneeDebut: e.anneeDebut,
     anneeLibelle: e.anneeLibelle,
     type: e.type,
-    tranche: e.tranche,
-    droitsEnTranches: e.droitsEnTranches,
     mois: jourDeDate(e.mois),
-    ordre: e.ordre,
+    libelle: e.libelle,
+    rangFrais: e.rangFrais,
     montantDu: e.montantDu,
     paye: e.paye,
   };

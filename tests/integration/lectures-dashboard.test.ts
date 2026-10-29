@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { tauxRecouvrement } from "@/lib/dashboard";
 import { situation } from "@/lib/ecolage";
-import { fabriquerAnnee, fabriquerEtudiant, fabriquerInscription, fabriquerPaiement } from "../factories";
+import { fabriquerAnnee, fabriquerEtudiant, fabriquerFrais, fabriquerInscription, fabriquerPaiement } from "../factories";
 import { connecter, fabriquerEtudiantInscrit, fabriquerMonde, MAINTENANT, type Monde } from "../factories/scenarios";
 
 const { getSession } = vi.hoisted(() => ({ getSession: vi.fn() }));
@@ -42,7 +42,7 @@ async function attenduParClasse(anneeId: string, jour: string, filiereId?: strin
   });
   const classes = new Map<string, Agregat>();
   for (const i of inscriptions) {
-    const sit = situation(await echeancesEtudiant(db, i.etudiantId), jour);
+    const sit = situation(await echeancesEtudiant(db, i.etudiantId, jour), jour);
     const an = sit.parAnnee.find((a) => a.anneeDebut === annee.anneeDebut);
     const duEchu = an?.duEchu ?? 0;
     const payeEchu = an?.payeEchu ?? 0;
@@ -81,7 +81,7 @@ async function jeuComplet() {
   await payer(c, [[1, 80_000]], { ...annule, annuleParId: m.admin.id });
   await payer(d, [[0, 50_000]]);
   await db.inscription.update({ where: { id: d.inscription.id }, data: { statut: "ABANDON" } });
-  await db.echeance.updateMany({ where: { inscriptionId: d.inscription.id, mois: { gt: new Date(Date.UTC(2026, 10, 1)) } }, data: { nonDueSortie: true } });
+  await db.echeance.updateMany({ where: { inscriptionId: d.inscription.id, type: { not: "DROITS" }, mois: { gt: new Date(Date.UTC(2026, 10, 1)) } }, data: { nonDueSortie: true } });
   await db.inscription.update({ where: { id: e.inscription.id }, data: { statut: "EXCLU" } });
   await payer({ etudiant: f, inscription: f2025 }, [[0, 100_000], [1, 80_000], [2, 80_000]]);
   await payer({ etudiant: f, inscription: f2026 }, [[0, 40_000]]);
@@ -149,6 +149,26 @@ describe("lireDashboard : jour de référence", () => {
     expect(paye.cartes.enRetard.nombre).toBe(0);
   });
 
+  it("les droits (1er mois) entrent dans l'attendu à date au 1er du 2e mois ; un frais, le mois suivant son mois", async () => {
+    const e = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarif(1));
+    await fabriquerFrais(m.annee.id, { classes: [{ filiereId: m.ifs.id, niveau: 1 }], montant: 15_000, mois: new Date(Date.UTC(2027, 2, 1)), inscriptionIds: [e.inscription.id] });
+    await payer(e, [[1, 80_000], [2, 80_000], [3, 80_000]]);
+
+    expect((await lireDashboard({}, "2026-10-31")).cartes.taux).toMatchObject({ attendu: 0, encaisse: 0 });
+    expect((await lireDashboard({}, "2026-11-01")).cartes.taux).toMatchObject({ attendu: 100_000 + 80_000, encaisse: 80_000 });
+    expect((await lireDashboard({}, "2027-03-31")).cartes.taux).toMatchObject({ attendu: 100_000 + 5 * 80_000, encaisse: 3 * 80_000 });
+    expect((await lireDashboard({}, "2027-04-01")).cartes.taux).toMatchObject({ attendu: 100_000 + 6 * 80_000 + 15_000, encaisse: 3 * 80_000 });
+  });
+
+  it("un mois où seul un frais est impayé compte comme un mois en retard : l'étudiant est en retard", async () => {
+    const e = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarif(1));
+    await fabriquerFrais(m.annee.id, { classes: [{ filiereId: m.ifs.id, niveau: 1 }], montant: 15_000, mois: new Date(Date.UTC(2026, 10, 1)), inscriptionIds: [e.inscription.id] });
+    await payer(e, [[0, 100_000], [1, 80_000], [2, 80_000]]);
+
+    expect((await lireDashboard({}, "2026-11-30")).cartes.enRetard).toEqual({ nombre: 0, sur: 1 });
+    expect((await lireDashboard({}, "2026-12-01")).cartes.enRetard).toEqual({ nombre: 1, sur: 1 });
+  });
+
   it("sans jour fourni : le jour à Madagascar de l'horloge", async () => {
     expect((await lireDashboard()).jour).toBe("2026-11-15");
     vi.setSystemTime(new Date("2026-11-30T21:30:00Z"));
@@ -165,25 +185,25 @@ describe("lireDashboard : jour de référence", () => {
 });
 
 describe("lireDashboard : taux", () => {
-  it("arrondi au dixième sur les sommes : 280 000 / 540 000 = 51,9 %", async () => {
+  it("arrondi au dixième sur les sommes : 230 000 / 540 000 = 42,6 %", async () => {
     const [a, b] = [await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarif(1)), await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarif(1))];
     await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarif(1));
     await payer(a, [[0, 100_000], [1, 80_000]]);
-    await payer(b, [[0, 100_000]]);
+    await payer(b, [[1, 50_000]]);
 
     const d = await lireDashboard({}, "2026-11-15");
 
-    expect(d.cartes.taux).toEqual({ valeur: 51.9, attendu: 540_000, encaisse: 280_000, bas: true });
-    expect(d.tableau.total.taux).toBe(51.9);
+    expect(d.cartes.taux).toEqual({ valeur: 42.6, attendu: 540_000, encaisse: 230_000, bas: true });
+    expect(d.tableau.total.taux).toBe(42.6);
   });
 
-  it("85 % exactement n'est pas bas, 84,4 % l'est", async () => {
+  it("85 % exactement n'est pas bas, 83,8 % l'est", async () => {
     const e = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarif(1));
     await payer(e, [[0, 100_000], [1, 53_000]]);
     expect((await lireDashboard({}, "2026-11-15")).cartes.taux).toEqual({ valeur: 85, attendu: 180_000, encaisse: 153_000, bas: false });
 
-    await db.paiementLigne.updateMany({ where: { echeanceId: e.inscription.echeances[1].id }, data: { montant: 52_000 } });
-    expect((await lireDashboard({}, "2026-11-15")).cartes.taux).toEqual({ valeur: 84.4, attendu: 180_000, encaisse: 152_000, bas: true });
+    await db.paiementLigne.updateMany({ where: { echeanceId: e.inscription.echeances[1].id }, data: { montant: 50_800 } });
+    expect((await lireDashboard({}, "2026-11-15")).cartes.taux).toEqual({ valeur: 83.8, attendu: 180_000, encaisse: 150_800, bas: true });
   });
 
   it("un surpaiement résiduel est plafonné au dû de l'échéance : jamais plus de 100 %", async () => {
@@ -210,7 +230,7 @@ describe("lireDashboard : population", () => {
     const exclu = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarif(1), { statut: "EXCLU" });
     await db.inscription.update({ where: { id: abandon.inscription.id }, data: { statut: "ABANDON" } });
     await db.inscription.update({ where: { id: exclu.inscription.id }, data: { statut: "EXCLU" } });
-    await payer(abandon, [[0, 100_000]]);
+    await payer(abandon, [[1, 80_000]]);
     await payer(exclu, [[0, 100_000], [1, 80_000]]);
     await payer(actif, [[0, 100_000]]);
 
@@ -218,15 +238,15 @@ describe("lireDashboard : population", () => {
 
     expect(d.cartes.effectif.total).toBe(1);
     expect(d.cartes.enRetard).toEqual({ nombre: 1, sur: 1 });
-    expect(d.cartes.taux).toMatchObject({ attendu: 3 * 180_000, encaisse: 100_000 + 100_000 + 180_000 });
+    expect(d.cartes.taux).toMatchObject({ attendu: 3 * 180_000, encaisse: 100_000 + 80_000 + 180_000 });
     expect(d.tableau.lignes).toHaveLength(1);
-    expect(d.tableau.lignes[0]).toMatchObject({ effectif: 1, enRetard: 1, attendu: 540_000, encaisse: 380_000 });
+    expect(d.tableau.lignes[0]).toMatchObject({ effectif: 1, enRetard: 1, attendu: 540_000, encaisse: 360_000 });
   });
 
   it("abandon avec mois non dus : seul l'échu et le mois de sortie sont attendus", async () => {
     const e = await fabriquerEtudiantInscrit(m.ifs.id, m.annee, tarif(1), { statut: "ABANDON" });
     await db.inscription.update({ where: { id: e.inscription.id }, data: { statut: "ABANDON" } });
-    await db.echeance.updateMany({ where: { inscriptionId: e.inscription.id, mois: { gt: new Date(Date.UTC(2026, 10, 1)) } }, data: { nonDueSortie: true } });
+    await db.echeance.updateMany({ where: { inscriptionId: e.inscription.id, type: { not: "DROITS" }, mois: { gt: new Date(Date.UTC(2026, 10, 1)) } }, data: { nonDueSortie: true } });
 
     const d = await lireDashboard({}, "2027-07-31");
 

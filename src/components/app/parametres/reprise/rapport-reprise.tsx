@@ -68,9 +68,9 @@ export function RapportReprise({
   const { totaux } = rapport;
   const erreurs = rapport.messages.filter((m) => m.gravite === "erreur");
   const avertissements = rapport.messages.filter((m) => m.gravite === "avertissement");
-  const aImporter = totaux.etudiants.nouveaux > 0 || totaux.paiements.aImporter > 0;
+  const aImporter = totaux.etudiants.nouveaux > 0;
   const peutImporter = !rapport.bloquant && signature !== null;
-  const libelleImport = `Importer ${pluriel(totaux.etudiants.nouveaux, "étudiant", "étudiants")} et ${pluriel(totaux.paiements.aImporter, "paiement", "paiements")}`;
+  const libelleImport = `Importer ${pluriel(totaux.etudiants.nouveaux, "étudiant", "étudiants")}`;
 
   async function lancerImport(): Promise<EtatAction<unknown>> {
     const donnees = new FormData();
@@ -142,11 +142,6 @@ export function RapportReprise({
           <TableauEtudiants etudiants={rapport.etudiants} />
         </BlocReplie>
       )}
-      {rapport.recapPaiements.length > 0 && (
-        <BlocReplie titre={`Paiements par étudiant (${rapport.recapPaiements.length})`}>
-          <TableauPaiements rapport={rapport} />
-        </BlocReplie>
-      )}
 
       <div className="flex flex-col gap-3 border-t bg-muted/40 px-4 py-4 sm:px-5">
         {echecImport && (
@@ -171,13 +166,14 @@ export function RapportReprise({
               description={
                 <>
                   <span className="block">
-                    {pluriel(totaux.etudiants.nouveaux, "étudiant sera créé", "étudiants seront créés")} et{" "}
-                    {pluriel(totaux.paiements.aImporter, "paiement sera enregistré", "paiements seront enregistrés")} pour{" "}
-                    {formaterAriary(totaux.paiements.montantAImporter)}.
+                    {totaux.etudiants.nouveaux > 1
+                      ? `${totaux.etudiants.nouveaux} étudiants seront créés et inscrits`
+                      : "1 étudiant sera créé et inscrit"}{" "}
+                    en {rapport.annee?.libelle}, avec tout l&apos;écolage de l&apos;année dû.
                   </span>
                   <span className="mt-2 block font-medium text-foreground">Un import ne s&apos;annule pas.</span>
                   <span className="mt-2 block">
-                    Pendant l&apos;import (jusqu&apos;à 2 minutes), le guichet ne peut enregistrer aucun paiement : lancez-le hors des heures de guichet.
+                    L&apos;import peut prendre jusqu&apos;à 2 minutes : une inscription ou un changement de Paramètres lancé pendant ce temps attend qu&apos;il se termine.
                   </span>
                 </>
               }
@@ -212,7 +208,7 @@ function Chiffre({ n, libelle, alerte }: { n: number; libelle: string; alerte?: 
 }
 
 function Totaux({ rapport }: { rapport: RapportRepriseAllege }) {
-  const { etudiants: e, paiements: p } = rapport.totaux;
+  const { etudiants: e } = rapport.totaux;
   return (
     <dl className="grid gap-x-8 gap-y-4 border-t bg-rose-pale px-4 py-4 text-sm sm:grid-cols-2 sm:px-5">
       <div>
@@ -221,17 +217,6 @@ function Totaux({ rapport }: { rapport: RapportRepriseAllege }) {
           <Chiffre n={e.nouveaux} libelle={e.nouveaux > 1 ? "nouveaux" : "nouveau"} />
           <Chiffre n={e.existants} libelle="déjà en base" />
           <Chiffre n={e.refuses} libelle={e.refuses > 1 ? "refusés" : "refusé"} alerte />
-        </dd>
-      </div>
-      <div>
-        <dt className="font-heading text-base font-semibold text-primary">Paiements</dt>
-        <dd className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
-          <span>
-            <strong className="font-semibold tabular-nums">{p.aImporter}</strong> à importer
-            {p.aImporter > 0 && <>, soit <span className="tabular-nums">{formaterAriary(p.montantAImporter)}</span></>}
-          </span>
-          <Chiffre n={p.dejaImportes} libelle={p.dejaImportes > 1 ? "déjà importés" : "déjà importé"} />
-          <Chiffre n={p.refuses} libelle={p.refuses > 1 ? "refusés" : "refusé"} alerte />
         </dd>
       </div>
     </dl>
@@ -371,59 +356,6 @@ function TableauEtudiants({ etudiants }: { etudiants: Etudiant[] }) {
         </CorpsAdaptatif>
       </TableauAdaptatif>
       {!tout && <PlusDeLignes restant={etudiants.length - visibles.length} onClick={() => setTout(true)} />}
-    </>
-  );
-}
-
-function TableauPaiements({ rapport }: { rapport: RapportRepriseAllege }) {
-  const [tout, setTout] = useState(false);
-  const noms = new Map(rapport.etudiants.map((e) => [e.ligne, e.nom ? `${e.nom.toUpperCase()} ${e.prenoms ?? ""}`.trim() : null]));
-  const recaps = rapport.recapPaiements;
-  const visibles = tout ? recaps : recaps.slice(0, LIGNES_VISIBLES);
-
-  return (
-    <>
-      <TableauAdaptatif>
-        <EnTeteAdaptatif>
-          <TableRow>
-            <ColonneAdaptative>N°</ColonneAdaptative>
-            <ColonneAdaptative>Étudiant</ColonneAdaptative>
-            <ColonneAdaptative>À importer</ColonneAdaptative>
-            <ColonneAdaptative className="text-right">Montant</ColonneAdaptative>
-            <ColonneAdaptative>Déjà importés</ColonneAdaptative>
-            <ColonneAdaptative>Refusés</ColonneAdaptative>
-            <ColonneAdaptative className="text-right">Reste à payer après</ColonneAdaptative>
-          </TableRow>
-        </EnTeteAdaptatif>
-        <CorpsAdaptatif>
-          {visibles.map((r) => (
-            <LigneAdaptative key={r.ligneEtudiant}>
-              <CelluleAdaptative libelle="N°" className="tabular-nums">
-                {r.numero}
-              </CelluleAdaptative>
-              <CelluleAdaptative pleine className="font-medium">
-                {noms.get(r.ligneEtudiant) ?? "—"}
-              </CelluleAdaptative>
-              <CelluleAdaptative libelle="À importer" className="tabular-nums">
-                {r.aImporter}
-              </CelluleAdaptative>
-              <CelluleAdaptative libelle="Montant" droite className="tabular-nums">
-                {formaterAriary(r.montantAImporter)}
-              </CelluleAdaptative>
-              <CelluleAdaptative libelle="Déjà importés" className="tabular-nums">
-                {r.dejaImportes}
-              </CelluleAdaptative>
-              <CelluleAdaptative libelle="Refusés" className={cn("tabular-nums", r.refuses > 0 && "font-medium text-retard")}>
-                {r.refuses}
-              </CelluleAdaptative>
-              <CelluleAdaptative libelle="Reste à payer après" droite className="tabular-nums">
-                {r.resteApres !== null ? formaterAriary(r.resteApres) : "—"}
-              </CelluleAdaptative>
-            </LigneAdaptative>
-          ))}
-        </CorpsAdaptatif>
-      </TableauAdaptatif>
-      {!tout && <PlusDeLignes restant={recaps.length - visibles.length} onClick={() => setTout(true)} />}
     </>
   );
 }

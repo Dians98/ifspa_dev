@@ -104,8 +104,6 @@ export function GrilleTarifs({ grille }: { grille: GrilleTarifsParametre }) {
 
   const entete = {
     titre: "Tarifs par filière et par niveau",
-    description:
-      "Montants en ariary, sans décimales. Un tarif identique pour tous les étudiants d'une même filière, année et niveau.",
     action: selecteur || undefined,
   };
 

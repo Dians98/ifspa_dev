@@ -138,7 +138,7 @@ describe("encaisser en ligne après une synchronisation hors ligne", () => {
     );
     connecter(getSession, m.user);
 
-    const r = await actions.encaisser({ etudiantId: e.etudiant.id, montant: 80_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: 900_000 });
+    const r = await actions.encaisser({ etudiantId: e.etudiant.id, montant: 80_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: 900_000, jourAffiche: "2026-11-15" });
 
     expect(r).toMatchObject({ statut: "erreur", code: "SITUATION_CHANGEE" });
     expect(await db.paiement.count()).toBe(1);
@@ -148,7 +148,7 @@ describe("encaisser en ligne après une synchronisation hors ligne", () => {
     await reserver(m.user.id, POSTE_A);
     connecter(getSession, m.user);
 
-    const r = await actions.encaisser({ etudiantId: e.etudiant.id, montant: 80_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: 900_000 });
+    const r = await actions.encaisser({ etudiantId: e.etudiant.id, montant: 80_000, mode: "ESPECES", idClient: randomUUID(), resteDuAffiche: 900_000, jourAffiche: "2026-11-15" });
 
     expect(r).toMatchObject({ statut: "succes", donnees: { numero: "R-2026-00021" } });
     expect(await db.paiement.findFirstOrThrow()).toMatchObject({ aVerifier: false, noteVerification: null });
@@ -171,6 +171,7 @@ describe("idClient partagé entre l'encaissement en ligne et la synchronisation"
     mode: "ESPECES",
     idClient: randomUUID(),
     resteDuAffiche: 900_000,
+    jourAffiche: "2026-11-15",
     ...surcharge,
   });
 

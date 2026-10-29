@@ -39,6 +39,7 @@ model User {
   blocsReserves      BlocNumeros[]        @relation("BlocNumerosReservePar")
   admissionsCreees   OperationAdmission[] @relation("AdmissionCreePar")
   admissionsAnnulees OperationAdmission[] @relation("AdmissionAnnuleePar")
+  fraisCrees         Frais[]              @relation("FraisCreePar")
 
   @@map("user")
 }
@@ -123,9 +124,10 @@ model Filiere {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  etudiants  Etudiant[]
-  tarifs     Tarif[]
-  admissions OperationAdmission[]
+  etudiants    Etudiant[]
+  tarifs       Tarif[]
+  admissions   OperationAdmission[]
+  classesFrais FraisClasse[]
 
   @@map("filiere")
 }
@@ -147,6 +149,7 @@ model AnneeScolaire {
   etudiantsEntres  Etudiant[]
   admissionsSource OperationAdmission[] @relation("AdmissionAnneeSource")
   admissionsCible  OperationAdmission[] @relation("AdmissionAnneeCible")
+  frais            Frais[]
 
   // Index unique partiel : au plus une année courante en base.
   @@unique([estCourante], where: { estCourante: true }, map: "annee_scolaire_une_seule_courante")
@@ -244,8 +247,6 @@ model Inscription {
   anneeScolaire        AnneeScolaire       @relation(fields: [anneeScolaireId], references: [id])
   niveau               Int
   redoublement         Boolean             @default(false)
-  // Droits d'inscription payés en 1, 2 ou 3 tranches (octobre, novembre, décembre)
-  droitsEnTranches     Int                 @default(1)
   statut               StatutInscription   @default(EN_COURS)
   // Renseigné quand l'inscription a été créée par une admission en lot
   operationAdmissionId String?
@@ -263,6 +264,7 @@ model Inscription {
 enum TypeEcheance {
   DROITS
   MENSUALITE
+  FRAIS
 }
 
 model Echeance {
@@ -270,18 +272,57 @@ model Echeance {
   inscriptionId String
   inscription   Inscription  @relation(fields: [inscriptionId], references: [id], onDelete: Cascade)
   type          TypeEcheance
-  tranche       Int? // 1 à 3 pour les droits, null pour une mensualité
-  mois          DateTime     @db.Date // 1er du mois concerné (date d'exigibilité)
-  ordre         Int // ordre de solde : pour chaque mois, la tranche de droits éventuelle puis la mensualité
-  montantDu     Int // copié depuis le tarif à la génération ; payé = somme des lignes de paiements non annulés (paiement partiel possible)
+  mois          DateTime     @db.Date // 1er du mois d'exigibilité ; l'ordre de solde se calcule (trierPourSolde)
+  montantDu     Int // copié du tarif ou du frais à la génération ; payé = somme des lignes de paiements non annulés
+  // Renseigné pour une échéance de type FRAIS
+  fraisId       String?
+  frais         Frais?       @relation(fields: [fraisId], references: [id], onDelete: Restrict)
   // Mois postérieur à une sortie (abandon, exclusion), rien payé dessus : hors du reste dû, des impayés et du taux
   nonDueSortie  Boolean      @default(false)
 
   lignesPaiement PaiementLigne[]
 
-  @@unique([inscriptionId, ordre])
+  @@unique([inscriptionId], where: { type: "DROITS" }, map: "echeance_un_seul_droits")
+  @@unique([inscriptionId, mois], where: { type: "MENSUALITE" }, map: "echeance_une_mensualite_par_mois")
+  @@unique([inscriptionId, fraisId])
   @@index([mois])
+  @@index([fraisId])
   @@map("echeance")
+}
+
+// Frais en cours d'année (admin) : une échéance FRAIS par inscription des classes visées
+model Frais {
+  id              String        @id @default(cuid())
+  libelle         String
+  montant         Int // en ariary
+  mois            DateTime      @db.Date // 1er du mois d'exigibilité
+  anneeScolaireId String
+  anneeScolaire   AnneeScolaire @relation(fields: [anneeScolaireId], references: [id])
+  // Ordre de création : départage deux frais du même mois dans l'ordre de solde, copié sur le poste hors ligne
+  rang            Int           @unique @default(autoincrement())
+  creeParId       String?
+  creePar         User?         @relation("FraisCreePar", fields: [creeParId], references: [id])
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  classes   FraisClasse[]
+  echeances Echeance[]
+
+  @@index([anneeScolaireId])
+  @@map("frais")
+}
+
+model FraisClasse {
+  id        String  @id @default(cuid())
+  fraisId   String
+  frais     Frais   @relation(fields: [fraisId], references: [id], onDelete: Cascade)
+  filiereId String
+  filiere   Filiere @relation(fields: [filiereId], references: [id])
+  niveau    Int
+
+  @@unique([fraisId, filiereId, niveau])
+  @@index([filiereId, niveau])
+  @@map("frais_classe")
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -368,6 +409,8 @@ model PaiementLigne {
   montant            Int
   // Reste dû sur l'échéance juste après ce paiement, figé pour réimprimer le reçu à l'identique
   resteEcheanceApres Int
+  // Libellé de l'échéance à l'émission : un frais renommé ensuite ne change pas le reçu réimprimé
+  libelle            String?
 
   @@index([echeanceId])
   @@map("paiement_ligne")

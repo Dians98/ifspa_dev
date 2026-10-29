@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { StatutEtudiant } from "@/generated/prisma/enums";
+import type { StatutEtudiant, TypeEcheance } from "@/generated/prisma/enums";
 import type { Sexe } from "@/generated/prisma/enums";
 import { dateDuJour, formaterJour, lireJour, type Jour } from "@/lib/dates";
 import { libelleStatutEtudiant } from "@/lib/etudiants";
@@ -81,17 +81,17 @@ export function controleSortie(c: {
 }
 
 /**
- * Échéances qui ne seront plus dues : mois strictement postérieur au mois de sortie, et aucune ligne de
- * paiement non annulé dessus. Le mois de sortie et ce qui est échu restent dus.
+ * Mensualités et frais qui ne seront plus dus : mois strictement postérieur au mois de sortie, et aucune ligne
+ * de paiement non annulé dessus. Le mois de sortie, ce qui est échu et les droits d'inscription restent dus.
  */
 export function echeancesNonDuesApresSortie(
-  echeances: readonly { id: string; mois: Date; nonDueSortie: boolean; lignesNonAnnulees: number }[],
+  echeances: readonly { id: string; type: TypeEcheance; mois: Date; nonDueSortie: boolean; lignesNonAnnulees: number }[],
   date: Jour,
 ): string[] {
   const { annee, mois } = lireJour(date);
   const indexSortie = annee * 12 + (mois - 1);
   return echeances
-    .filter((e) => !e.nonDueSortie && e.lignesNonAnnulees === 0)
+    .filter((e) => e.type !== "DROITS" && !e.nonDueSortie && e.lignesNonAnnulees === 0)
     .filter((e) => e.mois.getUTCFullYear() * 12 + e.mois.getUTCMonth() > indexSortie)
     .map((e) => e.id);
 }
@@ -99,6 +99,7 @@ export function echeancesNonDuesApresSortie(
 /** Échéance telle que la fenêtre de sortie la reçoit : tout ce qu'il faut pour rejouer `echeancesNonDuesApresSortie`. */
 export type EcheanceAvantSortie = {
   id: string;
+  type: TypeEcheance;
   /** 1er du mois d'exigibilité, « 2026-10-01 » */
   mois: Jour;
   montantDu: number;

@@ -49,10 +49,10 @@ Source officielle : `LOGO ET ARRËTEE IFSPA.pdf` (logo et arrêtés : ouverture 
 - **AnneeScolaire** : `libelle` (`2026-2027`), `anneeDebut` (2026), `dateDebut`, `dateFin`, `moisDebutEcolage` (10 = octobre), `estCourante`, `cloturee`
 - **Tarif** : `filiereId`, `anneeScolaireId`, `niveau`, `droitsInscription`, `montantMensuel`, `nombreMois`. Unicité sur (filière, année scolaire, niveau).
 - **Etudiant** : `matricule` (unique), `nom`, `prenoms`, `sexe`, `dateNaissance`, `lieuNaissance`, `cin?`, `telephone`, `email?`, `adresse`, `tuteurNom?`, `tuteurTelephone?`, `tuteurProfession?` (tuteur facultatif, un par étudiant : retiré le 30/09/2026, rétabli le 28/10/2026 avec la profession ; nom exigé dès que son téléphone ou sa profession est saisi), `photo?`, `filiereId`, `anneeEntreeId`, `statut` (`ACTIF` | `DIPLOME` | `ABANDON` | `EXCLU`), `dateSortie?`, `motifSortie?`
-- **Inscription** (une par étudiant et par année scolaire) : `etudiantId`, `anneeScolaireId`, `niveau`, `redoublement` (bool), `droitsEnTranches` (1, 2 ou 3), `statut` (`EN_COURS` | `ADMIS` | `REDOUBLE` | `DIPLOME` | `ABANDON`), `operationAdmissionId?`
-- **Echeance** : générée à l'inscription à partir du Tarif. Le montant est copié au moment de la génération, pour qu'un changement de tarif ne modifie pas le passé. Champs : `inscriptionId`, `type` (`DROITS` | `MENSUALITE`), `tranche?` (1 à 3 pour les droits), `mois` (date du 1er du mois d'exigibilité), `montantDu`.
-  - **Droits d'inscription en 1, 2 ou 3 fois** (demande du client) : choix fait à l'inscription (`Inscription.droitsEnTranches`, 1 par défaut). Tranches égales arrondies au millier, le reste sur la 1re (ex. 100 000 en 3 fois = 34 000 + 33 000 + 33 000). Exigibles : 1re tranche en octobre (à l'inscription), 2e en novembre, 3e en décembre. Au passage en année supérieure, le choix de l'année précédente est repris ; il reste modifiable sur la fiche tant qu'aucune tranche n'est payée.
-  - **Où et quand encaisser les droits** : au guichet, sur l'écran Encaisser, comme les mensualités. Ordre de solde : pour chaque mois, la tranche de droits éventuelle puis la mensualité. Un nouvel étudiant paie ses droits (ou la 1re tranche) juste après son inscription ; un étudiant qui passe en année supérieure paie ceux de la nouvelle année à la rentrée d'octobre.
+- **Inscription** (une par étudiant et par année scolaire) : `etudiantId`, `anneeScolaireId`, `niveau`, `redoublement` (bool), `statut` (`EN_COURS` | `ADMIS` | `REDOUBLE` | `DIPLOME` | `ABANDON`), `operationAdmissionId?`
+- **Echeance** : générée à l'inscription à partir du Tarif. Le montant est copié au moment de la génération, pour qu'un changement de tarif ne modifie pas le passé. Champs : `inscriptionId`, `type` (`DROITS` | `MENSUALITE` | `FRAIS`), `fraisId?`, `mois` (date du 1er du mois d'exigibilité), `montantDu`, `nonDueSortie`. Pas de champ d'ordre : l'ordre de solde se calcule au jour du paiement (phase 10).
+  - **Droits d'inscription** : une seule échéance par année, exigible le 1er mois de l'année (en retard dès le 2e mois), payable en plusieurs fois (les 1, 2 ou 3 tranches ont été retirées le 29/10/2026, voir phase 10). Encaissés au guichet comme le reste.
+- **Frais** / **FraisClasse** : frais en cours d'année défini par l'admin (`libelle`, `montant`, `mois`, `anneeScolaireId`, `rang`), visant une ou plusieurs classes (`filiereId`, `niveau`). Voir phase 10.
 - **Paiement** : `numeroRecu` (unique), `etudiantId`, `date`, `montant`, `mode` (`ESPECES` | `MOBILE_MONEY`), `operateur?` (`MVOLA` | `ORANGE` | `AIRTEL`), `reference?`, `observation?`, `saisiParId`, `annule`, `annuleParId?`, `motifAnnulation?`, `idClient?` (unique : identifiant généré sur le poste pour l'encaissement hors ligne, rend un double envoi sans effet), `aVerifier` (paiement synchronisé alors que l'échéance avait été soldée ailleurs)
 - **BlocNumeros** : bloc de numéros réservé à l'avance par un poste, pour attribuer hors ligne un numéro définitif. Sert aux reçus de l'encaissement hors ligne (clé `RECU:{annee}`) et pourra servir aux matricules (`MATRICULE:{CODE}:{annee}`). Champs : `poste`, `cle` (clé du `Compteur`), `premier`, `dernier`, `reserveParId`.
 - **PaiementLigne** : `paiementId`, `echeanceId`, `montant`. Répartit un paiement sur les échéances, de la plus ancienne à la plus récente. **Paiement partiel autorisé** (rétabli à la demande du client le 01/10/2026), sur les droits comme sur les mensualités : le montant reçu est libre. Ce qui dépasse les échéances soldées va en acompte sur l'échéance suivante (l'étudiant apporte 100 000 Ar pour un mois à 80 000 Ar : le mois est soldé, 20 000 Ar d'acompte sur le mois suivant) ; un montant inférieur à une échéance la paie en partie. `PaiementLigne.montant` peut donc être inférieur à `Echeance.montantDu` ; le payé d'une échéance est la somme de ses lignes de paiements non annulés. Un montant qui dépasse le reste dû total de l'étudiant (toutes années confondues) est refusé (pas de trop-perçu). **Pas de notion d'« arriérés »** (retirée à la demande du client) : les impayés d'une année restent dus sur cette année, rien n'est reporté sur l'année suivante. Ils restent toutefois visibles et encaissables : un paiement peut couvrir des échéances de plusieurs années, de la plus ancienne à la plus récente (décision du 11/10/2026).
@@ -62,7 +62,7 @@ Source officielle : `LOGO ET ARRËTEE IFSPA.pdf` (logo et arrêtés : ouverture 
 
 **Règles clés**
 - Le matricule est généré à la création : `{Filiere.code}-{AnneeEntree.anneeDebut}-{séquence sur 4 chiffres}`.
-- Une échéance est soit **payée**, soit **partielle** (acompte versé, reste dû, mois pas encore passé), soit **en retard** (mois passé, pas entièrement payée ; on affiche le reste dû), soit **à venir**. « Mois passé » : une échéance du mois M est en retard **à partir du 1er du mois M+1** (l'échéance d'octobre non soldée est en retard le 1er novembre). La règle vaut aussi pour les tranches de droits. Les droits (ou leur 1re tranche) sont dus à l'inscription.
+- Une échéance est soit **payée**, soit **partielle** (acompte versé, reste dû, mois pas encore passé), soit **en retard** (mois passé, pas entièrement payée ; on affiche le reste dû), soit **à venir**. « Mois passé » : une échéance du mois M est en retard **à partir du 1er du mois M+1** (l'échéance d'octobre non soldée est en retard le 1er novembre). La règle vaut aussi pour les droits (exigibles en décembre) et les frais.
 - **Pas d'inscription en cours d'année** : la création d'un étudiant génère toujours les échéances de l'année complète (droits et 10 mensualités d'octobre à juillet).
 - Aucune suppression physique de paiement. L'admin **annule** le paiement avec un motif : le reçu reste dans l'historique, marqué ANNULÉ.
 
@@ -284,7 +284,7 @@ L'administrateur de l'institut ajuste ensuite lui-même dans Paramètres. Les é
 - [x] `montant-en-lettres.ts`, avec ses tests
 - [x] Encaissement (saisie rapide et depuis la fiche), numérotation des reçus
 - [x] Reçu au format ticket thermique 80 mm (58 mm en option), sans QR code
-- [x] Droits d'inscription en 1, 2 ou 3 tranches
+- [x] ~~Droits d'inscription en 1, 2 ou 3 tranches~~ (retiré en phase 10)
 - [x] Paiement partiel : montant reçu libre, acompte sur l'échéance suivante, statut « partiel »
 - [x] Encaissement hors ligne (écran Encaisser seul, rien à installer) : page en cache, copie locale légère (IndexedDB), file d'attente, blocs de numéros de reçu, synchronisation automatique et manuelle
 - [x] Relevé d'écolage PDF A4, impression directe
@@ -351,6 +351,56 @@ Le site n'apparaît pas tout seul ni tout de suite : il faut le déclarer à Goo
 - [ ] **Contrôle à J+7 puis J+30** : rechercher `site:<domaine>` sur Google ; dans Search Console, rapports « Pages » (indexée ? pourquoi exclue ?) et « Signaux Web essentiels » ; corriger ce qui est signalé.
 - Pas de promesse de classement : Google décide. Ce qui le fait progresser ensuite, c'est le contenu réel (présentation, filières, conditions d'admission), la fiche Google à jour et les liens depuis d'autres sites.
 
+### Phase 10 — Frais en cours d'année et droits sans tranches (décidé le 29/10/2026)
+Principe inchangé : l'étudiant vient au guichet avec une somme, l'application la répartit seule.
+
+**Droits d'inscription sans tranches**
+- Le choix 1, 2 ou 3 tranches est retiré. Chaque inscription a **une seule échéance de droits**, du montant du tarif, payable en plusieurs fois (paiement partiel).
+- Exigible **le 1er mois** de l'année scolaire : en retard à partir du **1er du 2e mois** si elle n'est pas soldée (année commençant en octobre : en retard au 1er novembre). Décidé le 29/10/2026, remplace « exigible en décembre ».
+- Retiré de l'inscription, des admissions en lot, de la fiche, des reçus (« tranche 1/3 » devient « Droits d'inscription »), du relevé et de l'export. L'import **ignore** l'ancienne colonne de tranches sans erreur.
+- Migration : pas d'étudiants réels en production ; en dev et en recette, les tranches existantes sont fusionnées en une échéance de droits, leurs lignes de paiement conservées.
+
+**Frais en cours d'année (admin seulement)**
+- Un frais : libellé, montant (ariary entier), **mois d'exigibilité** (mois en cours ou à venir, dans l'année scolaire, octobre à juillet), une **année scolaire**, une ou plusieurs **classes** (filière + niveau). Même montant pour tous, pas de dispense.
+- Concernés : toutes les inscriptions de l'année dans ces classes, redoublants compris, sauf les étudiants déjà sortis (abandon, exclusion). Une inscription créée **plus tard** dans une classe visée (inscription, admission en lot, import) reçoit le frais **automatiquement**.
+- Chaque étudiant concerné reçoit **une échéance** de type Frais (paiement partiel possible). En retard le 1er du mois suivant son mois d'exigibilité. Après une sortie : un frais exigible après la sortie et sans paiement n'est plus dû (même règle que les mensualités).
+- Gestion : **Paramètres → Frais**, avec récapitulatif avant création (« 42 étudiants recevront 15 000 Ar, exigibles en mars 2027 »). Modifiable (libellé, montant, mois) et supprimable **tant qu'aucun paiement ne l'a touché** ; ensuite verrouillé, sauf le libellé. Rien n'est modifiable sur une année clôturée.
+- Les frais comptent partout : reste dû, Encaisser (y compris hors ligne), impayés, taux de recouvrement, dashboard, fiche étudiant ; libellé visible sur le reçu et le relevé A4. Le secrétariat les voit et les encaisse, sans les gérer. Export : oui ; import : non (ils s'appliquent d'eux-mêmes aux étudiants importés).
+
+**Précisions (29/10/2026)**
+- Les **droits restent toujours dus**, même en cas de sortie avant décembre : la règle « plus dû après la sortie » ne vaut que pour les mensualités et les frais.
+- Le **libellé** d'un frais est **figé sur la ligne de paiement** à l'encaissement : un reçu réimprimé garde le libellé du jour du paiement ; les écrans affichent le libellé courant.
+- Un nouveau frais ne s'applique pas aux étudiants **diplômés** (ni abandon, ni exclusion).
+- Un mois où seul un frais est en retard compte comme « mois en retard » (impayés, relevé).
+- Les droits comptent dans l'« attendu à date » du taux de recouvrement dès le 2e mois de l'année.
+
+**Ordre de répartition d'un versement** (remplace « pour chaque mois, la tranche puis la mensualité »)
+Année par année, la plus ancienne d'abord ; dans une année :
+1. droits d'inscription ;
+2. mensualités dues (mois passés et mois en cours) ;
+3. frais dus (mois d'exigibilité atteint), par mois puis par ordre de création ;
+4. mensualités à venir ;
+5. frais à venir.
+
+**Calendrier des années scolaires (29/10/2026)**
+- Premier mois des mensualités : **les 12 mois** possibles (au lieu de septembre, octobre, novembre), choisi à la création de l'année, non modifiable ensuite.
+- Toujours **10 mensualités**, comptées à partir de ce mois **dans l'année de début** (« 2027-2028 » commençant en janvier : janvier à octobre 2027).
+- Nom toujours « {année de début}-{année de début + 1} », même si l'année se termine dans la même année civile. Année suivante (passage en lot, matricule) : toujours année de début + 1.
+- **Chevauchement refusé** : une année ne peut pas commencer avant la fin de l'année précédente ni finir après le début de la suivante (« 2027-2028 ne peut pas commencer avant août 2027 : 2026-2027 se termine en juillet 2027. »).
+
+**Import sans paiements (29/10/2026)**
+- L'import ne reprend plus que les **étudiants** (et leur inscription sur l'année courante). Feuille « Paiements », analyse des paiements, reçus « R-… » de reprise et leur numérotation : retirés. Une feuille ou des colonnes de paiements dans un ancien fichier sont ignorées sans erreur.
+- L'import se fait au tout début de l'année, avant tout paiement : l'année courante est entièrement due. Un import tardif se règle à la main au guichet.
+- Les années précédentes ne sont pas créées par l'import : rien n'y est dû, les étudiants arrivent « à jour ».
+- Les données déjà importées (dev, recette) restent telles quelles.
+
+Tâches :
+- [x] Schéma, migration et logique de répartition (`src/lib/ecolage.ts`), y compris la copie hors ligne d'Encaisser
+- [ ] Paramètres → Frais (création avec récapitulatif, modification, suppression, verrouillage)
+- [ ] Retrait des tranches dans l'inscription, les admissions, la fiche, les reçus, le relevé, l'import et l'export
+- [ ] Application automatique des frais aux inscriptions créées plus tard
+- [ ] CLAUDE.md, tests, E2E, recette
+
 ## Points ouverts (sans bloquer le démarrage)
 
 - **Durée de chaque filière** : 3 ans dans le seed, modifiable dans Paramètres.
@@ -368,7 +418,7 @@ Le site n'apparaît pas tout seul ni tout de suite : il faut le déclarer à Goo
 - **Tests unitaires (Vitest)** :
   - matricule : format, séquence, unicité quand plusieurs créations arrivent en même temps ;
   - échéances : génération à partir du tarif ;
-  - répartition d'un paiement : plusieurs mois d'un coup, paiement partiel (acompte sur l'échéance suivante, échéance payée en partie, tranche de droits payée en partie), paiement couvrant des échéances de deux années, refus du trop-perçu au-delà du reste dû total ;
+  - répartition d'un paiement : plusieurs mois d'un coup, paiement partiel (acompte sur l'échéance suivante, échéance payée en partie, droits payés en partie, frais payé en partie), paiement couvrant des échéances de deux années, refus du trop-perçu au-delà du reste dû total ;
   - calcul des retards à une date donnée (dernier jour du mois M : à venir ; 1er du mois M+1 : en retard) ;
   - montant en lettres ;
   - admission puis annulation, qui doit restaurer exactement l'état d'avant.

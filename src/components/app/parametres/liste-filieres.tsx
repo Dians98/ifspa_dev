@@ -37,7 +37,6 @@ export function ListeFilieres({ filieres }: { filieres: FiliereParametre[] }) {
   return (
     <PanneauParametre
       titre="Filières"
-      description="Le code sert de préfixe au matricule (ex. IF-2026-0001) et ne peut plus changer une fois des étudiants inscrits."
       action={filieres.length > 0 ? <BoutonAjouter /> : undefined}
     >
       {filieres.length === 0 ? (

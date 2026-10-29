@@ -6,9 +6,9 @@ const mois = (annee: number, mois1a12: number) => new Date(Date.UTC(annee, mois1
 let n = 0;
 const echeance = (anneeDebut: number, m: Date, montantDu: number, paye: number, nonDueSortie = false): EcheancePayee => ({
   id: `e${++n}`,
+  type: "MENSUALITE",
   anneeDebut,
   mois: m,
-  ordre: n,
   montantDu,
   paye,
   nonDueSortie,

@@ -14,7 +14,7 @@ test.describe("Étudiants — secrétariat", () => {
   const prenoms = "Hélène";
   let urlFiche = "";
 
-  test("inscrire un étudiant IF en 1re année, droits en 3 fois", async ({ page }) => {
+  test("inscrire un étudiant IF en 1re année", async ({ page }) => {
     await page.goto("/app/etudiants/nouveau");
     await expect(page.getByRole("heading", { level: 1, name: "Nouvel étudiant" })).toBeVisible();
 
@@ -27,11 +27,10 @@ test.describe("Étudiants — secrétariat", () => {
     await page.getByLabel("Adresse").fill("Lot 12, Tanambao V, Toamasina");
 
     await page.getByRole("radio", { name: /Infirmier/ }).click();
-    await page.getByRole("radio", { name: "En 3 fois" }).click();
 
     // Le récapitulatif annonce le matricule indicatif et l'échéancier avant l'enregistrement.
     await expect(page.getByRole("complementary", { name: "Récapitulatif" })).toContainText(/IF-2026-\d{4}/);
-    await expect(page.getByRole("complementary", { name: "Récapitulatif" })).toContainText("Droits 1/3");
+    await expect(page.getByRole("complementary", { name: "Récapitulatif" })).toContainText(/exigibles en octobre 2026/);
 
     await page.getByRole("button", { name: "Inscrire l'étudiant" }).click();
 
@@ -42,8 +41,8 @@ test.describe("Étudiants — secrétariat", () => {
     await expect(page.getByText(/Étudiant inscrit sous le matricule IF-2026-\d{4}/)).toBeVisible();
     await expect(page.getByRole("link", { name: "Encaisser les droits d'inscription" })).toBeVisible();
 
-    // 3 tranches de droits + 10 mensualités.
-    await expect(page.getByRole("listitem").filter({ hasText: "Reste" })).toHaveCount(13);
+    // Une échéance de droits + 10 mensualités.
+    await expect(page.getByRole("listitem").filter({ hasText: "Reste" })).toHaveCount(11);
   });
 
   test("la recherche ignore les accents et se reflète dans l'URL", async ({ page }) => {
@@ -87,28 +86,6 @@ test.describe("Étudiants — secrétariat", () => {
     const tuteur = page.getByRole("definition").filter({ hasText: "RAKOTO Jean" });
     await expect(tuteur).toContainText("Commerçant");
     await expect(tuteur.getByRole("link", { name: "032 11 222 33" })).toBeVisible();
-  });
-
-  test("passer les droits de 3 fois à 1 fois, puis à 3 fois", async ({ page }) => {
-    await page.goto(urlFiche);
-    const grille = page.getByRole("listitem").filter({ hasText: "Reste" });
-    await expect(grille).toHaveCount(13);
-
-    async function choisir(n: 1 | 3) {
-      await page.getByRole("button", { name: /Modifier le paiement des droits/ }).click();
-      const dialogue = page.getByRole("dialog", { name: /Droits d'inscription/ });
-      await dialogue.getByRole("radio", { name: `En ${n} fois` }).click();
-      await dialogue.getByRole("button", { name: `Payer les droits en ${n} fois` }).click();
-      await expect(dialogue).toBeHidden();
-    }
-
-    await choisir(1);
-    await expect(grille).toHaveCount(11);
-    await expect(page.getByText("Droits payés en une fois")).toBeVisible();
-
-    await choisir(3);
-    await expect(grille).toHaveCount(13);
-    await expect(page.getByText("Droits payés en 3 fois")).toBeVisible();
   });
 });
 

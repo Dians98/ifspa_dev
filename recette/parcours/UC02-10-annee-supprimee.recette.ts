@@ -36,7 +36,7 @@ test("UC02-10 : une année sans étudiant se supprime avec ses tarifs", async ({
     await expect(confirmation).toContainText("Aucun étudiant n'y est inscrit. Ses tarifs seront supprimés avec elle, définitivement.");
     await capture(page, DOSSIER, "UC02-10-02-confirmer-suppression");
     await confirmation.getByRole("button", { name: "Supprimer l'année" }).click();
-    await expect(page.getByText("Année 2029-2030 supprimée, avec ses tarifs.")).toBeVisible();
+    await expect(page.getByText("Année 2029-2030 supprimée, avec ses tarifs et ses frais.")).toBeVisible();
     await expect(ligneParametre(page, /^2029-2030/)).toHaveCount(0);
   });
 
@@ -53,7 +53,7 @@ test("UC02-10 : une année sans étudiant se supprime avec ses tarifs", async ({
     await ouvrirAnnees(page);
     await page.getByRole("button", { name: "Supprimer l'année 2029-2030" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Supprimer l'année" }).click();
-    await expect(page.getByText("Année 2029-2030 supprimée, avec ses tarifs.")).toBeVisible();
+    await expect(page.getByText("Année 2029-2030 supprimée, avec ses tarifs et ses frais.")).toBeVisible();
     await capture(page, DOSSIER, "UC02-10-04-liste-finale");
   });
 });

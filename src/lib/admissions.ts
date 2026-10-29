@@ -5,7 +5,7 @@ import {
   type StatutInscription,
 } from "@/generated/prisma/enums";
 import { dateDuJour, formaterJour, type Jour } from "@/lib/dates";
-import { controleTranches, genererEcheances, type EcheanceGeneree, type TarifEcheances } from "@/lib/ecolage";
+import { controleDroits, genererEcheances, type EcheanceGeneree, type TarifEcheances } from "@/lib/ecolage";
 import { DUREE_MAX, libelleAnnee, libelleNiveau } from "@/lib/parametres";
 
 // Passage en année supérieure, par classe (filière × niveau). Pur : ni base, ni horloge (jour injecté).
@@ -194,7 +194,6 @@ export type InscriptionClasse = {
   etudiantId: string;
   nom: string;
   prenoms: string;
-  droitsEnTranches: number;
   statutInscription: StatutInscription;
   statutEtudiant: StatutEtudiant;
   dateSortie: Date | null;
@@ -211,6 +210,8 @@ export type ContextePassage = {
   inscriptions: readonly InscriptionClasse[];
   decisions: readonly { inscriptionId: string; decision: DecisionAdmission }[];
   tarifs: { niveauSuivant: TarifEcheances | null; memeNiveau: TarifEcheances | null };
+  /** Frais déjà prévus sur l'année cible pour chaque classe d'arrivée, copiés sur les inscriptions créées. */
+  frais: { niveauSuivant: readonly EcheanceGeneree[]; memeNiveau: readonly EcheanceGeneree[] };
 };
 
 export type ComptesDecisions = { admis: number; redoublants: number; diplomes: number; abandons: number };
@@ -220,7 +221,6 @@ export type InscriptionACreer = {
   inscriptionSourceId: string;
   niveau: number;
   redoublement: boolean;
-  droitsEnTranches: number;
   echeances: EcheanceGeneree[];
 };
 
@@ -327,16 +327,11 @@ export function planifierPassage(c: ContextePassage): ResultatPassage {
 
   const tarifDe = (decision: DecisionAdmission) =>
     decision === "ADMIS" ? c.tarifs.niveauSuivant! : c.tarifs.memeNiveau!;
-  const tranchesImpossibles = suivies.filter(
-    (s) => creeInscription(s.decision) && controleTranches(tarifDe(s.decision).droitsInscription, s.inscription.droitsEnTranches),
-  );
-  if (tranchesImpossibles.length) {
-    const premier = tranchesImpossibles[0];
-    const raison = controleTranches(tarifDe(premier.decision).droitsInscription, premier.inscription.droitsEnTranches);
-    return {
-      ok: false,
-      erreur: `${listerNoms(tranchesImpossibles.map((s) => nomComplet(s.inscription)))} : ${raison} Modifiez d'abord le paiement des droits sur sa fiche, ou le tarif.`,
-    };
+  const fraisDe = (decision: DecisionAdmission) => (decision === "ADMIS" ? c.frais.niveauSuivant : c.frais.memeNiveau);
+  const decisionsCreatrices = [...new Set(suivies.filter((s) => creeInscription(s.decision)).map((s) => s.decision))];
+  for (const d of decisionsCreatrices) {
+    const raison = controleDroits(tarifDe(d).droitsInscription);
+    if (raison) return { ok: false, erreur: raison };
   }
 
   const dateSortie = dateDuJour(c.jour);
@@ -362,8 +357,7 @@ export function planifierPassage(c: ContextePassage): ResultatPassage {
         inscriptionSourceId: i.inscriptionId,
         niveau: redouble ? niveau : niveau + 1,
         redoublement: redouble,
-        droitsEnTranches: i.droitsEnTranches,
-        echeances: genererEcheances(tarifDe(s.decision), cible, i.droitsEnTranches),
+        echeances: [...genererEcheances(tarifDe(s.decision), cible), ...fraisDe(s.decision)],
       });
     }
     const statut = statutEtudiantApres(s.decision);

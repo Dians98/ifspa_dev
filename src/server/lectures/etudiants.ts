@@ -5,20 +5,18 @@ import { StatutEtudiant, type ModePaiement, type OperateurMobile, type Sexe, typ
 import { db } from "@/lib/db";
 import { dateHeureMadagascar, formaterJour, jourDeDate, jourMadagascar, type Jour } from "@/lib/dates";
 import {
-  controleTranches,
   dateLimiteRetard,
   LIBELLE_STATUT_ECHEANCE,
+  libelleMois,
+  moisDroits,
   situation,
   suivreEcheance,
-  TRANCHES_POSSIBLES,
-  tranchesDroits,
-  type NombreTranches,
+  trierChronologique,
   type StatutEcheance,
   type TotauxEcolage,
 } from "@/lib/ecolage";
 import { LIBELLE_MODE, LIBELLE_OPERATEUR } from "@/lib/encaissement";
 import {
-  controleTranchesModifiables,
   formaterTelephone,
   LIBELLE_SEXE,
   libelleNiveauInscription,
@@ -171,10 +169,11 @@ export async function lireEtudiants(
 
 export type EcheanceFiche = {
   id: string;
-  /** « Droits — tranche 2/3 », « Octobre 2026 » */
+  /** « Droits d'inscription », « Octobre 2026 », ou le libellé courant du frais. */
   libelle: string;
   type: TypeEcheance;
-  tranche: number | null;
+  /** Frais d'origine d'une échéance FRAIS. */
+  fraisId: string | null;
   /** 1er du mois d'exigibilité, « 2026-10-01 » */
   mois: Jour;
   montantDu: number;
@@ -201,12 +200,8 @@ export type InscriptionFiche = {
   redoublement: boolean;
   statut: StatutInscription;
   libelleStatut: string;
-  droitsEnTranches: number;
-  tranchesModifiables: boolean;
-  /** Raison affichable quand les tranches ne sont plus modifiables. */
-  refusTranches: string | null;
   totaux: TotauxEcolage;
-  /** Dans l'ordre de solde : pour chaque mois, la tranche de droits puis la mensualité. */
+  /** Ordre de lecture : droits, puis mois par mois, la mensualité avant les frais du mois. */
   echeances: EcheanceFiche[];
 };
 
@@ -385,7 +380,6 @@ export async function lireDossierEtudiant(id: string, jour: Jour): Promise<Dossi
           id: true,
           niveau: true,
           redoublement: true,
-          droitsEnTranches: true,
           statut: true,
           anneeScolaire: { select: { id: true, libelle: true, anneeDebut: true, cloturee: true } },
         },
@@ -395,25 +389,11 @@ export async function lireDossierEtudiant(id: string, jour: Jour): Promise<Dossi
   });
   if (!e) return null;
 
-  const [echeances, lignesDroits] = await Promise.all([
-    echeancesEtudiant(db, id, { avecNonDues: true }),
-    // Lignes annulées comprises : elles bloquent aussi le redécoupage des droits.
-    db.$queryRaw<{ inscriptionId: string; n: number }[]>`
-      SELECT ec."inscriptionId", COUNT(*)::int AS n
-      FROM paiement_ligne pl JOIN echeance ec ON ec.id = pl."echeanceId" JOIN inscription i ON i.id = ec."inscriptionId"
-      WHERE i."etudiantId" = ${id} AND ec.type = 'DROITS'
-      GROUP BY ec."inscriptionId"`,
-  ]);
-  const lignesParInscription = new Map(lignesDroits.map((l) => [l.inscriptionId, l.n]));
+  const echeances = trierChronologique(await echeancesEtudiant(db, id, jour, { avecNonDues: true }));
   const sit = situation(echeances, jour);
   const parAnnee = sit.parAnnee;
 
   const parcours = e.inscriptions.map((i): InscriptionFiche => {
-    const refusTranches = controleTranchesModifiables({
-      lignesPaiementDroits: lignesParInscription.get(i.id) ?? 0,
-      anneeLibelle: i.anneeScolaire.libelle,
-      anneeCloturee: i.anneeScolaire.cloturee,
-    });
     const totauxAnnee = parAnnee.find((a) => a.anneeDebut === i.anneeScolaire.anneeDebut);
     return {
       id: i.id,
@@ -426,9 +406,6 @@ export async function lireDossierEtudiant(id: string, jour: Jour): Promise<Dossi
       redoublement: i.redoublement,
       statut: i.statut,
       libelleStatut: libelleStatutInscription(i.statut, e.sexe),
-      droitsEnTranches: i.droitsEnTranches,
-      tranchesModifiables: refusTranches === null,
-      refusTranches,
       totaux: totauxSeuls(totauxAnnee),
       echeances: echeances
         .filter((x) => x.inscriptionId === i.id)
@@ -438,8 +415,7 @@ export async function lireDossierEtudiant(id: string, jour: Jour): Promise<Dossi
             id: x.id,
             libelle: x.libelle,
             type: x.type,
-            // Droits en une fois : pas de numéro de tranche à afficher.
-            tranche: i.droitsEnTranches > 1 ? x.tranche : null,
+            fraisId: x.fraisId,
             mois: jourDeDate(x.mois),
             montantDu: x.montantDu,
             paye: x.paye,
@@ -494,6 +470,7 @@ export async function lireDossierEtudiant(id: string, jour: Jour): Promise<Dossi
       e.statut === "ACTIF"
         ? echeances.map((x) => ({
             id: x.id,
+            type: x.type,
             mois: jourDeDate(x.mois),
             montantDu: x.montantDu,
             paye: x.paye,
@@ -513,18 +490,24 @@ export async function lireFicheEtudiant(
   return lireDossierEtudiant(id, jour);
 }
 
-export type OptionTranches = {
-  n: NombreTranches;
-  /** Montant de chaque tranche, la 1re portant l'arrondi ; null si le découpage est impossible. */
-  montants: number[] | null;
-  refus: string | null;
+/** Frais déjà prévus pour une classe : l'inscription les reçoit automatiquement. */
+export type FraisPrevu = {
+  id: string;
+  libelle: string;
+  montant: number;
+  /** « 2027-03-01 » */
+  mois: Jour;
+  /** « mars 2027 » */
+  libelleMois: string;
 };
 
 export type NiveauInscription = {
   niveau: number;
   libelle: string;
   /** null : tarif manquant, l'inscription dans cette classe est bloquée. */
-  tarif: { droitsInscription: number; montantMensuel: number; nombreMois: number; total: number; tranches: OptionTranches[] } | null;
+  tarif: { droitsInscription: number; montantMensuel: number; nombreMois: number; total: number } | null;
+  /** Par ordre de création ; non compris dans `tarif.total`. */
+  frais: FraisPrevu[];
 };
 
 export type ContexteInscription = {
@@ -538,8 +521,8 @@ export type ContexteInscription = {
     moisDebutEcolage: number;
     /** « octobre » */
     libelleMoisDebut: string;
-    /** Mois d'exigibilité des tranches 1, 2 et 3 des droits : « octobre », « novembre », « décembre ». */
-    moisTranches: string[];
+    /** 1er mois de l'année, où les droits deviennent exigibles (en retard le 1er du mois suivant) : « octobre 2026 ». */
+    moisDroits: string;
   } | null;
   /** Inscription impossible (pas d'année courante, année clôturée) : message à afficher à la place du formulaire. */
   refus: string | null;
@@ -567,7 +550,7 @@ export async function contexteInscription(): Promise<ContexteInscription> {
       filieres: [],
     };
   }
-  const [filieres, tarifs, compteurs] = await Promise.all([
+  const [filieres, tarifs, compteurs, frais] = await Promise.all([
     db.filiere.findMany({
       where: { actif: true },
       orderBy: { code: "asc" },
@@ -578,10 +561,13 @@ export async function contexteInscription(): Promise<ContexteInscription> {
       select: { filiereId: true, niveau: true, droitsInscription: true, montantMensuel: true, nombreMois: true },
     }),
     db.compteur.findMany({ where: { cle: { startsWith: "MATRICULE:" } } }),
+    db.frais.findMany({
+      where: { anneeScolaireId: annee.id },
+      orderBy: { rang: "asc" },
+      select: { id: true, libelle: true, montant: true, mois: true, classes: { select: { filiereId: true, niveau: true } } },
+    }),
   ]);
   const valeurs = new Map(compteurs.map((c) => [c.cle, c.valeur]));
-  // Même calendrier que `genererEcheances` : tranche k au k-ième mois à partir du début de l'écolage.
-  const nomMoisDecale = (k: number) => NOMS_MOIS[(annee.moisDebutEcolage - 1 + k) % 12];
 
   return {
     annee: {
@@ -590,8 +576,8 @@ export async function contexteInscription(): Promise<ContexteInscription> {
       anneeDebut: annee.anneeDebut,
       periode: periodeAnnee(annee.anneeDebut, annee.moisDebutEcolage),
       moisDebutEcolage: annee.moisDebutEcolage,
-      libelleMoisDebut: nomMoisDecale(0),
-      moisTranches: TRANCHES_POSSIBLES.map((_, k) => nomMoisDecale(k)),
+      libelleMoisDebut: NOMS_MOIS[annee.moisDebutEcolage - 1],
+      moisDroits: libelleMois(moisDroits(annee)).toLowerCase(),
     },
     refus: annee.cloturee
       ? `L'année ${annee.libelle} est clôturée : aucune inscription n'est possible. Demandez à l'administrateur de définir l'année courante.`
@@ -611,12 +597,17 @@ export async function contexteInscription(): Promise<ContexteInscription> {
                 montantMensuel: t.montantMensuel,
                 nombreMois: t.nombreMois,
                 total: totalAnnuel(t),
-                tranches: TRANCHES_POSSIBLES.map((n) => {
-                  const refus = controleTranches(t.droitsInscription, n);
-                  return { n, montants: refus ? null : tranchesDroits(t.droitsInscription, n), refus };
-                }),
               }
             : null,
+          frais: frais
+            .filter((x) => x.classes.some((c) => c.filiereId === f.id && c.niveau === niveau))
+            .map((x) => ({
+              id: x.id,
+              libelle: x.libelle,
+              montant: x.montant,
+              mois: jourDeDate(x.mois),
+              libelleMois: libelleMois(x.mois).toLowerCase(),
+            })),
         };
       }),
     })),

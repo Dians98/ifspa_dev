@@ -97,21 +97,12 @@ export function RepriseDonnees({ anneeCourante }: { anneeCourante: string | null
       {statut}
       <PanneauParametre
         titre="Télécharger le modèle"
-        description={
-          anneeCourante
-            ? `Une ligne par étudiant inscrit en ${anneeCourante}, une ligne par paiement déjà reçu.`
-            : "Il faut une année courante pour préparer le modèle."
-        }
+        description={anneeCourante ? undefined : "Il faut une année courante pour préparer le modèle."}
       >
         <div className="space-y-4 px-4 py-4 text-sm sm:px-5">
           <ul className="list-disc space-y-1.5 pl-5 text-muted-foreground">
-            <li>
-              Remplissez la feuille « Étudiants » (un étudiant par ligne) et la feuille « Paiements » (un paiement par
-              ligne).
-            </li>
-            <li>
-              Saisissez le téléphone et le n° de reçu papier comme du texte : Excel retire sinon le 0 du début.
-            </li>
+            <li>Remplissez la feuille « Étudiants » : un étudiant par ligne.</li>
+            <li>Saisissez les téléphones et le CIN comme du texte : Excel retire sinon le 0 du début.</li>
             <li>
               Un étudiant entré une année précédente demande que cette année existe : créez-la d&apos;abord dans{" "}
               <Link href="/app/parametres/annees" className={lienTexte}>
@@ -138,14 +129,6 @@ export function RepriseDonnees({ anneeCourante }: { anneeCourante: string | null
                 >
                   CSV Étudiants
                 </a>
-                <span aria-hidden>·</span>
-                <a
-                  href="/api/import/modele?format=paiements.csv"
-                  download
-                  className={`${lienTexte} inline-flex min-h-6 items-center max-md:min-h-11`}
-                >
-                  CSV Paiements
-                </a>
               </p>
             </div>
           ) : (
@@ -171,12 +154,11 @@ export function RepriseDonnees({ anneeCourante }: { anneeCourante: string | null
 
       <PanneauParametre
         titre="Déposer le fichier rempli"
-        description="Le fichier est lu et contrôlé, mais rien n'est enregistré avant votre confirmation."
       >
         <div className="space-y-4 px-4 py-4 sm:px-5">
           <ZoneDepot fichiers={fichiers} onChange={(f) => { setFichiers(f); setErreurServeur(null); }} descriptionId={`${aideId} ${erreurId}`} disabled={enCours} />
           <p id={aideId} className="text-sm text-muted-foreground">
-            Un fichier .xlsx, ou les deux CSV (Étudiants et Paiements). 1 Mo au plus.
+            Un fichier .xlsx, ou le CSV Étudiants. 1 Mo au plus.
           </p>
           <p id={erreurId} role="alert" className={erreur ? "flex items-start gap-2 text-sm text-destructive" : "sr-only"}>
             {erreur && <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />}

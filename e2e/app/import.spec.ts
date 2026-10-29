@@ -39,7 +39,6 @@ test.describe("Reprise des données — administrateur", () => {
     ]);
     expect(telechargement.suggestedFilename()).toMatch(/^modele-import-ifspa-.*\.xlsx$/);
     await expect(page.getByRole("link", { name: "CSV Étudiants" })).toHaveAttribute("href", "/api/import/modele?format=etudiants.csv");
-    await expect(page.getByRole("link", { name: "CSV Paiements" })).toHaveAttribute("href", "/api/import/modele?format=paiements.csv");
   });
 
   test("un fichier d'un autre format est refusé avant l'envoi", async ({ page }) => {
@@ -73,17 +72,19 @@ test.describe("Reprise des données — administrateur", () => {
   });
 
   test("un fichier correct propose l'import, avec une seule confirmation", async ({ page }) => {
+    // Un ancien CSV Paiements déposé avec les étudiants est ignoré, avec un avertissement.
     await deposer(page, [fichier("etudiants-valide.csv"), fichier("paiements-vide.csv")]);
     await page.getByRole("button", { name: "Analyser les fichiers" }).click();
 
-    await expect(page.getByText("Prêt à importer 1 nouvel étudiant et 0 paiement.")).toBeFocused();
-    await page.getByRole("button", { name: "Importer 1 étudiant et 0 paiement" }).click();
+    await expect(page.getByText("Prêt à importer 1 nouvel étudiant.")).toBeFocused();
+    await expect(page.getByText(/n'est plus importée, elle est ignorée/)).toBeVisible();
+    await page.getByRole("button", { name: "Importer 1 étudiant" }).click();
 
     const dialogue = page.getByRole("alertdialog");
     await expect(dialogue).toContainText("Un import ne s'annule pas.");
-    await expect(dialogue).toContainText("hors des heures de guichet");
+    await expect(dialogue).toContainText("avec tout l'écolage de l'année dû");
     await dialogue.getByRole("button", { name: "Annuler" }).click();
     await expect(dialogue).toBeHidden();
-    await expect(page.getByRole("button", { name: "Importer 1 étudiant et 0 paiement" })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Importer 1 étudiant" })).toBeEnabled();
   });
 });

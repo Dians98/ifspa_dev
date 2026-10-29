@@ -41,7 +41,7 @@ test.describe("Préparation — administrateur : l'année 2025-2026 et ses tarif
       }
       await capture(page, DOSSIER, "P-03-tarifs-2025-saisis");
       await page.getByRole("button", { name: "Enregistrer" }).click();
-      await expect(page.getByText("Modifiez directement les montants dans le tableau.")).toBeVisible();
+      await expect(page.getByText("Tarifs 2025-2026 enregistrés.")).toBeVisible();
       await page.reload();
       await expect(page.getByLabel("Mensualité, IF 1re année")).toHaveValue(/80\s000/);
       await capture(page, DOSSIER, "P-04-tarifs-2025-enregistres");

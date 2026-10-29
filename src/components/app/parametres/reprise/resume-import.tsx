@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 import { CircleCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TableRow } from "@/components/ui/table";
-import { formaterAriary } from "@/lib/montant";
 import type { ResumeImport } from "@/server/actions/import";
 import { BadgeEtat } from "../badge-etat";
 import { PanneauParametre } from "../panneau-parametre";
@@ -38,7 +37,7 @@ export function ResumeReprise({
   return (
     <PanneauParametre
       titre="Import terminé"
-      description="Les étudiants et les paiements sont enregistrés. Les reçus sont datés du jour indiqué dans le fichier, à 12:00."
+      description="Les étudiants sont enregistrés et inscrits sur l'année courante, avec toutes leurs échéances de l'année."
       action={
         <div className="flex flex-wrap gap-2">
           <Button asChild className="max-md:h-11">
@@ -64,26 +63,6 @@ export function ResumeReprise({
             {pluriel(resume.etudiantsCrees, "créé", "créés")}
             {resume.etudiants.length > resume.etudiantsCrees &&
               `, ${resume.etudiants.length - resume.etudiantsCrees} déjà en base`}
-          </dd>
-        </div>
-        <div>
-          <dt className="font-heading text-base font-semibold text-primary">Paiements</dt>
-          <dd className="mt-1">
-            {resume.paiements === 0 ? (
-              "Aucun paiement importé."
-            ) : (
-              <>
-                {pluriel(resume.paiements, "enregistré", "enregistrés")} pour{" "}
-                <span className="tabular-nums">{formaterAriary(resume.montant)}</span>, reçus{" "}
-                <span className="tabular-nums">{resume.premierRecu}</span>
-                {resume.dernierRecu !== resume.premierRecu && (
-                  <>
-                    {" "}à <span className="tabular-nums">{resume.dernierRecu}</span>
-                  </>
-                )}
-                .
-              </>
-            )}
           </dd>
         </div>
       </dl>
