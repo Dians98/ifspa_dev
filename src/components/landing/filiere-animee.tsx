@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Une filière : la photo reste fixe ; les coches de la liste se tracent une à une.
+ * La liste elle-même déclenche l'animation : sur mobile, elle arrive bien après la photo.
  * L'état de départ n'est posé qu'au client, sous la ligne de flottaison.
  */
 export function FiliereAnimee({
@@ -25,10 +26,10 @@ export function FiliereAnimee({
   points: string[];
   children: ReactNode;
 }) {
-  const ref = useRef<HTMLElement>(null);
+  const ref = useRef<HTMLUListElement>(null);
 
   const construire = useCallback(
-    (el: HTMLElement) => {
+    (el: HTMLUListElement) => {
       const lignes = Array.from(el.querySelectorAll<HTMLElement>("[data-point]"));
       const traits = lignes.map((l) => Array.from(l.querySelectorAll<SVGGeometryElement>("circle, path")));
       const textes = lignes.map((l) => l.querySelector<HTMLElement>("[data-texte]")!);
@@ -46,7 +47,7 @@ export function FiliereAnimee({
         },
         montrer: () => {
           lignes.forEach((_, i) => {
-            const debut = 0.2 + i * 0.12;
+            const debut = 0.15 + i * 0.18;
             const [cercle, coche] = traits[i];
             animate(cercle, { strokeDashoffset: [1, 0] }, { duration: 0.45, ease: "easeOut", delay: debut });
             if (coche) animate(coche, { strokeDashoffset: [1, 0] }, { duration: 0.3, ease: "easeOut", delay: debut + 0.25 });
@@ -62,14 +63,14 @@ export function FiliereAnimee({
   useRevelation(ref, construire);
 
   return (
-    <article ref={ref} className="grid items-center gap-8 md:grid-cols-2 lg:gap-16">
+    <article className="grid items-center gap-8 md:grid-cols-2 lg:gap-16">
       <div className={cn("relative aspect-[4/3] overflow-hidden rounded-2xl", photoADroite && "md:order-2")}>
         {photo}
         {mention}
       </div>
       <div>
         {children}
-        <ul className="mt-6 space-y-3">
+        <ul ref={ref} className="mt-6 space-y-3">
           {points.map((p) => (
             <li key={p} data-point className="flex items-start gap-3">
               <CircleCheck

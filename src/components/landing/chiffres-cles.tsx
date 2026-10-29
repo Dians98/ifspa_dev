@@ -45,7 +45,7 @@ function chiffres(): Chiffre[] {
   ];
 }
 
-function Nombre({ c }: { c: Chiffre }) {
+function Nombre({ c, delai }: { c: Chiffre; delai: number }) {
   const classe = "font-heading text-5xl leading-none font-semibold text-primary xl:text-6xl";
   if (c.valeur === null) {
     return (
@@ -59,7 +59,7 @@ function Nombre({ c }: { c: Chiffre }) {
     <p className={classe}>
       <span aria-hidden>
         {c.plus && <span className="mr-1 align-[0.32em] text-[0.55em] text-rose">+</span>}
-        <CompteurAnime valeur={c.valeur} formater={c.format} />
+        <CompteurAnime valeur={c.valeur} formater={c.format} delai={delai} />
       </span>
       <span className="sr-only">
         {c.plus ? "Plus de " : ""}
@@ -91,7 +91,7 @@ export function ChiffresCles() {
               >
                 {/* Repère en filigrane, dans la carte : le chiffre garde la vedette. */}
                 <Icone className="absolute right-6 bottom-6 size-14 text-bleu/15" strokeWidth={1.25} aria-hidden />
-                <Nombre c={c} />
+                <Nombre c={c} delai={i * 0.1 + 0.2} />
                 <p className="mt-4 pr-16 text-base font-semibold text-foreground">{c.libelle}</p>
                 {c.precision && <p className="mt-1 pr-16 text-sm text-muted-foreground">{c.precision}</p>}
               </Reveal>
