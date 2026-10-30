@@ -6,10 +6,18 @@ export const ETABLISSEMENT = {
   nom: "Institut de Formation Supérieur des Paramédicaux Atsinanana",
   sigle: "IFSPA",
   ville: "Toamasina",
+  /** Ancien nom de la ville, encore très employé dans les recherches. */
+  villeAutreNom: "Tamatave",
   region: "Atsinanana",
+  pays: "Madagascar",
   domaine: "Science de la Santé",
   anneeFondation: 2008,
 } as const;
+
+/** « Toamasina (Tamatave) » pour la ville officielle ; une autre ville saisie en base reste telle quelle. */
+export function villeAvecAutreNom(ville: string) {
+  return ville === ETABLISSEMENT.ville ? `${ville} (${ETABLISSEMENT.villeAutreNom})` : ville;
+}
 
 export const DEVISE: string | null = "Foi – Civisme – Performance";
 

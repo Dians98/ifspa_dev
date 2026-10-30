@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { COORDONNEES, DEVISE, ETABLISSEMENT } from "@/lib/etablissement";
+import { COORDONNEES, DEVISE, ETABLISSEMENT, villeAvecAutreNom } from "@/lib/etablissement";
 import logo from "../../../public/brand/logo-ifspa.png";
 
 type Coordonnees = {
@@ -72,7 +72,10 @@ export function PiedDePage({ coord }: { coord: Coordonnees }) {
 
         <Colonne titre="Contact">
           <address className="space-y-3 not-italic text-muted-foreground">
-            <p>{coord.adresse ? `${coord.adresse}, ${coord.ville}` : `${coord.ville}, Madagascar`}</p>
+            <p>
+              {coord.adresse && `${coord.adresse}, `}
+              {villeAvecAutreNom(coord.ville)}, {ETABLISSEMENT.pays}
+            </p>
             {coord.telephone && <p>{coord.telephone}</p>}
             {coord.email && <p className="[overflow-wrap:anywhere]">{coord.email}</p>}
             <p className="[overflow-wrap:anywhere]">{COORDONNEES.emailAdmin}</p>

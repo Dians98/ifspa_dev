@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { COORDONNEES, ETABLISSEMENT } from "@/lib/etablissement-constantes";
 
-export { ARRETES, CHIFFRES_CLES, COORDONNEES, DEVISE, ETABLISSEMENT, ETUDES, MENTION_AGREMENT_TICKET } from "@/lib/etablissement-constantes";
+export { ARRETES, CHIFFRES_CLES, COORDONNEES, DEVISE, ETABLISSEMENT, ETUDES, MENTION_AGREMENT_TICKET, villeAvecAutreNom } from "@/lib/etablissement-constantes";
 
 /** Coordonnées publiques : celles saisies en base l'emportent sur les coordonnées officielles du code. */
 export async function getCoordonnees() {

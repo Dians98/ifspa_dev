@@ -11,7 +11,7 @@ import { FiliereAnimee } from "@/components/landing/filiere-animee";
 import { FriseAgrements } from "@/components/landing/frise-agrements";
 import { IconeFacebook } from "@/components/landing/icone-facebook";
 import { PiedDePage } from "@/components/landing/pied-de-page";
-import { ARRETES, COORDONNEES, DEVISE, ETABLISSEMENT, ETUDES, getCoordonnees } from "@/lib/etablissement";
+import { ARRETES, COORDONNEES, DEVISE, ETABLISSEMENT, ETUDES, getCoordonnees, villeAvecAutreNom } from "@/lib/etablissement";
 import { DESCRIPTION_SITE, TITRE_SITE, URL_SITE } from "@/lib/site";
 import logo from "../../public/brand/logo-ifspa.png";
 import photoHero from "../../public/images/illustration/hero-etudiants-1920.webp";
@@ -51,7 +51,7 @@ const PHOTOS_GALERIE: PhotoGalerie[] = (
   ] satisfies PhotoGalerie[]
 ).map((p) => ({ ...p, illustration: true }));
 
-const PRESENTATION = `L'${ETABLISSEMENT.nom} est un établissement supérieur privé fondé en ${ETABLISSEMENT.anneeFondation} et autorisé depuis 2011, qui forme en ${ETUDES.dureeAnnees} ans des infirmier(e)s et des sages-femmes.`;
+const PRESENTATION = `L'${ETABLISSEMENT.nom} est un établissement d'enseignement supérieur privé fondé en ${ETABLISSEMENT.anneeFondation} et autorisé depuis 2011, qui forme en ${ETUDES.dureeAnnees} ans des infirmier(e)s et des sages-femmes.`;
 
 /** Mention posée sur une photo de banque d'images. */
 function MentionIllustration({ className }: { className?: string }) {
@@ -94,6 +94,9 @@ export default async function Accueil() {
 
   // Données structurées : uniquement ce qui est affiché sur la page (les coordonnées non saisies sont omises).
   const institut = { "@id": `${URL_SITE}/#institut` };
+  // Numéro malgache local (« 034 … ») passé au format international attendu par schema.org.
+  const telephoneInternational = coord.telephone.trim().replace(/^0/, "+261 ");
+  const villeOfficielle = coord.ville === ETABLISSEMENT.ville;
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
@@ -102,7 +105,7 @@ export default async function Accueil() {
         "@id": `${URL_SITE}/#site`,
         url: `${URL_SITE}/`,
         name: ETABLISSEMENT.sigle,
-        alternateName: ETABLISSEMENT.nom,
+        alternateName: [ETABLISSEMENT.nom, COORDONNEES.facebook],
         inLanguage: "fr",
         publisher: institut,
       },
@@ -110,7 +113,7 @@ export default async function Accueil() {
         "@type": "CollegeOrUniversity",
         ...institut,
         name: ETABLISSEMENT.nom,
-        alternateName: ETABLISSEMENT.sigle,
+        alternateName: [ETABLISSEMENT.sigle, COORDONNEES.facebook],
         description: PRESENTATION,
         foundingDate: String(ETABLISSEMENT.anneeFondation),
         ...(DEVISE && { slogan: DEVISE }),
@@ -123,8 +126,20 @@ export default async function Accueil() {
           addressRegion: ETABLISSEMENT.region,
           addressCountry: "MG",
         },
-        ...(coord.telephone && { telephone: coord.telephone }),
+        // Ville desservie avec son ancien nom, rattachée à sa région et au pays.
+        areaServed: {
+          "@type": "City",
+          name: coord.ville,
+          ...(villeOfficielle && { alternateName: ETABLISSEMENT.villeAutreNom }),
+          containedInPlace: {
+            "@type": "AdministrativeArea",
+            name: `Région ${ETABLISSEMENT.region}`,
+            containedInPlace: { "@type": "Country", name: ETABLISSEMENT.pays },
+          },
+        },
+        ...(coord.telephone && { telephone: telephoneInternational }),
         ...(coord.email && { email: coord.email }),
+        sameAs: [COORDONNEES.facebookUrl],
       },
       ...FILIERES.map((f) => ({
         "@type": "EducationalOccupationalProgram",
@@ -224,7 +239,8 @@ export default async function Accueil() {
               </h2>
               <div className="mt-6 space-y-4 text-lg leading-relaxed text-muted-foreground">
                 <p>
-                  Fondé en {ETABLISSEMENT.anneeFondation} à Toamasina, l&apos;{ETABLISSEMENT.sigle} a pour mission de former des
+                  Fondé en {ETABLISSEMENT.anneeFondation} à {villeAvecAutreNom(ETABLISSEMENT.ville)}, à {ETABLISSEMENT.pays},
+                  l&apos;{ETABLISSEMENT.sigle} a pour mission de former des
                   infirmier(e)s et des sages-femmes compétents, dans le domaine «&nbsp;{ETABLISSEMENT.domaine}&nbsp;».
                 </p>
                 <p>
@@ -365,7 +381,16 @@ export default async function Accueil() {
             </h2>
             <dl className="mt-10 divide-y divide-white/15 border-y border-white/15">
               {[
-                { icon: MapPin, label: "Adresse", value: `${coord.adresse}, ${coord.ville}` },
+                {
+                  icon: MapPin,
+                  label: "Adresse",
+                  value: (
+                    <>
+                      {coord.adresse}, {villeAvecAutreNom(coord.ville)}, {ETABLISSEMENT.pays}
+                      <span className="mt-1 block text-base font-normal text-primary-foreground/70">{COORDONNEES.acces}</span>
+                    </>
+                  ),
+                },
                 {
                   icon: Phone,
                   label: "Téléphone",
